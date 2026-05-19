@@ -1417,25 +1417,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── 配布済みデータの同期 ────────────────────────────────
   await syncBundledQuestions();
 
-  // 認証状態は auth-module.js の onAuthStateChanged で一元管理する。
-  // ただし認証イベントが来ない環境では真っ白になるため、短時間後にログイン画面へフォールバックする。
-  const appEl = document.getElementById('app');
-  const overlayEl = document.getElementById('login-overlay');
-  appEl.classList.add('hidden');
-  overlayEl.classList.add('hidden');
-
-  setTimeout(() => {
-    const firebaseUser = (() => {
-      try {
-        return (window.firebase && firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser : null;
-      } catch {
-        return null;
-      }
-    })();
-    if (appEl.classList.contains('hidden') && overlayEl.classList.contains('hidden') && !firebaseUser) {
-      showLoginOverlay();
-    }
-  }, 1800);
+  // ── 認証の初期表示 ────────────────────────────────────────
+  // ログイン不能を避けるため、起動時は確実にログイン画面を表示する。
+  showLoginOverlay();
 
   // ログイン・登録は auth-module.js で処理
   // Firebase Authentication のイベントハンドラは auth-module.js で設定済み
