@@ -80,13 +80,13 @@
 
 2. **ローカルからプッシュ**  
    ```powershell
-   git remote add origin https://github.com/YOUR_USERNAME/chisatsu-exam-practice.git
+   git remote add origin https://github.com/D1424-da/chisatsu-exam-practice.git
    git branch -M main
    git push -u origin main
    ```
 
 3. **Pages 設定（Settings > Pages > main ブランチを選択）**  
-   数分で公開されます: https://YOUR_USERNAME.github.io/chisatsu-exam-practice
+   数分で公開されます: https://D1424-da.github.io/chisatsu-exam-practice
 
 詳細: [GITHUB_PAGES_SETUP.md](GITHUB_PAGES_SETUP.md)
 
@@ -116,8 +116,4 @@ MITライセンス
 
 ---
 
-## 例題提供元
 
-- 土地家屋調査士試験過去問: https://www.nishio-shinichi-office.com/
-
-powershell -ExecutionPolicy Bypass -File .\scraper.ps1 -Year h18
