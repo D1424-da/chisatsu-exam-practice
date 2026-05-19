@@ -1167,7 +1167,7 @@ function startSessionWithLimbId(limbId) {
     return;
   }
 
-  session = { queue: [target], index: 0 };
+  session = { queue: [target], index: 0, fromPage: 'stats' };
   startStudyTimerIfNeeded();
   showPage('study');
   document.getElementById('session-info').classList.remove('hidden');
@@ -1193,8 +1193,14 @@ function renderCurrentLimb() {
   document.getElementById('progress-bar').style.width = pct + '%';
 
   if (index >= queue.length) {
+    const fromPage = session.fromPage || 'study';
     endSession();
-    showCompletionMessage();
+    if (fromPage === 'stats') {
+      showPage('stats');
+      renderStats();
+    } else {
+      showCompletionMessage();
+    }
     return;
   }
 
