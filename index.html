@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>肢別問題集</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <!-- ログインオーバーレイ -->
@@ -15,8 +21,8 @@
       <!-- ログインフォーム -->
       <div id="login-form-area">
         <div class="form-group">
-          <label>ユーザー名</label>
-          <input type="text" id="login-username" class="login-input" autocomplete="username" />
+          <label>メールアドレス</label>
+          <input type="email" id="login-email" class="login-input" autocomplete="email" />
         </div>
         <div class="form-group">
           <label>パスワード</label>
@@ -24,18 +30,23 @@
         </div>
         <p id="login-error" class="login-error hidden"></p>
         <button id="btn-login" class="btn btn-primary login-submit">ログイン</button>
+        
+        <div class="divider">または</div>
+        
+        <div id="google-login-btn" style="text-align: center;"></div>
+        
         <button id="btn-show-register" class="btn btn-ghost login-submit">新規ユーザー作成</button>
-        <button id="btn-show-reset" class="btn-link login-link">パスワード・ユーザー名を忘れた方はこちら</button>
+        <button id="btn-show-reset" class="btn-link login-link">パスワードをお忘れですか？</button>
       </div>
 
       <!-- 登録フォーム -->
       <div id="register-form-area" class="hidden">
         <div class="form-group">
-          <label>ユーザー名</label>
-          <input type="text" id="reg-username" class="login-input" autocomplete="username" />
+          <label>メールアドレス</label>
+          <input type="email" id="reg-email" class="login-input" autocomplete="email" />
         </div>
         <div class="form-group">
-          <label>パスワード（4文字以上）</label>
+          <label>パスワード（6文字以上）</label>
           <input type="password" id="reg-password" class="login-input" autocomplete="new-password" />
         </div>
         <div class="form-group">
@@ -43,33 +54,20 @@
           <input type="password" id="reg-password2" class="login-input" autocomplete="new-password" />
         </div>
         <p id="reg-error" class="login-error hidden"></p>
-        <button id="btn-register" class="btn btn-primary login-submit">作成してログイン</button>
+        <button id="btn-register" class="btn btn-primary login-submit">新規ユーザー作成</button>
         <button id="btn-show-login" class="btn btn-ghost login-submit">← ログインに戻る</button>
       </div>
 
       <!-- パスワードリセットフォーム -->
       <div id="reset-form-area" class="hidden">
-        <p class="login-reset-note">登録済みのユーザー名一覧を確認したり、データファイルを使ってパスワードをリセットできます。</p>
-        <div id="reset-verify-area">
-          <p id="reset-verify-status" class="reset-verify-status"></p>
-          <button id="btn-reset-open-file" class="btn btn-ghost login-submit hidden">データファイルを開いて確認</button>
-        </div>
-        <div id="reset-fields" class="hidden">
-          <div class="form-group">
-            <label>あなたのユーザー名</label>
-            <input type="text" id="reset-username" class="login-input" autocomplete="username" placeholder="ユーザー名を入力" />
-          </div>
-          <div class="form-group">
-            <label>新しいパスワード（4文字以上）</label>
-            <input type="password" id="reset-pw" class="login-input" autocomplete="new-password" />
-          </div>
-          <div class="form-group">
-            <label>パスワード確認</label>
-            <input type="password" id="reset-pw2" class="login-input" autocomplete="new-password" />
-          </div>
+        <p class="login-reset-note">登録済みのメールアドレスにパスワードリセットメールを送信します。</p>
+        <div class="form-group">
+          <label>メールアドレス</label>
+          <input type="email" id="reset-email" class="login-input" autocomplete="email" placeholder="メールアドレスを入力" />
         </div>
         <p id="reset-error" class="login-error hidden"></p>
-        <button id="btn-do-reset" class="btn btn-primary login-submit hidden">パスワードをリセット</button>
+        <p id="reset-success" class="reset-success hidden">✓ パスワードリセットメールを送信しました。メールをご確認ください。</p>
+        <button id="btn-do-reset" class="btn btn-primary login-submit">リセットメールを送信</button>
         <button id="btn-show-login-from-reset" class="btn btn-ghost login-submit">← ログインに戻る</button>
       </div>
     </div>
@@ -345,6 +343,8 @@
     </div>
   </div>
 
+  <script src="firebase-config.js"></script>
+  <script src="auth-module.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

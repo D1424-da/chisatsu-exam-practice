@@ -10,7 +10,7 @@
                           "id":  "H26-1-l0",
                           "text":  "成年被後見人は、意思能力のある状態で日常生活に関する法律行為をした場合であっても、その法律行為を取り消すことができる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -38,12 +38,11 @@
                           "id":  "H26-1-l4",
                           "text":  "成年後見人は財産に関する法律行為一般について代理権を有し、保佐人及び補助人は家庭裁判所の審判により付与された特定の法律行為について代理権を有する。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "ウオ"
     },
     {
         "id":  "H26-2",
@@ -88,8 +87,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "アウ"
     },
     {
         "id":  "H26-3",
@@ -109,7 +107,7 @@
                           "id":  "H26-3-l1",
                           "text":  "Ｃは、Ａの死亡前に、故意にＢを殺害しようとしたが未遂に終わった場合には、これにより刑に処せられたときであっても、Ａの相続人となる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -130,12 +128,11 @@
                           "id":  "H26-3-l4",
                           "text":  "Ａの死亡前にＡとＢとが離婚し、ＢがＣの親権者と定められていた場合であっても、Ｃは、Ａの相続人となる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "2",
-        "needsReview":  false
+        "correctCombo":  "5"
     },
     {
         "id":  "H26-5",
@@ -148,7 +145,7 @@
                           "id":  "H26-5-l0",
                           "text":  "地図は、一筆又は二筆以上の土地ごとに作成し、各土地の区画を明確にし、地番を表示するものである。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -162,26 +159,25 @@
                           "id":  "H26-5-l2",
                           "text":  "主に田、畑が占める地域及びその周辺の地域の地図は、2,500分の１の縮尺で作成しなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-5-l3",
                           "text":  "地図には、基本三角点等の位置が記録される。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-5-l4",
                           "text":  "地図の閲覧を請求することができるのは、請求する土地の所有者や当該土地の抵当権者及び隣接土地所有者等の利害関係を有する者に限られる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "ウオ"
     },
     {
         "id":  "H26-6",
@@ -226,8 +222,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "アエ"
     },
     {
         "id":  "H26-7",
@@ -240,7 +235,7 @@
                           "id":  "H26-7-l0",
                           "text":  "表題登記のある建物について、当該建物を共用部分とする旨の規約を設定した場合には、当該建物の表題部所有者は、当該規約を設定した日から１か月以内に、共用部分である旨の登記を申請しなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -254,7 +249,7 @@
                           "id":  "H26-7-l2",
                           "text":  "表題登記がない土地の所有者であるＡが、当該土地の表題登記を申請することなくＢとの間で売買契約を締結し、Ｂが当該土地の所有権を取得した場合には、Ｂは、その所有権の取得の日から１か月以内に、当該土地の表題登記を申請しなければならない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -272,8 +267,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アオ",
-        "needsReview":  false
+        "correctCombo":  "ウオ"
     },
     {
         "id":  "H26-8",
@@ -286,28 +280,28 @@
                           "id":  "H26-8-l0",
                           "text":  "没問（法人Ａが表題部所有者である土地につき地目の変更の登記を申請する場合において、当該申請を受ける登記所が、法人Ａの代表者の氏名及び住所を含む法人Ａの登記を受けた登記所と同一である登記所に準ずるものとして法務大臣が指定した登記所であるときは、法人Ａの代表者の資格を証する情報を提供することを要しない。）",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-8-l1",
                           "text":  "Ａが所有権の登記名義人である土地につき合筆の登記を当該登記の申請代理人である土地家屋調査士Ｂによって申請する場合において、Ａの本人確認情報と併せて、土地家屋調査士Ｂが所属する土地家屋調査士会が発行した職印に関する証明書を提供するこきは、Ａの印鑑に関する証明書を提供することを要しない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-8-l2",
                           "text":  "Ａが所有権の登記名義人である土地につき合筆の登記を当該登記の申請代理人である土地家屋調査士Ｂによって申請する場合において、Ａが署名して公証人の認証を受けた委任状を提供するときは、当該委任状につきＡの印鑑に関する証明書を提供することを要しない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-8-l3",
                           "text":  "土地の表題部所有者であるＡについて相続が開始し、Ａの相続人がＢのみである場合において、Ｂが当該土地について表示に関する登記を申請するときは、Ａについて相続があったことを証する市町村長、登記官その他の公務員が職務上作成した情報を提供することを要しない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -318,8 +312,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "イエ"
     },
     {
         "id":  "H26-9",
@@ -332,7 +325,7 @@
                           "id":  "H26-9-l0",
                           "text":  "土地の表題部所有者又は所有権の登記名義人は、地積について錯誤があったことが判明した日から１か月以内に、地積の更正の登記を申請しなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -346,7 +339,7 @@
                           "id":  "H26-9-l2",
                           "text":  "土地の地積が減少することとなる地積の更正の登記を申請する場合には、当該土地に抵当権の設定の登記がされていても、その抵当権の登記名義人が承諾したことを証する情報を提供することを要しない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -364,8 +357,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アオ",
-        "needsReview":  false
+        "correctCombo":  "ウオ"
     },
     {
         "id":  "H26-10",
@@ -410,8 +402,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "アウ"
     },
     {
         "id":  "H26-11",
@@ -424,7 +415,7 @@
                           "id":  "H26-11-l0",
                           "text":  "建物がえい行移転したことにより所在が変更した場合において、当該建物の表題部の変更の登記を申請するときは、その申請情報の内容である登記原因及びその日付について、「年月日所在地番変更」と記録しなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -445,7 +436,7 @@
                           "id":  "H26-11-l3",
                           "text":  "甲附属建物がある建物について、甲附属建物を取り壊して乙附属建物を新築した場合に、乙附属建物について甲附属建物と同じ符号を付すことはできない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -456,8 +447,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "イエ"
     },
     {
         "id":  "H26-12",
@@ -470,7 +460,7 @@
                           "id":  "H26-12-l0",
                           "text":  "一棟の建物に属する区分建物の全部について表題登記の申請をする場合には、各別の申請情報によることはできない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -491,7 +481,7 @@
                           "id":  "H26-12-l3",
                           "text":  "敷地権付き区分建物の表題登記の申請をする場合において、その敷地権の目的である土地が当該区分建物の所在地を管轄する登記所以外の登記所の管轄区域内にあるときは、当該土地の不動産番号と併せて当該土地を管轄する登記所の表示を申請情報の内容とすれば、当該土地の不動産所在事項、地目及び地積を申請情報の内容とすることを要しない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -502,8 +492,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "イエ"
     },
     {
         "id":  "H26-13",
@@ -516,7 +505,7 @@
                           "id":  "H26-13-l0",
                           "text":  "建物の分割の登記を申請する場合において提供する建物図面及び各階平面図には、分割後の各建物を表示し、これに符号を付さなければならない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -530,7 +519,7 @@
                           "id":  "H26-13-l2",
                           "text":  "同一の登記所の管轄区域内にある２個の建物について建物図面の訂正の申出をする場合には、一の申出情報によって申出をすることができる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -548,8 +537,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "ウエ"
     },
     {
         "id":  "H26-14",
@@ -594,8 +582,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "",
-        "needsReview":  true
+        "correctCombo":  ""
     },
     {
         "id":  "H26-15",
@@ -608,28 +595,28 @@
                           "id":  "H26-15-l0",
                           "text":  "区分建物でない木造の建物の床面積は、壁の厚さ又は形状にかかわらず、柱の中心線で囲まれた部分の水平投影面積により定める。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-15-l1",
                           "text":  "区分建物が属する一棟の建物の床面積は、各階ごとに壁その他の区画の内側線で囲まれた部分の水平投影面積により定める。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-15-l2",
                           "text":  "区分建物において、エレベーター室、エレベーター巻上げ機械室及び階段室で構成される天井の高さが１．８メートルの塔屋は、一棟の建物の床面積に算入する。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-15-l3",
                           "text":  "観覧席の部分には固定式の屋根の設備を有し、競技場の部分には開閉式の屋根の設備を有するスポーツ施設は、観覧席部分の面積のほか、競技場部分の面積も、床面積に算入する。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -640,8 +627,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "イウ"
     },
     {
         "id":  "H26-16",
@@ -686,8 +672,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "",
-        "needsReview":  true
+        "correctCombo":  ""
     },
     {
         "id":  "H26-17",
@@ -700,21 +685,21 @@
                           "id":  "H26-17-l0",
                           "text":  "賃借権の登記がある甲建物と所有権の登記のみがある乙建物について合体による登記等を申請する場合において、甲建物に設定された賃借権が合体後の建物に存続するときは、その旨を申請情報の内容としなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-17-l1",
                           "text":  "所有権の登記がある建物と表題登記があるが所有権の登記がない建物について合体による登記等を申請する場合において、合体後の建物の価額が6,000万円であり、所有権の登記がない建物の所有者が合体後の建物について有することとなる持分の割合を１０分の３としたときは、登録免許税額は９万円である。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-17-l2",
                           "text":  "合体前の各建物の所有者が異なっており、合体前の各建物の所有者が合体後の建物について有することとなる持分の割合を定めなければならない場合において、合体前の各建物の所有者全員が申請人となり、その印鑑に関する証明書の提供があるときは、その合体による登記等の申請情報をもって、当該持分の割合を証する情報を兼ねることができる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -728,12 +713,11 @@
                           "id":  "H26-17-l4",
                           "text":  "合体前の建物の所有権の登記名義人の住所に変更があった場合でも、変更があったことを証する情報を添付情報として提供すれば当該所有権の登記名義人の住所の変更の登記をすることなく、合体による登記等を申請することができる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "ウオ"
     },
     {
         "id":  "H26-18",
@@ -746,7 +730,7 @@
                           "id":  "H26-18-l0",
                           "text":  "閉鎖された地図に準ずる図面については、請求人が利害関係を有する部分に限り、その写しの交付を請求することができる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -760,7 +744,7 @@
                           "id":  "H26-18-l2",
                           "text":  "電磁的記録に記録されている地役権図面の内容を証明した書面の交付の請求は、電子情報処理組織を使用して請求情報を登記所に提供する方法によることができる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -778,8 +762,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "イウ"
     },
     {
         "id":  "H26-19",
@@ -792,28 +775,28 @@
                           "id":  "H26-19-l0",
                           "text":  "筆界特定とは、一筆の土地及びこれに隣接する他の土地について、筆界の現地における位置を特定することをいい、その位置を特定することができないときは、その位置の範囲を特定することとをいう。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-19-l1",
                           "text":  "対象土地の筆界について、民事訴訟の手続により筆界の確定を求める訴えが提起された場合であっても、当該訴えに係る判決が確定する前であれば、当該筆界についてされた筆界特定の申請は却下されない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-19-l2",
                           "text":  "甲土地の所有権の登記名義人の相続人は、相続により甲土地の所有権を取得したとしても、甲土地について相続を原因とする所有権の移転の登記がされなければ、甲土地を対象土地とする筆界特定の申請をすることができない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H26-19-l3",
                           "text":  "甲土地の一部の所有権を取得したAは、甲土地の所有権の登記名義人であるBに代位しなければ、甲土地を対象土地とする筆界特定の申請をすることができない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -824,8 +807,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "ウエ"
     },
     {
         "id":  "H26-20",
@@ -870,7 +852,6 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "",
-        "needsReview":  true
+        "correctCombo":  ""
     }
 ]

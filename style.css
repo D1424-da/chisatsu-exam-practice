@@ -682,6 +682,31 @@ body {
 .login-link:hover { color: var(--primary); }
 .login-reset-note { font-size: .85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.6; }
 .reset-verify-status { font-size: .85rem; font-weight: 600; margin-bottom: 6px; }
+.reset-success { color: var(--success); font-weight: 600; font-size: .9rem; margin-bottom: 12px; }
+
+/* ─── Firebase / 認証関連 ────────────────────────────── */
+.divider {
+  position: relative;
+  text-align: center;
+  margin: 18px 0;
+  color: var(--text-muted);
+  font-size: .85rem;
+}
+.divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--border);
+  z-index: 1;
+}
+.divider { background: var(--surface); }
+.divider::before { z-index: 0; }
+
+#google-login-btn { display: flex; justify-content: center; padding: 12px 0; }
+
 /* ─── ヘッダーのユーザーバッジ ──────────────────────────── */
 .user-badge { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .user-badge-name {
