@@ -45,7 +45,7 @@ git push -u origin main
 数分後、以下のURLでアプリが公開されます：
 
 ```
-https://YOUR_USERNAME.github.io/chisatsu-exam-practice
+https://d1424-da.github.io/chisatsu-exam-practice
 ```
 
 ## 以降の更新手順

@@ -23,6 +23,19 @@ function loadData() {
   try { records   = JSON.parse(localStorage.getItem(rk)) || {}; } catch { records = {}; }
 }
 
+async function syncBundledQuestions() {
+  try {
+    const resp = await fetch(`output/all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
+    if (!resp.ok) return;
+    const bundled = await resp.json();
+    if (!Array.isArray(bundled) || bundled.length === 0) return;
+    localStorage.setItem(KEY_QUESTIONS, JSON.stringify(bundled));
+    questions = bundled;
+  } catch {
+    // Bundled JSON is optional; fall back to existing localStorage data.
+  }
+}
+
 function saveQuestions() {
   localStorage.setItem(KEY_QUESTIONS, JSON.stringify(questions));
   writeToFile();
@@ -366,11 +379,10 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
     const isDialogueCombination = isDialogueKeyword && isCombinationKeyword;
 
     // Keyword rule:
-    // - "幾つあるか" questions -> inline OX
-    // - questions containing "対話" -> inline OX
+    // - "対話" questions -> inline OX
     // - "対話" + "組み合わせ/組合せ" -> inline OX
-    // - "組み合わせ/組合せ" only -> keep normal OX (no inline synthesis)
-    if ((isCountQuestion || isDialogueKeyword || isDialogueCombination) && Array.isArray(q.limbs) && q.limbs.length >= 2) {
+    // - "幾つあるか" or "組み合わせ/組合せ" only -> keep normal OX
+    if ((isDialogueKeyword || isDialogueCombination) && !isCountQuestion && Array.isArray(q.limbs) && q.limbs.length >= 2) {
       const keys = ['ア', 'イ', 'ウ', 'エ', 'オ'];
       const combo = String(q.correctCombo || '');
       const isInverted = qText.includes('誤っている');
@@ -1313,6 +1325,9 @@ function esc(str) {
 document.addEventListener('DOMContentLoaded', async () => {
   // ── ファイルストレージ初期化 ──────────────────────────────
   await initFileStorage();
+
+  // ── 配布済みデータの同期 ────────────────────────────────
+  await syncBundledQuestions();
 
   // ── 認証の初期化 ──────────────────────────────────────────
   try {
