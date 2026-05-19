@@ -190,7 +190,9 @@ async function pullRecordsFromCloudIfNeeded() {
     const ref = firebase.firestore().collection('records').doc(uid);
     const snap = await ref.get();
     const meta = getRecordsMeta(uid);
+    const now = Date.now();
     const localEditedAt = Number(meta.localEditedAt || 0);
+    const localAccessAt = Number(meta.lastAccessAt || localEditedAt || 0);
 
     if (!snap.exists) {
       // Backward compatibility: migrate legacy records collection format.
@@ -199,16 +201,18 @@ async function pullRecordsFromCloudIfNeeded() {
       if (Object.keys(aggregatedLegacy).length > 0) {
         records = aggregatedLegacy;
         localStorage.setItem(localKey, JSON.stringify(records));
-        const migratedAt = Date.now();
+        const migratedAt = now;
         saveRecordsMeta({
           ...meta,
           localEditedAt: migratedAt,
+          lastAccessAt: migratedAt,
           lastCloudPullAt: migratedAt
         }, uid);
         await ref.set({
           uid,
           records,
           updatedAtMs: migratedAt,
+          accessedAtMs: migratedAt,
           migratedFromLegacy: true,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
@@ -218,13 +222,21 @@ async function pullRecordsFromCloudIfNeeded() {
       }
 
       if (localRecords && Object.keys(localRecords).length > 0) {
+        const seedAt = localAccessAt || now;
         await ref.set({
           uid,
           records: localRecords,
-          updatedAtMs: localEditedAt || Date.now(),
+          updatedAtMs: localEditedAt || seedAt,
+          accessedAtMs: seedAt,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
       }
+      saveRecordsMeta({
+        ...meta,
+        localEditedAt: localEditedAt || now,
+        lastAccessAt: now,
+        lastCloudPullAt: now
+      }, uid);
       cloudRecordsLoadedUid = uid;
       return;
     }
@@ -232,22 +244,34 @@ async function pullRecordsFromCloudIfNeeded() {
     const data = snap.data() || {};
     const remoteRecords = (data.records && typeof data.records === 'object') ? data.records : null;
     const remoteEditedAt = Number(data.updatedAtMs || 0);
+    const remoteAccessAt = Number(data.accessedAtMs || remoteEditedAt || 0);
     if (!remoteRecords) {
       cloudRecordsLoadedUid = uid;
       return;
     }
 
-    const shouldUseRemote = Object.keys(localRecords).length === 0 || remoteEditedAt >= localEditedAt;
-    if (shouldUseRemote) {
-      records = remoteRecords;
-      localStorage.setItem(localKey, JSON.stringify(records));
-      saveRecordsMeta({
-        ...meta,
-        localEditedAt: remoteEditedAt || Date.now(),
-        lastCloudPullAt: Date.now()
-      }, uid);
-      tryRenderStatsIfOpen();
-    }
+    // アクセス時刻優先: より最近アクセスされた側の成績を勝者として上書きする。
+    const preferRemoteByAccess = remoteAccessAt > localAccessAt;
+    const winnerRecords = preferRemoteByAccess ? remoteRecords : localRecords;
+    const winnerEditedAt = preferRemoteByAccess ? (remoteEditedAt || now) : (localEditedAt || now);
+    records = winnerRecords;
+    localStorage.setItem(localKey, JSON.stringify(records));
+    saveRecordsMeta({
+      ...meta,
+      localEditedAt: winnerEditedAt,
+      lastAccessAt: now,
+      lastCloudPullAt: now
+    }, uid);
+
+    // 判定結果をクラウドにも反映し、次回は同じ勝者が再現されるようにする。
+    await ref.set({
+      uid,
+      records,
+      updatedAtMs: winnerEditedAt,
+      accessedAtMs: now,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    tryRenderStatsIfOpen();
     cloudRecordsLoadedUid = uid;
   } catch (e) {
     console.warn('クラウド成績データ同期(取得)エラー:', e);
@@ -260,11 +284,13 @@ async function pushRecordsToCloud() {
   const uid = getAuthUid();
   if (!uid) return;
   if (!(window.firebase && firebase.firestore)) return;
+  const now = Date.now();
   try {
     await firebase.firestore().collection('records').doc(uid).set({
       uid,
       records,
-      updatedAtMs: Date.now(),
+      updatedAtMs: now,
+      accessedAtMs: now,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch (e) {
@@ -331,11 +357,13 @@ function saveQuestions() {
 function saveRecords() {
   const uid = getAuthUid();
   const rk = getRecordStorageKey(uid);
+  const now = Date.now();
   localStorage.setItem(rk, JSON.stringify(records));
   if (uid) {
     saveRecordsMeta({
       ...getRecordsMeta(uid),
-      localEditedAt: Date.now()
+      localEditedAt: now,
+      lastAccessAt: now
     }, uid);
   }
   pushRecordsToCloud();
