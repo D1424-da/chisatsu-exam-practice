@@ -55,6 +55,15 @@ function saveRecordsMeta(meta, uid = getAuthUid()) {
   localStorage.setItem(`${KEY_RECORDS_META}_${uid}`, JSON.stringify(meta || {}));
 }
 
+function getActiveUser() {
+  return window.currentUser || currentUser || null;
+}
+
+function getActiveUserId() {
+  const user = getActiveUser();
+  return user?.uid || user?.id || null;
+}
+
 function getAuthUid() {
   try {
     if (window.firebase && firebase.auth && firebase.auth().currentUser) {
@@ -63,7 +72,30 @@ function getAuthUid() {
   } catch {
     // ignore
   }
-  return window.currentUser?.uid || null;
+  return getActiveUserId();
+}
+
+function aggregateLegacyRecordDocs(docs) {
+  const out = {};
+  for (const snap of docs) {
+    const d = (snap && typeof snap.data === 'function') ? (snap.data() || {}) : {};
+
+    if (d.records && typeof d.records === 'object') {
+      for (const [limbId, stat] of Object.entries(d.records)) {
+        if (!out[limbId]) out[limbId] = { correct: 0, wrong: 0 };
+        out[limbId].correct += Number(stat?.correct || 0);
+        out[limbId].wrong += Number(stat?.wrong || 0);
+      }
+      continue;
+    }
+
+    if (typeof d.limbId === 'string' && d.limbId) {
+      if (!out[d.limbId]) out[d.limbId] = { correct: 0, wrong: 0 };
+      if (d.correct === true) out[d.limbId].correct += 1;
+      else out[d.limbId].wrong += 1;
+    }
+  }
+  return out;
 }
 
 async function pullQuestionsFromCloudIfNeeded() {
@@ -161,6 +193,30 @@ async function pullRecordsFromCloudIfNeeded() {
     const localEditedAt = Number(meta.localEditedAt || 0);
 
     if (!snap.exists) {
+      // Backward compatibility: migrate legacy records collection format.
+      const legacyQuery = await firebase.firestore().collection('records').where('uid', '==', uid).get();
+      const aggregatedLegacy = aggregateLegacyRecordDocs(legacyQuery.docs || []);
+      if (Object.keys(aggregatedLegacy).length > 0) {
+        records = aggregatedLegacy;
+        localStorage.setItem(localKey, JSON.stringify(records));
+        const migratedAt = Date.now();
+        saveRecordsMeta({
+          ...meta,
+          localEditedAt: migratedAt,
+          lastCloudPullAt: migratedAt
+        }, uid);
+        await ref.set({
+          uid,
+          records,
+          updatedAtMs: migratedAt,
+          migratedFromLegacy: true,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        tryRenderStatsIfOpen();
+        cloudRecordsLoadedUid = uid;
+        return;
+      }
+
       if (localRecords && Object.keys(localRecords).length > 0) {
         await ref.set({
           uid,
@@ -217,6 +273,7 @@ async function pushRecordsToCloud() {
 }
 
 function loadData() {
+  currentUser = getActiveUser();
   try { questions = JSON.parse(localStorage.getItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
   const rk = getRecordStorageKey();
   try { records   = JSON.parse(localStorage.getItem(rk)) || {}; } catch { records = {}; }
@@ -491,21 +548,23 @@ function showLoginOverlay() {
 }
 
 function hideLoginOverlay() {
+  currentUser = getActiveUser();
   // Firebase認証後にデータを読み込む
   loadData();
   refreshFilterOptions();
 
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  document.getElementById('current-user-name').textContent = currentUser.displayName || currentUser.email;
+  document.getElementById('current-user-name').textContent = currentUser?.displayName || currentUser?.email || '';
 }
 
 function renderUsers() {
   const users = getUsers();
+  const activeId = getActiveUserId();
   const html = users.map(u => `
     <div class="user-row">
-      <span class="user-row-name">${esc(u.name)}${u.id === currentUser.id ? ' <span class="badge-you">あなた</span>' : ''}</span>
-      ${u.id === currentUser.id
+      <span class="user-row-name">${esc(u.name)}${u.id === activeId ? ' <span class="badge-you">あなた</span>' : ''}</span>
+      ${u.id === activeId
         ? `<button class="btn btn-ghost btn-sm" onclick="showChangePwForm()">パスワード変更</button>`
         : `<button class="btn btn-danger btn-sm" onclick="deleteUserById('${esc(u.id)}')">\u524a\u9664</button>`}
     </div>
@@ -573,9 +632,10 @@ async function resetPassword(name, pw, pw2) {
 }
 
 async function changePassword(oldPw, newPw, newPw2) {
-  if (!currentUser)     return 'ログインが必要です';
+  const activeId = getActiveUserId();
+  if (!activeId)        return 'ログインが必要です';
   const users = getUsers();
-  const user = users.find(u => u.id === currentUser.id);
+  const user = users.find(u => u.id === activeId);
   if (!user)            return 'ユーザー情報が見つかりません';
   if (await hashPassword(oldPw) !== user.pwHash) return '現在のパスワードが違います';
   if (newPw.length < 4) return '新しいパスワードは4文字以上にしてください';
