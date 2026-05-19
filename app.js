@@ -4,7 +4,8 @@
 
 // ── ストレージキー ──────────────────────────────────────────
  const KEY_QUESTIONS   = 'limb_questions';
-const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<userId>
+const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<uid>
+const KEY_RECORDS_META = 'limb_records_meta'; // パーユーザーキー: limb_records_meta_<uid>
 const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
@@ -16,6 +17,8 @@ let session     = null; // 現在の学習セッション { queue: [limb], index
 let currentUser = null; // { id, name }
 let cloudQuestionsLoadedUid = null;
 let cloudPullInFlight = false;
+let cloudRecordsLoadedUid = null;
+let cloudRecordsPullInFlight = false;
 
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -31,6 +34,25 @@ function getQuestionsMeta() {
 
 function saveQuestionsMeta(meta) {
   localStorage.setItem(KEY_QUESTIONS_META, JSON.stringify(meta || {}));
+}
+
+function getRecordStorageKey(uid = getAuthUid()) {
+  return uid ? `${KEY_RECORDS}_${uid}` : KEY_RECORDS;
+}
+
+function getRecordsMeta(uid = getAuthUid()) {
+  if (!uid) return {};
+  try {
+    const m = JSON.parse(localStorage.getItem(`${KEY_RECORDS_META}_${uid}`));
+    return (m && typeof m === 'object') ? m : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRecordsMeta(meta, uid = getAuthUid()) {
+  if (!uid) return;
+  localStorage.setItem(`${KEY_RECORDS_META}_${uid}`, JSON.stringify(meta || {}));
 }
 
 function getAuthUid() {
@@ -115,11 +137,91 @@ async function pushQuestionsToCloud() {
   }
 }
 
+function tryRenderStatsIfOpen() {
+  const pageStats = document.getElementById('page-stats');
+  if (!pageStats || !pageStats.classList.contains('active')) return;
+  if (typeof renderStats === 'function') renderStats();
+}
+
+async function pullRecordsFromCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid || cloudRecordsPullInFlight) return;
+  if (cloudRecordsLoadedUid === uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+
+  const localKey = getRecordStorageKey(uid);
+  cloudRecordsPullInFlight = true;
+  try {
+    let localRecords = {};
+    try { localRecords = JSON.parse(localStorage.getItem(localKey)) || {}; } catch { localRecords = {}; }
+
+    const ref = firebase.firestore().collection('records').doc(uid);
+    const snap = await ref.get();
+    const meta = getRecordsMeta(uid);
+    const localEditedAt = Number(meta.localEditedAt || 0);
+
+    if (!snap.exists) {
+      if (localRecords && Object.keys(localRecords).length > 0) {
+        await ref.set({
+          uid,
+          records: localRecords,
+          updatedAtMs: localEditedAt || Date.now(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+      cloudRecordsLoadedUid = uid;
+      return;
+    }
+
+    const data = snap.data() || {};
+    const remoteRecords = (data.records && typeof data.records === 'object') ? data.records : null;
+    const remoteEditedAt = Number(data.updatedAtMs || 0);
+    if (!remoteRecords) {
+      cloudRecordsLoadedUid = uid;
+      return;
+    }
+
+    const shouldUseRemote = Object.keys(localRecords).length === 0 || remoteEditedAt >= localEditedAt;
+    if (shouldUseRemote) {
+      records = remoteRecords;
+      localStorage.setItem(localKey, JSON.stringify(records));
+      saveRecordsMeta({
+        ...meta,
+        localEditedAt: remoteEditedAt || Date.now(),
+        lastCloudPullAt: Date.now()
+      }, uid);
+      tryRenderStatsIfOpen();
+    }
+    cloudRecordsLoadedUid = uid;
+  } catch (e) {
+    console.warn('クラウド成績データ同期(取得)エラー:', e);
+  } finally {
+    cloudRecordsPullInFlight = false;
+  }
+}
+
+async function pushRecordsToCloud() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  try {
+    await firebase.firestore().collection('records').doc(uid).set({
+      uid,
+      records,
+      updatedAtMs: Date.now(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.warn('クラウド成績データ同期(保存)エラー:', e);
+  }
+}
+
 function loadData() {
   try { questions = JSON.parse(localStorage.getItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
-  const rk = currentUser ? `${KEY_RECORDS}_${currentUser.id}` : KEY_RECORDS;
+  const rk = getRecordStorageKey();
   try { records   = JSON.parse(localStorage.getItem(rk)) || {}; } catch { records = {}; }
   pullQuestionsFromCloudIfNeeded();
+  pullRecordsFromCloudIfNeeded();
 }
 
 async function syncBundledQuestions() {
@@ -170,8 +272,16 @@ function saveQuestions() {
 }
 
 function saveRecords() {
-  const rk = currentUser ? `${KEY_RECORDS}_${currentUser.id}` : KEY_RECORDS;
+  const uid = getAuthUid();
+  const rk = getRecordStorageKey(uid);
   localStorage.setItem(rk, JSON.stringify(records));
+  if (uid) {
+    saveRecordsMeta({
+      ...getRecordsMeta(uid),
+      localEditedAt: Date.now()
+    }, uid);
+  }
+  pushRecordsToCloud();
   writeToFile();
 }
 
@@ -238,6 +348,11 @@ function getAllRecords() {
   for (const u of getUsers()) {
     try { out[u.id] = JSON.parse(localStorage.getItem(`${KEY_RECORDS}_${u.id}`)) || {}; }
     catch { out[u.id] = {}; }
+  }
+  const authUid = getAuthUid();
+  if (authUid && !(authUid in out)) {
+    try { out[authUid] = JSON.parse(localStorage.getItem(getRecordStorageKey(authUid))) || {}; }
+    catch { out[authUid] = {}; }
   }
   return out;
 }
@@ -341,6 +456,8 @@ function logout() {
   session = null;
   questions = [];
   records = {};
+  cloudQuestionsLoadedUid = null;
+  cloudRecordsLoadedUid = null;
   showLoginOverlay();
 }
 
