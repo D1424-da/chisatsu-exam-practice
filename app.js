@@ -372,69 +372,6 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
     if (filterSubject  && q.subject  !== filterSubject)  continue;
     if (filterCategory && q.category !== filterCategory) continue;
 
-    const qText = q.questionText || '';
-    const isCountQuestion = qText.includes('幾つあるか');
-    const isDialogueKeyword = qText.includes('対話');
-    const isCombinationKeyword = /組み合わせ|組合せ/.test(qText);
-    const isDialogueCombination = isDialogueKeyword && isCombinationKeyword;
-
-    // Keyword rule:
-    // - "対話" questions -> inline OX
-    // - "対話" + "組み合わせ/組合せ" -> inline OX
-    // - "幾つあるか" or "組み合わせ/組合せ" only -> keep normal OX
-    if ((isDialogueKeyword || isDialogueCombination) && !isCountQuestion && Array.isArray(q.limbs) && q.limbs.length >= 2) {
-      const keys = ['ア', 'イ', 'ウ', 'エ', 'オ'];
-      const combo = String(q.correctCombo || '');
-      const isInverted = qText.includes('誤っている');
-      const comboSet = new Set(combo.split('').filter(k => keys.includes(k)));
-
-      const inlineWrong = [];
-      const parts = [];
-      q.limbs.slice(0, 5).forEach((l, i) => {
-        const key = keys[i] || String(i + 1);
-        // Prefer combo-based reconstruction when available; fallback to existing limb.correct.
-        let isCorrect = typeof l.correct === 'boolean' ? l.correct : false;
-        if (comboSet.size > 0 && keys.includes(key)) {
-          isCorrect = isInverted ? !comboSet.has(key) : comboSet.has(key);
-        }
-        if (!isCorrect) inlineWrong.push(key);
-        parts.push(`（${key}）〇× ${l.text || ''}`);
-      });
-
-      const inlineLimb = {
-        id: `${q.id}-count-inline`,
-        text: parts.join('\n'),
-        context: '',
-        correct: true,
-        inlineOxWrong: inlineWrong,
-        explanation: '',
-        questionId: q.id,
-        subject: q.subject,
-        category: q.category,
-        questionText: q.questionText,
-        source: q.source,
-      };
-
-      if (splitInlineForStats) {
-        const items = parseInlineOxItems(inlineLimb.text || '');
-        const expected = getInlineOxExpectedAnswers(inlineLimb, items);
-        if (items.length > 0 && expected.length === items.length) {
-          for (const it of items) {
-            limbs.push({
-              ...inlineLimb,
-              id: makeInlineRecordId(inlineLimb.id, it.key),
-              text: `${inlineLimb.text}\n[判定対象: ${it.key}]`,
-            });
-          }
-        } else {
-          limbs.push(inlineLimb);
-        }
-      } else {
-        limbs.push(inlineLimb);
-      }
-      continue;
-    }
-
     for (const limb of q.limbs) {
       if (splitInlineForStats) {
         const items = parseInlineOxItems(limb.text || '');
@@ -675,7 +612,6 @@ function renderCurrentLimb() {
     <div class="limb-card card">
       ${limb.source ? `<div class="limb-meta"><span class="badge badge-source">${esc(limb.source)}</span> <span class="badge badge-subject">${esc(limb.subject)}</span>${limb.category ? ` <span class="badge badge-category">${esc(limb.category)}</span>` : ''}</div>` : `<div class="limb-meta"><span class="badge badge-subject">${esc(limb.subject)}</span>${limb.category ? ` <span class="badge badge-category">${esc(limb.category)}</span>` : ''}</div>`}
       ${limb.questionText ? `<div class="question-shared"><span class="question-label">問題文</span><span class="question-body">${esc(limb.questionText)}</span></div>` : ''}
-      ${limb.context ? `<div class="limb-context"><span class="limb-context-label">教授</span>${esc(limb.context.replace(/^教授[：:：]\s*/, ''))}</div>` : ''}
       <div class="limb-text">${isInlineOxQuestion ? renderInlineOxText(limb.text) : esc(limb.text)}</div>
       <div class="limb-record">${rate !== null ? `正答率 ${rate}% (${rec.correct}○ ${rec.wrong}×)` : '未回答'}</div>
       ${answerSectionHtml}
