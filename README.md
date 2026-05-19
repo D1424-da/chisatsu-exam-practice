@@ -8,7 +8,7 @@
 ## 🚀 クイックスタート
 
 ### オンライン版（GitHub Pages）
-- **推奨**: https://YOUR_USERNAME.github.io/chisatsu-exam-practice
+- **推奨**: https://D1424-da.github.io/chisatsu-exam-practice
 - セットアップ不要、すぐに使用可能
 - 詳細は [GITHUB_PAGES_SETUP.md](GITHUB_PAGES_SETUP.md) を参照
 
