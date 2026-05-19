@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    肢別問題集 - app.js
    ========================================================= */
 
@@ -190,28 +190,9 @@ async function hashPassword(pw) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function loginUser(name, pw) {
-  const user = getUsers().find(u => u.name === name);
-  if (!user) return 'ユーザーが見つかりません';
-  if (await hashPassword(pw) !== user.pwHash) return 'パスワードが違います';
-  currentUser = { id: user.id, name: user.name };
-  sessionStorage.setItem(KEY_SESSION_USER, JSON.stringify(currentUser));
-  return null;
-}
-
-async function registerUser(name, pw, pw2) {
-  if (!name)          return 'ユーザー名を入力してください';
-  if (pw.length < 4)  return 'パスワードは4文字以上にしてください';
-  if (pw !== pw2)     return 'パスワードが一致しません';
-  const users = getUsers();
-  if (users.find(u => u.name === name)) return 'そのユーザー名は既に使用されています';
-  const newUser = { id: uid(), name, pwHash: await hashPassword(pw) };
-  users.push(newUser);
-  saveUsers(users);
-  currentUser = { id: newUser.id, name: newUser.name };
-  sessionStorage.setItem(KEY_SESSION_USER, JSON.stringify(currentUser));
-  return null;
-}
+// Firebase authentication is handled by auth-module.js
+// Old local authentication functions removed (no longer needed with Firebase)
+// NOTE: Use Firebase Auth API instead: firebase.auth().signInWithEmailAndPassword(email, password)
 
 function logout() {
   currentUser = null;
@@ -223,27 +204,38 @@ function logout() {
 }
 
 function showLoginOverlay() {
-  const users = getUsers();
-  if (users.length === 0) {
-    document.getElementById('login-form-area').classList.add('hidden');
-    document.getElementById('register-form-area').classList.remove('hidden');
-  } else {
-    document.getElementById('login-form-area').classList.remove('hidden');
-    document.getElementById('register-form-area').classList.add('hidden');
-  }
-  document.getElementById('login-error').classList.add('hidden');
-  document.getElementById('reg-error').classList.add('hidden');
-  document.getElementById('reset-form-area').classList.add('hidden');
-  document.getElementById('login-username').value = '';
-  document.getElementById('login-password').value = '';
+  // Show login form by default (Firebase auth-module.js handles form switching)
+  const loginFormArea = document.getElementById('login-form-area');
+  const registerFormArea = document.getElementById('register-form-area');
+  const resetFormArea = document.getElementById('reset-form-area');
+  
+  if (loginFormArea) loginFormArea.classList.remove('hidden');
+  if (registerFormArea) registerFormArea.classList.add('hidden');
+  if (resetFormArea) resetFormArea.classList.add('hidden');
+  
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-overlay').classList.remove('hidden');
+  
+  // Clear form fields if they exist (use Firebase form element IDs)
+  const loginEmail = document.getElementById('login-email');
+  const loginPassword = document.getElementById('login-password');
+  const regEmail = document.getElementById('reg-email');
+  const regPassword = document.getElementById('reg-password');
+  const regPassword2 = document.getElementById('reg-password2');
+  const resetEmail = document.getElementById('reset-email');
+  
+  if (loginEmail) loginEmail.value = '';
+  if (loginPassword) loginPassword.value = '';
+  if (regEmail) regEmail.value = '';
+  if (regPassword) regPassword.value = '';
+  if (regPassword2) regPassword2.value = '';
+  if (resetEmail) resetEmail.value = '';
 }
 
 function hideLoginOverlay() {
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  document.getElementById('current-user-name').textContent = currentUser.name;
+  document.getElementById('current-user-name').textContent = currentUser.displayName || currentUser.email;
 }
 
 function renderUsers() {
@@ -1267,61 +1259,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     showLoginOverlay();
   }
 
-  // ログイン
-  document.getElementById('btn-login').addEventListener('click', async () => {
-    const name = document.getElementById('login-username').value.trim();
-    const pw   = document.getElementById('login-password').value;
-    const errEl = document.getElementById('login-error');
-    const err = await loginUser(name, pw);
-    if (err) {
-      errEl.textContent = err;
-      errEl.classList.remove('hidden');
-    } else {
-      loadData();
-      refreshFilterOptions();
-      hideLoginOverlay();
-    }
-  });
-  document.getElementById('login-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('btn-login').click();
-  });
+  // ログイン・登録は auth-module.js で処理
+  // Firebase Authentication のイベントハンドラは auth-module.js で設定済み
 
-  // 登録
-  document.getElementById('btn-register').addEventListener('click', async () => {
-    const name = document.getElementById('reg-username').value.trim();
-    const pw   = document.getElementById('reg-password').value;
-    const pw2  = document.getElementById('reg-password2').value;
-    const errEl = document.getElementById('reg-error');
-    const err = await registerUser(name, pw, pw2);
-    if (err) {
-      errEl.textContent = err;
-      errEl.classList.remove('hidden');
-    } else {
-      loadData();
-      refreshFilterOptions();
-      hideLoginOverlay();
-    }
-  });
+  // フォーム切替は auth-module.js で処理 (switchAuthForm())
 
-  // フォーム切替
-  document.getElementById('btn-show-register').addEventListener('click', () => {
-    document.getElementById('login-form-area').classList.add('hidden');
-    document.getElementById('register-form-area').classList.remove('hidden');
-    document.getElementById('reg-username').focus();
-  });
-  document.getElementById('btn-show-login').addEventListener('click', () => {
-    document.getElementById('register-form-area').classList.add('hidden');
-    document.getElementById('login-form-area').classList.remove('hidden');
-    document.getElementById('login-username').focus();
-  });
-
-  // パスワードリセット
-  document.getElementById('btn-show-reset').addEventListener('click', showResetForm);
-  document.getElementById('btn-show-login-from-reset').addEventListener('click', () => {
-    document.getElementById('reset-form-area').classList.add('hidden');
-    document.getElementById('login-form-area').classList.remove('hidden');
-    document.getElementById('login-username').focus();
-  });
+  // パスワードリセット (パスワードリセットは auth-module.js で処理)
+  // btn-show-reset と btn-do-reset は auth-module.js で処理
   document.getElementById('btn-reset-open-file').addEventListener('click', async () => {
     try {
       const [handle] = await window.showOpenFilePicker({
@@ -1356,7 +1300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert(`「${name}」のパスワードをリセットしました。`);
       document.getElementById('reset-form-area').classList.add('hidden');
       document.getElementById('login-form-area').classList.remove('hidden');
-      document.getElementById('login-username').value = name;
+      document.getElementById('login-email').value = name;
       document.getElementById('login-password').value = '';
       document.getElementById('login-password').focus();
     }
