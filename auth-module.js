@@ -299,8 +299,18 @@ function initGoogleSignIn() {
   window.googleSignInInitialized = true;
 
   try {
+    // 注意：Google Sign-In が不要な場合は、このセクション全体をコメントアウトしてください
+    // Google Cloud Console から取得した Client ID に置き換えてください
+    const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+    
+    // Client ID が設定されていない場合はスキップ
+    if (GOOGLE_CLIENT_ID.includes("YOUR_")) {
+      console.warn('⚠ Google Sign-In が設定されていません（Google Client ID が必要）');
+      return;
+    }
+    
     google.accounts.id.initialize({
-      client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+      client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleSignInCallback
     });
 
