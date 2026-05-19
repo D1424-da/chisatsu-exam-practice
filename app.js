@@ -1417,19 +1417,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── 配布済みデータの同期 ────────────────────────────────
   await syncBundledQuestions();
 
-  // ── 認証の初期化 ──────────────────────────────────────────
-  try {
-    const saved = sessionStorage.getItem(KEY_SESSION_USER);
-    if (saved) currentUser = JSON.parse(saved);
-  } catch { currentUser = null; }
-
-  if (currentUser) {
-    loadData();
-    refreshFilterOptions();
-    hideLoginOverlay();
-  } else {
-    showLoginOverlay();
-  }
+  // 認証状態は auth-module.js の onAuthStateChanged で一元管理する。
+  // ここでログイン画面を表示すると、モバイルの再読込時に一瞬ログイン画面が見えるため待機にする。
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-overlay').classList.add('hidden');
 
   // ログイン・登録は auth-module.js で処理
   // Firebase Authentication のイベントハンドラは auth-module.js で設定済み
