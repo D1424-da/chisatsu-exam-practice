@@ -1268,47 +1268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // フォーム切替は auth-module.js で処理 (switchAuthForm())
 
-  // パスワードリセット (パスワードリセットは auth-module.js で処理)
-  // btn-show-reset と btn-do-reset は auth-module.js で処理
-  document.getElementById('btn-reset-open-file').addEventListener('click', async () => {
-    try {
-      const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'JSONデータ', accept: { 'application/json': ['.json'] } }],
-      });
-      const file = await handle.getFile();
-      const data = JSON.parse(await file.text());
-      if (!Array.isArray(data.users)) throw new Error('ユーザーデータが見つかりません')
-      const statusEl = document.getElementById('reset-verify-status');
-      statusEl.textContent = `確認完了: ${handle.name}`;
-      statusEl.style.color = 'var(--success)';
-      document.getElementById('btn-reset-open-file').classList.add('hidden');
-      populateResetUserList(data.users);
-    } catch (e) {
-      if (e.name !== 'AbortError') {
-        const statusEl = document.getElementById('reset-verify-status');
-        statusEl.textContent = 'ファイルを読み込めませんでした: ' + e.message;
-        statusEl.style.color = 'var(--danger)';
-      }
-    }
-  });
-  document.getElementById('btn-do-reset').addEventListener('click', async () => {
-    const name  = document.getElementById('reset-username').value;
-    const pw    = document.getElementById('reset-pw').value;
-    const pw2   = document.getElementById('reset-pw2').value;
-    const errEl = document.getElementById('reset-error');
-    const err = await resetPassword(name, pw, pw2);
-    if (err) {
-      errEl.textContent = err;
-      errEl.classList.remove('hidden');
-    } else {
-      alert(`「${name}」のパスワードをリセットしました。`);
-      document.getElementById('reset-form-area').classList.add('hidden');
-      document.getElementById('login-form-area').classList.remove('hidden');
-      document.getElementById('login-email').value = name;
-      document.getElementById('login-password').value = '';
-      document.getElementById('login-password').focus();
-    }
-  });
+  // パスワードリセットは Firebase 版 UI/auth-module.js 側で処理
 
   // ログアウト
   document.getElementById('btn-logout').addEventListener('click', () => {

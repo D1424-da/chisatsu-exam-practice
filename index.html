@@ -25,11 +25,11 @@
       <!-- ログインフォーム -->
       <div id="login-form-area">
         <div class="form-group">
-          <label>メールアドレス</label>
+          <label for="login-email">メールアドレス</label>
           <input type="email" id="login-email" class="login-input" autocomplete="email" />
         </div>
         <div class="form-group">
-          <label>パスワード</label>
+          <label for="login-password">パスワード</label>
           <input type="password" id="login-password" class="login-input" autocomplete="current-password" />
         </div>
         <p id="login-error" class="login-error hidden"></p>
@@ -46,15 +46,15 @@
       <!-- 登録フォーム -->
       <div id="register-form-area" class="hidden">
         <div class="form-group">
-          <label>メールアドレス</label>
+          <label for="reg-email">メールアドレス</label>
           <input type="email" id="reg-email" class="login-input" autocomplete="email" />
         </div>
         <div class="form-group">
-          <label>パスワード（6文字以上）</label>
+          <label for="reg-password">パスワード（6文字以上）</label>
           <input type="password" id="reg-password" class="login-input" autocomplete="new-password" />
         </div>
         <div class="form-group">
-          <label>パスワード確認</label>
+          <label for="reg-password2">パスワード確認</label>
           <input type="password" id="reg-password2" class="login-input" autocomplete="new-password" />
         </div>
         <p id="reg-error" class="login-error hidden"></p>
@@ -66,7 +66,7 @@
       <div id="reset-form-area" class="hidden">
         <p class="login-reset-note">登録済みのメールアドレスにパスワードリセットメールを送信します。</p>
         <div class="form-group">
-          <label>メールアドレス</label>
+          <label for="reset-email">メールアドレス</label>
           <input type="email" id="reset-email" class="login-input" autocomplete="email" placeholder="メールアドレスを入力" />
         </div>
         <p id="reset-error" class="login-error hidden"></p>
@@ -100,19 +100,19 @@
       <section class="filter-bar card">
         <div class="filter-row">
           <div class="filter-group">
-            <label>試験・科目</label>
+            <label for="filter-subject">試験・科目</label>
             <select id="filter-subject">
               <option value="">すべて</option>
             </select>
           </div>
           <div class="filter-group">
-            <label>カテゴリ</label>
+            <label for="filter-category">カテゴリ</label>
             <select id="filter-category">
               <option value="">すべて</option>
             </select>
           </div>
           <div class="filter-group filter-year-range">
-            <label>年度</label>
+            <label for="filter-year-from">年度</label>
             <div class="year-range-inner">
               <select id="filter-year-from"><option value="">指定なし</option></select>
               <span class="year-range-sep">〜</span>
@@ -120,7 +120,7 @@
             </div>
           </div>
           <div class="filter-group">
-            <label>出題モード</label>
+            <label for="filter-mode">出題モード</label>
             <select id="filter-mode">
               <option value="all">全問ランダム</option>
               <option value="weak">苦手優先</option>
@@ -205,15 +205,15 @@
       <div id="add-user-form" class="card user-add-form hidden">
         <h3>新規ユーザー</h3>
         <div class="form-group">
-          <label>ユーザー名</label>
+          <label for="new-user-name">ユーザー名</label>
           <input type="text" id="new-user-name" class="search-input" />
         </div>
         <div class="form-group">
-          <label>パスワード（4文字以上）</label>
+          <label for="new-user-pw">パスワード（4文字以上）</label>
           <input type="password" id="new-user-pw" class="search-input" />
         </div>
         <div class="form-group">
-          <label>パスワード確認</label>
+          <label for="new-user-pw2">パスワード確認</label>
           <input type="password" id="new-user-pw2" class="search-input" />
         </div>
         <p id="add-user-error" class="login-error hidden"></p>
@@ -227,15 +227,15 @@
       <div id="change-pw-form" class="card user-add-form hidden">
         <h3>パスワードを変更</h3>
         <div class="form-group">
-          <label>現在のパスワード</label>
+          <label for="change-pw-old">現在のパスワード</label>
           <input type="password" id="change-pw-old" class="search-input" autocomplete="current-password" />
         </div>
         <div class="form-group">
-          <label>新しいパスワード（4文字以上）</label>
+          <label for="change-pw-new">新しいパスワード（4文字以上）</label>
           <input type="password" id="change-pw-new" class="search-input" autocomplete="new-password" />
         </div>
         <div class="form-group">
-          <label>パスワード確認</label>
+          <label for="change-pw-new2">パスワード確認</label>
           <input type="password" id="change-pw-new2" class="search-input" autocomplete="new-password" />
         </div>
         <p id="change-pw-error" class="login-error hidden"></p>
@@ -308,25 +308,25 @@
       <form id="form-question">
         <input type="hidden" id="edit-question-id" />
         <div class="form-group">
-          <label>試験・科目 <span class="required">*</span></label>
+          <label for="input-subject">試験・科目 <span class="required">*</span></label>
           <input type="text" id="input-subject" list="subject-list" placeholder="例：行政書士" required />
           <datalist id="subject-list"></datalist>
         </div>
         <div class="form-group">
-          <label>カテゴリ</label>
+          <label for="input-category">カテゴリ</label>
           <input type="text" id="input-category" list="category-list" placeholder="例：行政法/行政行為" />
           <datalist id="category-list"></datalist>
         </div>
         <div class="form-group">
-          <label>問題番号・出典</label>
+          <label for="input-source">問題番号・出典</label>
           <input type="text" id="input-source" placeholder="例：R5-問14" />
         </div>
         <div class="form-group">
-          <label>問題（大問）文 <small>任意</small></label>
+          <label for="input-question-text">問題（大問）文 <small>任意</small></label>
           <textarea id="input-question-text" rows="2" placeholder="選択肢に共通する問題文があれば入力"></textarea>
         </div>
         <div class="form-group">
-          <label>肢 <span class="required">*</span></label>
+          <div class="manage-filter-label">肢 <span class="required">*</span></div>
           <div id="limbs-editor"></div>
           <button type="button" id="btn-add-limb" class="btn btn-ghost btn-sm">＋ 肢を追加</button>
         </div>
