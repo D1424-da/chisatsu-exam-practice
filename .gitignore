@@ -1,0 +1,30 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Scraper scripts (dev only)
+scraper.ps1
+check_urls.ps1
+
+# Logs
+check_urls_log.txt
+h18_test.txt
+h18_links.txt
+year_links.txt
+all_year_links.txt
+test_h18.txt
+tmp_href.txt
+tmp_q1.txt
+
+# Archive (optional - remove if you want to version these)
+archive/
+
+# Node/package files (if you add npm later)
+node_modules/
+package-lock.json
