@@ -25,6 +25,8 @@ let cloudStudyPullInFlight = false;
 let cloudStudyFlushInFlight = false;
 let studyTime = { totalMs: 0, pendingDeltaMs: 0 };
 let sessionStudyStartedAt = 0;
+let studyTimeBackend = 'auto'; // 'study_stats' | 'records' | 'auto'
+
 
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -340,6 +342,101 @@ function formatStudyDuration(ms) {
   return `${s}秒`;
 }
 
+function isPermissionDeniedError(e) {
+  return String(e?.code || '').includes('permission-denied');
+}
+
+async function readCloudStudyTotal(uid) {
+  if (!(window.firebase && firebase.firestore)) return { totalMs: 0, backend: 'study_stats', exists: false };
+
+  // Prefer backend decided in prior attempts.
+  if (studyTimeBackend === 'records') {
+    const snap = await firebase.firestore().collection('records').doc(uid).get();
+    const total = Math.max(0, Number((snap.data() || {}).studyTotalMs || 0));
+    return { totalMs: total, backend: 'records', exists: snap.exists };
+  }
+
+  try {
+    const snap = await firebase.firestore().collection('study_stats').doc(uid).get();
+    const total = Math.max(0, Number((snap.data() || {}).totalMs || 0));
+    return { totalMs: total, backend: 'study_stats', exists: snap.exists };
+  } catch (e) {
+    if (!isPermissionDeniedError(e)) throw e;
+    const snap = await firebase.firestore().collection('records').doc(uid).get();
+    const total = Math.max(0, Number((snap.data() || {}).studyTotalMs || 0));
+    return { totalMs: total, backend: 'records', exists: snap.exists };
+  }
+}
+
+async function setCloudStudyTotal(uid, totalMs, backendHint = 'auto') {
+  const total = Math.max(0, Number(totalMs || 0));
+  const now = Date.now();
+
+  if (backendHint === 'records' || studyTimeBackend === 'records') {
+    await firebase.firestore().collection('records').doc(uid).set({
+      uid,
+      studyTotalMs: total,
+      studyUpdatedAtMs: now,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return 'records';
+  }
+
+  try {
+    await firebase.firestore().collection('study_stats').doc(uid).set({
+      uid,
+      totalMs: total,
+      updatedAtMs: now,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return 'study_stats';
+  } catch (e) {
+    if (!isPermissionDeniedError(e)) throw e;
+    await firebase.firestore().collection('records').doc(uid).set({
+      uid,
+      studyTotalMs: total,
+      studyUpdatedAtMs: now,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return 'records';
+  }
+}
+
+async function incrementCloudStudyTotal(uid, deltaMs, backendHint = 'auto') {
+  const delta = Math.max(0, Math.floor(Number(deltaMs || 0)));
+  if (delta <= 0) return backendHint === 'records' ? 'records' : 'study_stats';
+  const now = Date.now();
+
+  if (backendHint === 'records' || studyTimeBackend === 'records') {
+    await firebase.firestore().collection('records').doc(uid).set({
+      uid,
+      studyTotalMs: firebase.firestore.FieldValue.increment(delta),
+      studyUpdatedAtMs: now,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return 'records';
+  }
+
+  try {
+    await firebase.firestore().collection('study_stats').doc(uid).set({
+      uid,
+      totalMs: firebase.firestore.FieldValue.increment(delta),
+      updatedAtMs: now,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return 'study_stats';
+  } catch (e) {
+    if (!isPermissionDeniedError(e)) throw e;
+    await firebase.firestore().collection('records').doc(uid).set({
+      uid,
+      studyTotalMs: firebase.firestore.FieldValue.increment(delta),
+      studyUpdatedAtMs: now,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return 'records';
+  }
+}
+
 function applyStudyDuration(elapsedMs) {
   const delta = Math.floor(Number(elapsedMs || 0));
   if (delta <= 0) return;
@@ -377,12 +474,8 @@ async function flushStudyTimePendingToCloud() {
 
   cloudStudyFlushInFlight = true;
   try {
-    await firebase.firestore().collection('study_stats').doc(uid).set({
-      uid,
-      totalMs: firebase.firestore.FieldValue.increment(delta),
-      updatedAtMs: Date.now(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    const backend = await incrementCloudStudyTotal(uid, delta, studyTimeBackend);
+    studyTimeBackend = backend;
 
     const latest = loadStudyTimeLocal(uid);
     saveStudyTimeLocal({
@@ -405,18 +498,13 @@ async function pullStudyTimeFromCloudIfNeeded() {
   cloudStudyPullInFlight = true;
   try {
     const local = loadStudyTimeLocal(uid);
-    const ref = firebase.firestore().collection('study_stats').doc(uid);
-    const snap = await ref.get();
+    const cloud = await readCloudStudyTotal(uid);
+    studyTimeBackend = cloud.backend;
 
-    if (!snap.exists) {
+    if (!cloud.exists) {
       const seedTotal = Math.max(0, Number(local.totalMs || 0));
       if (seedTotal > 0) {
-        await ref.set({
-          uid,
-          totalMs: seedTotal,
-          updatedAtMs: Date.now(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        studyTimeBackend = await setCloudStudyTotal(uid, seedTotal, studyTimeBackend);
         saveStudyTimeLocal({ totalMs: seedTotal, pendingDeltaMs: 0 }, uid);
       } else {
         saveStudyTimeLocal(local, uid);
@@ -425,8 +513,7 @@ async function pullStudyTimeFromCloudIfNeeded() {
       return;
     }
 
-    const data = snap.data() || {};
-    const cloudTotal = Math.max(0, Number(data.totalMs || 0));
+    const cloudTotal = Math.max(0, Number(cloud.totalMs || 0));
     const localSynced = Math.max(0, Number(local.totalMs || 0) - Number(local.pendingDeltaMs || 0));
     const pending = Math.max(0, Number(local.pendingDeltaMs || 0));
     const mergedSynced = Math.max(cloudTotal, localSynced);
@@ -438,12 +525,7 @@ async function pullStudyTimeFromCloudIfNeeded() {
     }, uid);
 
     if (mergedSynced > cloudTotal && pending === 0) {
-      await ref.set({
-        uid,
-        totalMs: mergedSynced,
-        updatedAtMs: Date.now(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+      studyTimeBackend = await setCloudStudyTotal(uid, mergedSynced, studyTimeBackend);
     }
 
     if (pending > 0) {
@@ -465,12 +547,7 @@ async function resetStudyTime() {
   saveStudyTimeLocal({ totalMs: 0, pendingDeltaMs: 0 }, uid);
   if (!uid || !(window.firebase && firebase.firestore)) return;
   try {
-    await firebase.firestore().collection('study_stats').doc(uid).set({
-      uid,
-      totalMs: 0,
-      updatedAtMs: Date.now(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    studyTimeBackend = await setCloudStudyTotal(uid, 0, studyTimeBackend);
   } catch (e) {
     console.warn('学習時間リセット同期エラー:', e);
   }
@@ -727,6 +804,7 @@ function logout() {
   cloudQuestionsLoadedUid = null;
   cloudRecordsLoadedUid = null;
   cloudStudyLoadedUid = null;
+  studyTimeBackend = 'auto';
   showLoginOverlay();
 }
 
