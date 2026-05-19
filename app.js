@@ -1062,6 +1062,11 @@ function parseInlineOxItems(text) {
 function extractInlineOxKey(body, idx) {
   const m = String(body).match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/);
   if (m) return m[1];
+  const d = String(body).match(/^([0-9０-９]+)/);
+  if (d) {
+    return d[1]
+      .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  }
   const k = String(body).match(/^([アイウエオ])/);
   if (k) return k[1];
   return String(idx + 1);
@@ -1072,9 +1077,11 @@ function getInlineOxExpectedAnswers(limb, items) {
   if (Array.isArray(limb.inlineOxAnswers) && limb.inlineOxAnswers.length >= items.length) {
     return limb.inlineOxAnswers.slice(0, items.length).map(v => !!v);
   }
-  const wrong = new Set(Array.isArray(limb.inlineOxWrong)
+  const wrongKeys = Array.isArray(limb.inlineOxWrong)
     ? limb.inlineOxWrong
-    : parseInlineWrongKeys(limb.inlineOxWrong));
+    : parseInlineWrongKeys(limb.inlineOxWrong);
+  if (wrongKeys.length === 0) return [];
+  const wrong = new Set(wrongKeys);
   return items.map(it => !wrong.has(it.key));
 }
 
