@@ -358,6 +358,68 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
   for (const q of questions) {
     if (filterSubject  && q.subject  !== filterSubject)  continue;
     if (filterCategory && q.category !== filterCategory) continue;
+
+    const qText = q.questionText || '';
+    const isCountQuestion = qText.includes('幾つあるか');
+    const isCombinationKeyword = /組み合わせ|組合せ/.test(qText);
+
+    // Keyword rule:
+    // - "幾つあるか" questions -> inline OX
+    // - questions containing "組み合わせ/組合せ" -> inline OX
+    //   (including "対話" + "組み合わせ")
+    if ((isCountQuestion || isCombinationKeyword) && Array.isArray(q.limbs) && q.limbs.length >= 2) {
+      const keys = ['ア', 'イ', 'ウ', 'エ', 'オ'];
+      const combo = String(q.correctCombo || '');
+      const isInverted = qText.includes('誤っている');
+      const comboSet = new Set(combo.split('').filter(k => keys.includes(k)));
+
+      const inlineWrong = [];
+      const parts = [];
+      q.limbs.forEach((l, i) => {
+        const key = keys[i] || String(i + 1);
+        // Prefer combo-based reconstruction when available; fallback to existing limb.correct.
+        let isCorrect = typeof l.correct === 'boolean' ? l.correct : false;
+        if (comboSet.size > 0 && keys.includes(key)) {
+          isCorrect = isInverted ? !comboSet.has(key) : comboSet.has(key);
+        }
+        if (!isCorrect) inlineWrong.push(key);
+        parts.push(`（${key}）〇× ${l.text || ''}`);
+      });
+
+      const inlineLimb = {
+        id: `${q.id}-count-inline`,
+        text: parts.join('\n'),
+        context: '',
+        correct: true,
+        inlineOxWrong: inlineWrong,
+        explanation: '',
+        questionId: q.id,
+        subject: q.subject,
+        category: q.category,
+        questionText: q.questionText,
+        source: q.source,
+      };
+
+      if (splitInlineForStats) {
+        const items = parseInlineOxItems(inlineLimb.text || '');
+        const expected = getInlineOxExpectedAnswers(inlineLimb, items);
+        if (items.length > 0 && expected.length === items.length) {
+          for (const it of items) {
+            limbs.push({
+              ...inlineLimb,
+              id: makeInlineRecordId(inlineLimb.id, it.key),
+              text: `${inlineLimb.text}\n[判定対象: ${it.key}]`,
+            });
+          }
+        } else {
+          limbs.push(inlineLimb);
+        }
+      } else {
+        limbs.push(inlineLimb);
+      }
+      continue;
+    }
+
     for (const limb of q.limbs) {
       if (splitInlineForStats) {
         const items = parseInlineOxItems(limb.text || '');
