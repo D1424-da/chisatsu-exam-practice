@@ -233,6 +233,10 @@ function showLoginOverlay() {
 }
 
 function hideLoginOverlay() {
+  // Firebase認証後にデータを読み込む
+  loadData();
+  refreshFilterOptions();
+
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('current-user-name').textContent = currentUser.displayName || currentUser.email;
