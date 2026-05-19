@@ -892,7 +892,8 @@ function startSession() {
 }
 
 function startSessionWithLimbId(limbId) {
-  const baseId = String(limbId || '').split('::')[0];
+  const raw = String(limbId || '');
+  const [baseId, inlineKey = ''] = raw.split('::');
   if (!baseId) return;
 
   const target = getAllLimbs('', '', false).find(l => l.id === baseId);
@@ -901,7 +902,7 @@ function startSessionWithLimbId(limbId) {
     return;
   }
 
-  session = { queue: [target], index: 0 };
+  session = { queue: [target], index: 0, inlineTargetKey: inlineKey || null };
   showPage('study');
   document.getElementById('session-info').classList.remove('hidden');
   document.getElementById('btn-start').textContent = '最初から';
@@ -934,9 +935,23 @@ function renderCurrentLimb() {
   const rec  = getRecord(limb.id);
   const total = rec.correct + rec.wrong;
   const rate  = total > 0 ? Math.round(rec.correct / total * 100) : null;
-  const inlineItems = parseInlineOxItems(limb.text || '');
-  const inlineExpected = getInlineOxExpectedAnswers(limb, inlineItems);
-  const isInlineOxQuestion = inlineItems.length > 0 && inlineExpected.length === inlineItems.length;
+  let inlineItems = parseInlineOxItems(limb.text || '');
+  let inlineExpected = getInlineOxExpectedAnswers(limb, inlineItems);
+  let isInlineOxQuestion = inlineItems.length > 0 && inlineExpected.length === inlineItems.length;
+  const targetInlineKey = String(session.inlineTargetKey || '');
+
+  if (isInlineOxQuestion && targetInlineKey) {
+    const targetIdx = inlineItems.findIndex(it => it.key === targetInlineKey);
+    if (targetIdx >= 0) {
+      inlineItems = [inlineItems[targetIdx]];
+      inlineExpected = [inlineExpected[targetIdx]];
+    }
+  }
+
+  const inlineFocused = isInlineOxQuestion && targetInlineKey && inlineItems.length === 1;
+  const inlineTextHtml = inlineFocused
+    ? `<div class="inline-focus-note">再挑戦対象: ${esc(inlineItems[0].key)}</div><div class="inline-focus-text">（${esc(inlineItems[0].body)}）${esc(inlineItems[0].tail || '')}</div>`
+    : (isInlineOxQuestion ? renderInlineOxText(limb.text) : esc(limb.text));
   const isChoiceQuestion = Array.isArray(limb.options) && limb.options.length >= 2;
   const answerButtonsHtml = isChoiceQuestion
     ? limb.options.map(opt => `<button class="btn-answer btn-choice" data-answer="${esc(opt)}">${esc(opt)}</button>`).join('')
@@ -962,7 +977,7 @@ function renderCurrentLimb() {
     <div class="limb-card card">
       ${limb.source ? `<div class="limb-meta"><span class="badge badge-source">${esc(limb.source)}</span> <span class="badge badge-subject">${esc(limb.subject)}</span>${limb.category ? ` <span class="badge badge-category">${esc(limb.category)}</span>` : ''}</div>` : `<div class="limb-meta"><span class="badge badge-subject">${esc(limb.subject)}</span>${limb.category ? ` <span class="badge badge-category">${esc(limb.category)}</span>` : ''}</div>`}
       ${limb.questionText ? `<div class="question-shared"><span class="question-label">問題文</span><span class="question-body">${esc(limb.questionText)}</span></div>` : ''}
-      <div class="limb-text">${isInlineOxQuestion ? renderInlineOxText(limb.text) : esc(limb.text)}</div>
+      <div class="limb-text">${inlineTextHtml}</div>
       <div class="limb-record">${rate !== null ? `正答率 ${rate}% (${rec.correct}○ ${rec.wrong}×)` : '未回答'}</div>
       ${answerSectionHtml}
     </div>
@@ -1592,11 +1607,14 @@ function renderStats() {
     const r = getRecord(limb.id);
     const t = r.correct + r.wrong;
     const rt = Math.round(r.correct / t * 100);
+    const inlineSuffix = String(limb.id).includes('::')
+      ? ` / 対話項目 ${esc(String(limb.id).split('::')[1] || '')}`
+      : '';
     return `<div class="weak-limb-row" data-limb-id="${esc(limb.id)}" role="button" tabindex="0" aria-label="この問題を再挑戦">
       <span class="weak-rank">${i + 1}</span>
       <div class="weak-limb-info">
         <div class="weak-limb-text">${esc(limb.text.slice(0, 80))}${limb.text.length > 80 ? '…' : ''}</div>
-        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(limb.category) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)</div>
+        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(limb.category) : ''}${inlineSuffix}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)</div>
       </div>
     </div>`;
   }).join('');
