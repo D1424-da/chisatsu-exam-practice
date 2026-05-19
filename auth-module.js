@@ -517,49 +517,6 @@ function switchAuthForm(form) {
 }
 
 // ===== 認証状態の監視 =====
-firebase.auth().onAuthStateChanged(async (user) => {
-  if (user) {
-    console.log('✓ ユーザーはログイン中:', user.email);
-    
-    // ログインオーバーレイを隠す
-    document.getElementById('login-overlay').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    
-    // グローバル変数にユーザー情報を保存
-    window.currentUser = {
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName || user.email.split('@')[0]
-    };
-    
-    // 問題データを読み込む
-        if (typeof loadData === 'function') loadData();
-        if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
-        
-        // ユーザー表示を更新
-    const userDisplayEl = document.getElementById('user-display-name');
-    if (userDisplayEl) {
-      userDisplayEl.textContent = window.currentUser.displayName;
-    }
-    
-    // ローカルストレージから成績を Firestore に同期（初回ログイン時など）
-    // TODO: 同期ロジック
-  } else {
-    console.log('✗ ユーザーはログインしていません');
-    
-    // アプリを隠す、ログイン画面を表示
-    document.getElementById('app').classList.add('hidden');
-    document.getElementById('login-overlay').classList.remove('hidden');
-    
-    // ログインフォームにリセット
-    switchAuthForm('login');
-    document.getElementById('login-email').value = '';
-    document.getElementById('login-password').value = '';
-    
-    // グローバル変数をクリア
-    window.currentUser = null;
-  }
-});
 
 // ===== イベントリスナー登録 =====
 document.addEventListener('DOMContentLoaded', () => {
