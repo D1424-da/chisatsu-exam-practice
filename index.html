@@ -11,6 +11,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Firebase configuration (must be after Firebase SDK) -->
+  <script src="firebase-config.js"></script>
 </head>
 <body>
   <!-- ログインオーバーレイ -->
@@ -343,7 +345,6 @@
     </div>
   </div>
 
-  <script src="firebase-config.js"></script>
   <script src="auth-module.js"></script>
   <script src="app.js"></script>
 </body>
