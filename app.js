@@ -6,6 +6,7 @@
  const KEY_QUESTIONS   = 'limb_questions';
 const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<uid>
 const KEY_RECORDS_META = 'limb_records_meta'; // パーユーザーキー: limb_records_meta_<uid>
+const KEY_STUDY_TIME  = 'limb_study_time'; // パーユーザーキー: limb_study_time_<uid>
 const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
@@ -19,6 +20,11 @@ let cloudQuestionsLoadedUid = null;
 let cloudPullInFlight = false;
 let cloudRecordsLoadedUid = null;
 let cloudRecordsPullInFlight = false;
+let cloudStudyLoadedUid = null;
+let cloudStudyPullInFlight = false;
+let cloudStudyFlushInFlight = false;
+let studyTime = { totalMs: 0, pendingDeltaMs: 0 };
+let sessionStudyStartedAt = 0;
 
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -38,6 +44,32 @@ function saveQuestionsMeta(meta) {
 
 function getRecordStorageKey(uid = getAuthUid()) {
   return uid ? `${KEY_RECORDS}_${uid}` : KEY_RECORDS;
+}
+
+function getStudyTimeStorageKey(uid = getAuthUid()) {
+  return uid ? `${KEY_STUDY_TIME}_${uid}` : KEY_STUDY_TIME;
+}
+
+function normalizeStudyTimeData(data) {
+  const totalMs = Math.max(0, Number(data?.totalMs || 0));
+  const pendingDeltaMs = Math.max(0, Number(data?.pendingDeltaMs || 0));
+  return { totalMs, pendingDeltaMs };
+}
+
+function loadStudyTimeLocal(uid = getAuthUid()) {
+  const key = getStudyTimeStorageKey(uid);
+  try {
+    return normalizeStudyTimeData(JSON.parse(localStorage.getItem(key)) || {});
+  } catch {
+    return { totalMs: 0, pendingDeltaMs: 0 };
+  }
+}
+
+function saveStudyTimeLocal(data, uid = getAuthUid()) {
+  const key = getStudyTimeStorageKey(uid);
+  const normalized = normalizeStudyTimeData(data || {});
+  localStorage.setItem(key, JSON.stringify(normalized));
+  studyTime = normalized;
 }
 
 function getRecordsMeta(uid = getAuthUid()) {
@@ -298,13 +330,161 @@ async function pushRecordsToCloud() {
   }
 }
 
+function formatStudyDuration(ms) {
+  const totalSec = Math.floor(Math.max(0, Number(ms || 0)) / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}時間 ${m}分`;
+  if (m > 0) return `${m}分 ${s}秒`;
+  return `${s}秒`;
+}
+
+function applyStudyDuration(elapsedMs) {
+  const delta = Math.floor(Number(elapsedMs || 0));
+  if (delta <= 0) return;
+  const uid = getAuthUid();
+  const local = loadStudyTimeLocal(uid);
+  saveStudyTimeLocal({
+    totalMs: local.totalMs + delta,
+    pendingDeltaMs: local.pendingDeltaMs + delta
+  }, uid);
+  flushStudyTimePendingToCloud();
+  tryRenderStatsIfOpen();
+}
+
+function startStudyTimerIfNeeded() {
+  if (sessionStudyStartedAt > 0) return;
+  sessionStudyStartedAt = Date.now();
+}
+
+function stopStudyTimerAndAccumulate() {
+  if (sessionStudyStartedAt <= 0) return;
+  const elapsed = Date.now() - sessionStudyStartedAt;
+  sessionStudyStartedAt = 0;
+  applyStudyDuration(elapsed);
+}
+
+async function flushStudyTimePendingToCloud() {
+  if (cloudStudyFlushInFlight) return;
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+
+  const local = loadStudyTimeLocal(uid);
+  const delta = Math.floor(Number(local.pendingDeltaMs || 0));
+  if (delta <= 0) return;
+
+  cloudStudyFlushInFlight = true;
+  try {
+    await firebase.firestore().collection('study_stats').doc(uid).set({
+      uid,
+      totalMs: firebase.firestore.FieldValue.increment(delta),
+      updatedAtMs: Date.now(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    const latest = loadStudyTimeLocal(uid);
+    saveStudyTimeLocal({
+      totalMs: latest.totalMs,
+      pendingDeltaMs: Math.max(0, latest.pendingDeltaMs - delta)
+    }, uid);
+  } catch (e) {
+    console.warn('学習時間同期(保存)エラー:', e);
+  } finally {
+    cloudStudyFlushInFlight = false;
+  }
+}
+
+async function pullStudyTimeFromCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid || cloudStudyPullInFlight) return;
+  if (cloudStudyLoadedUid === uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+
+  cloudStudyPullInFlight = true;
+  try {
+    const local = loadStudyTimeLocal(uid);
+    const ref = firebase.firestore().collection('study_stats').doc(uid);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      const seedTotal = Math.max(0, Number(local.totalMs || 0));
+      if (seedTotal > 0) {
+        await ref.set({
+          uid,
+          totalMs: seedTotal,
+          updatedAtMs: Date.now(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        saveStudyTimeLocal({ totalMs: seedTotal, pendingDeltaMs: 0 }, uid);
+      } else {
+        saveStudyTimeLocal(local, uid);
+      }
+      cloudStudyLoadedUid = uid;
+      return;
+    }
+
+    const data = snap.data() || {};
+    const cloudTotal = Math.max(0, Number(data.totalMs || 0));
+    const localSynced = Math.max(0, Number(local.totalMs || 0) - Number(local.pendingDeltaMs || 0));
+    const pending = Math.max(0, Number(local.pendingDeltaMs || 0));
+    const mergedSynced = Math.max(cloudTotal, localSynced);
+    const mergedTotal = mergedSynced + pending;
+
+    saveStudyTimeLocal({
+      totalMs: mergedTotal,
+      pendingDeltaMs: pending
+    }, uid);
+
+    if (mergedSynced > cloudTotal && pending === 0) {
+      await ref.set({
+        uid,
+        totalMs: mergedSynced,
+        updatedAtMs: Date.now(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
+    if (pending > 0) {
+      await flushStudyTimePendingToCloud();
+    }
+
+    tryRenderStatsIfOpen();
+    cloudStudyLoadedUid = uid;
+  } catch (e) {
+    console.warn('学習時間同期(取得)エラー:', e);
+  } finally {
+    cloudStudyPullInFlight = false;
+  }
+}
+
+async function resetStudyTime() {
+  stopStudyTimerAndAccumulate();
+  const uid = getAuthUid();
+  saveStudyTimeLocal({ totalMs: 0, pendingDeltaMs: 0 }, uid);
+  if (!uid || !(window.firebase && firebase.firestore)) return;
+  try {
+    await firebase.firestore().collection('study_stats').doc(uid).set({
+      uid,
+      totalMs: 0,
+      updatedAtMs: Date.now(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.warn('学習時間リセット同期エラー:', e);
+  }
+}
+
 function loadData() {
   currentUser = getActiveUser();
   try { questions = JSON.parse(localStorage.getItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
   const rk = getRecordStorageKey();
   try { records   = JSON.parse(localStorage.getItem(rk)) || {}; } catch { records = {}; }
+  studyTime = loadStudyTimeLocal();
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded();
+  pullStudyTimeFromCloudIfNeeded();
 }
 
 async function syncBundledQuestions() {
@@ -536,13 +716,17 @@ async function hashPassword(pw) {
 // NOTE: Use Firebase Auth API instead: firebase.auth().signInWithEmailAndPassword(email, password)
 
 function logout() {
+  stopStudyTimerAndAccumulate();
   currentUser = null;
   sessionStorage.removeItem(KEY_SESSION_USER);
   session = null;
   questions = [];
   records = {};
+  studyTime = { totalMs: 0, pendingDeltaMs: 0 };
+  sessionStudyStartedAt = 0;
   cloudQuestionsLoadedUid = null;
   cloudRecordsLoadedUid = null;
+  cloudStudyLoadedUid = null;
   showLoginOverlay();
 }
 
@@ -844,6 +1028,7 @@ function refreshFilterOptions() {
 
 // ── 学習セッション ────────────────────────────────────────────
 function startSession() {
+  stopStudyTimerAndAccumulate();
   const subject  = document.getElementById('filter-subject').value;
   const category = document.getElementById('filter-category').value;
   const yearFrom = document.getElementById('filter-year-from').value;
@@ -886,12 +1071,14 @@ function startSession() {
   }
 
   session = { queue: limbs, index: 0 };
+  startStudyTimerIfNeeded();
   document.getElementById('session-info').classList.remove('hidden');
   document.getElementById('btn-start').textContent = '最初から';
   renderCurrentLimb();
 }
 
 function startSessionWithLimbId(limbId) {
+  stopStudyTimerAndAccumulate();
   const raw = String(limbId || '');
   const [baseId, inlineKey = ''] = raw.split('::');
   if (!baseId) return;
@@ -903,6 +1090,7 @@ function startSessionWithLimbId(limbId) {
   }
 
   session = { queue: [target], index: 0, inlineTargetKey: inlineKey || null };
+  startStudyTimerIfNeeded();
   showPage('study');
   document.getElementById('session-info').classList.remove('hidden');
   document.getElementById('btn-start').textContent = '最初から';
@@ -910,6 +1098,7 @@ function startSessionWithLimbId(limbId) {
 }
 
 function endSession() {
+  stopStudyTimerAndAccumulate();
   session = null;
   document.getElementById('session-info').classList.add('hidden');
   document.getElementById('btn-start').textContent = '学習開始';
@@ -1577,6 +1766,8 @@ function renderStats() {
   document.getElementById('stat-rate').textContent   = rate !== null ? rate + '%' : '-%';
   document.getElementById('stat-limbs').textContent  = answered.length;
   document.getElementById('stat-weak').textContent   = weak.length;
+  const studyEl = document.getElementById('stat-study-time');
+  if (studyEl) studyEl.textContent = formatStudyDuration(studyTime.totalMs);
 
   // 科目別
   const subjectMap = {};
@@ -1821,9 +2012,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // 成績リセット
-  document.getElementById('btn-reset-stats').addEventListener('click', () => {
+  document.getElementById('btn-reset-stats').addEventListener('click', async () => {
     if (!confirm('すべての成績をリセットしますか？')) return;
     records = {};
+    await resetStudyTime();
     saveRecords();
     renderStats();
   });
@@ -1841,5 +2033,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!row) return;
     e.preventDefault();
     startSessionWithLimbId(row.dataset.limbId);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopStudyTimerAndAccumulate();
+      return;
+    }
+    if (session) startStudyTimerIfNeeded();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    stopStudyTimerAndAccumulate();
   });
 });
