@@ -378,7 +378,7 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
 
       const inlineWrong = [];
       const parts = [];
-      q.limbs.forEach((l, i) => {
+      q.limbs.slice(0, 5).forEach((l, i) => {
         const key = keys[i] || String(i + 1);
         // Prefer combo-based reconstruction when available; fallback to existing limb.correct.
         let isCorrect = typeof l.correct === 'boolean' ? l.correct : false;
