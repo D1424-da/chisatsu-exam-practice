@@ -361,13 +361,16 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
 
     const qText = q.questionText || '';
     const isCountQuestion = qText.includes('幾つあるか');
+    const isDialogueKeyword = qText.includes('対話');
     const isCombinationKeyword = /組み合わせ|組合せ/.test(qText);
+    const isDialogueCombination = isDialogueKeyword && isCombinationKeyword;
 
     // Keyword rule:
     // - "幾つあるか" questions -> inline OX
-    // - questions containing "組み合わせ/組合せ" -> inline OX
-    //   (including "対話" + "組み合わせ")
-    if ((isCountQuestion || isCombinationKeyword) && Array.isArray(q.limbs) && q.limbs.length >= 2) {
+    // - questions containing "対話" -> inline OX
+    // - "対話" + "組み合わせ/組合せ" -> inline OX
+    // - "組み合わせ/組合せ" only -> keep normal OX (no inline synthesis)
+    if ((isCountQuestion || isDialogueKeyword || isDialogueCombination) && Array.isArray(q.limbs) && q.limbs.length >= 2) {
       const keys = ['ア', 'イ', 'ウ', 'エ', 'オ'];
       const combo = String(q.correctCombo || '');
       const isInverted = qText.includes('誤っている');
