@@ -7,30 +7,152 @@
 const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<userId>
 const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
+const KEY_QUESTIONS_META = 'limb_questions_meta';
 
 // ── 状態 ────────────────────────────────────────────
 let questions   = [];   // 全問題
 let records     = {};   // 成績
 let session     = null; // 現在の学習セッション { queue: [limb], index, filter }
 let currentUser = null; // { id, name }
+let cloudQuestionsLoadedUid = null;
+let cloudPullInFlight = false;
 
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+function getQuestionsMeta() {
+  try {
+    const m = JSON.parse(localStorage.getItem(KEY_QUESTIONS_META));
+    return (m && typeof m === 'object') ? m : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveQuestionsMeta(meta) {
+  localStorage.setItem(KEY_QUESTIONS_META, JSON.stringify(meta || {}));
+}
+
+function getAuthUid() {
+  try {
+    if (window.firebase && firebase.auth && firebase.auth().currentUser) {
+      return firebase.auth().currentUser.uid;
+    }
+  } catch {
+    // ignore
+  }
+  return window.currentUser?.uid || null;
+}
+
+async function pullQuestionsFromCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid || cloudPullInFlight) return;
+  if (cloudQuestionsLoadedUid === uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+
+  cloudPullInFlight = true;
+  try {
+    const ref = firebase.firestore().collection('question_sets').doc(uid);
+    const snap = await ref.get();
+    const meta = getQuestionsMeta();
+    const localEditedAt = Number(meta.localEditedAt || 0);
+
+    if (!snap.exists) {
+      // First login on this account: seed cloud with current local questions if any.
+      if (Array.isArray(questions) && questions.length > 0) {
+        await ref.set({
+          uid,
+          questions,
+          updatedAtMs: Date.now(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+      cloudQuestionsLoadedUid = uid;
+      return;
+    }
+
+    const data = snap.data() || {};
+    const remoteQuestions = Array.isArray(data.questions) ? data.questions : null;
+    const remoteEditedAt = Number(data.updatedAtMs || 0);
+    if (!remoteQuestions || remoteQuestions.length === 0) {
+      cloudQuestionsLoadedUid = uid;
+      return;
+    }
+
+    // Prefer remote when local is empty or remote is newer.
+    const shouldUseRemote = !Array.isArray(questions) || questions.length === 0 || remoteEditedAt >= localEditedAt;
+    if (shouldUseRemote) {
+      questions = remoteQuestions;
+      localStorage.setItem(KEY_QUESTIONS, JSON.stringify(questions));
+      saveQuestionsMeta({
+        ...meta,
+        localEditedAt: remoteEditedAt || Date.now(),
+        localDirty: false,
+        lastCloudPullAt: Date.now()
+      });
+    }
+    cloudQuestionsLoadedUid = uid;
+  } catch (e) {
+    console.warn('クラウド問題データ同期(取得)エラー:', e);
+  } finally {
+    cloudPullInFlight = false;
+  }
+}
+
+async function pushQuestionsToCloud() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  try {
+    await firebase.firestore().collection('question_sets').doc(uid).set({
+      uid,
+      questions,
+      updatedAtMs: Date.now(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.warn('クラウド問題データ同期(保存)エラー:', e);
+  }
+}
 
 function loadData() {
   try { questions = JSON.parse(localStorage.getItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
   const rk = currentUser ? `${KEY_RECORDS}_${currentUser.id}` : KEY_RECORDS;
   try { records   = JSON.parse(localStorage.getItem(rk)) || {}; } catch { records = {}; }
+  pullQuestionsFromCloudIfNeeded();
 }
 
 async function syncBundledQuestions() {
   try {
+    const local = JSON.parse(localStorage.getItem(KEY_QUESTIONS) || '[]');
+    const meta = getQuestionsMeta();
+    // Preserve explicit local edits/imports on this device.
+    if (meta.localDirty) return;
+
     const resp = await fetch(`output/all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
     if (!resp.ok) return;
     const bundled = await resp.json();
     if (!Array.isArray(bundled) || bundled.length === 0) return;
+
+    const localJson = JSON.stringify(Array.isArray(local) ? local : []);
+    const bundledJson = JSON.stringify(bundled);
+    if (localJson === bundledJson) {
+      saveQuestionsMeta({
+        ...meta,
+        localDirty: false,
+        lastBundledSyncAt: Date.now()
+      });
+      return;
+    }
+
     localStorage.setItem(KEY_QUESTIONS, JSON.stringify(bundled));
     questions = bundled;
+    saveQuestionsMeta({
+      ...meta,
+      localDirty: false,
+      localEditedAt: Number(meta.localEditedAt || 0),
+      lastBundledSyncAt: Date.now()
+    });
   } catch {
     // Bundled JSON is optional; fall back to existing localStorage data.
   }
@@ -38,6 +160,12 @@ async function syncBundledQuestions() {
 
 function saveQuestions() {
   localStorage.setItem(KEY_QUESTIONS, JSON.stringify(questions));
+  saveQuestionsMeta({
+    ...getQuestionsMeta(),
+    localDirty: true,
+    localEditedAt: Date.now()
+  });
+  pushQuestionsToCloud();
   writeToFile();
 }
 
@@ -553,6 +681,23 @@ function startSession() {
   }
 
   session = { queue: limbs, index: 0 };
+  document.getElementById('session-info').classList.remove('hidden');
+  document.getElementById('btn-start').textContent = '最初から';
+  renderCurrentLimb();
+}
+
+function startSessionWithLimbId(limbId) {
+  const baseId = String(limbId || '').split('::')[0];
+  if (!baseId) return;
+
+  const target = getAllLimbs('', '', false).find(l => l.id === baseId);
+  if (!target) {
+    alert('対象の問題が見つかりませんでした。');
+    return;
+  }
+
+  session = { queue: [target], index: 0 };
+  showPage('study');
   document.getElementById('session-info').classList.remove('hidden');
   document.getElementById('btn-start').textContent = '最初から';
   renderCurrentLimb();
@@ -1232,17 +1377,17 @@ function renderStats() {
   }).join('');
   document.getElementById('subject-stats').innerHTML = subjectHtml || '<p>データなし</p>';
 
-  // 苦手肢トップ10
+  // 苦手肢トップ50
   const weakSorted = allLimbs
     .filter(l => getRecord(l.id).wrong > 0)
     .sort((a, b) => weakScore(b.id) - weakScore(a.id))
-    .slice(0, 10);
+    .slice(0, 50);
 
   const weakHtml = weakSorted.map((limb, i) => {
     const r = getRecord(limb.id);
     const t = r.correct + r.wrong;
     const rt = Math.round(r.correct / t * 100);
-    return `<div class="weak-limb-row">
+    return `<div class="weak-limb-row" data-limb-id="${esc(limb.id)}" role="button" tabindex="0" aria-label="この問題を再挑戦">
       <span class="weak-rank">${i + 1}</span>
       <div class="weak-limb-info">
         <div class="weak-limb-text">${esc(limb.text.slice(0, 80))}${limb.text.length > 80 ? '…' : ''}</div>
@@ -1468,5 +1613,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     records = {};
     saveRecords();
     renderStats();
+  });
+
+  // 苦手肢リストから再挑戦
+  const weakList = document.getElementById('weak-limbs-list');
+  weakList.addEventListener('click', (e) => {
+    const row = e.target.closest('.weak-limb-row[data-limb-id]');
+    if (!row) return;
+    startSessionWithLimbId(row.dataset.limbId);
+  });
+  weakList.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('.weak-limb-row[data-limb-id]');
+    if (!row) return;
+    e.preventDefault();
+    startSessionWithLimbId(row.dataset.limbId);
   });
 });
