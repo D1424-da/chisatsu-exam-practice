@@ -24,14 +24,14 @@
                           "id":  "H28-1-l2",
                           "text":  "ＡがＢに対して貸金返還請求の訴えを提起した場合には、その訴訟手続きにおけるＡの権利行使の意思の表示は、その訴えが取り下げられたときにおいても、Ｂに対する催告として時効の中断の効力を有する。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-1-l3",
                           "text":  "時効の完成前にＢがＡに対しての債務の一部弁済として５０万円を支払ったときは、当該債務の残務について時効の中断の効力は生じない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -42,8 +42,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "アエ"
     },
     {
         "id":  "H28-2",
@@ -56,28 +55,28 @@
                           "id":  "H28-2-l0",
                           "text":  "土地の所有者が隣地の所有者と共同して境界標を設けるときは、その設置の費用は、双方の土地の広狭に応じて分担する。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-2-l1",
                           "text":  "境界線から５０センチメートル以上の距離を保たないで建物の建築をしようとする者があるときであっても、建築に着手した時から１年を経過した後は、隣地の所有者は、その建築を中止させることができない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-2-l2",
                           "text":  "土地の所有者は、隣地の竹木の枝が境界線を越えるときは、その枝を切り取ることができる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-2-l3",
                           "text":  "土地の所有者は、境界の付近において建物を修繕するため必要があるときであっても、隣人の承諾がなければ、その住家に立ち入ることはできない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -88,8 +87,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "イエ"
     },
     {
         "id":  "H28-3",
@@ -134,8 +132,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アオ",
-        "needsReview":  false
+        "correctCombo":  "アオ"
     },
     {
         "id":  "H28-4",
@@ -148,7 +145,7 @@
                           "id":  "H28-4-l0",
                           "text":  "申請人が登記識別情報を提供することができないことにつき正当な理由がある場合は、当該登記識別情報を提供することができない理由を申請情報の内容とすることを要しない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -162,7 +159,7 @@
                           "id":  "H28-4-l2",
                           "text":  "所有権の登記がある土地の合筆の登記の申請につき事前通知がされる場合において、当該合筆の登記の申請が所有権の登記名義人の住所の変更の登記の申請に係る受付の日から６か月後にされているときは、登記官から当該登記名義人の登記記録上の前の住所にあてて当該合筆の登記の申請があったことの通知はされない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -180,8 +177,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アオ",
-        "needsReview":  false
+        "correctCombo":  "ウオ"
     },
     {
         "id":  "H28-5",
@@ -226,8 +222,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アオ",
-        "needsReview":  false
+        "correctCombo":  "アオ"
     },
     {
         "id":  "H28-6",
@@ -254,14 +249,14 @@
                           "id":  "H28-6-l2",
                           "text":  "土地の合筆の登記を申請する場合には、所有権の登記名義人が登記識別情報を提供することができないときに提供する資格者代理人が作成した本人確認情報は、作成後３ヵ月以内のものでなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-6-l3",
                           "text":  "書面により所有権の登記がある土地の合筆の登記を申請する場合には、当該登記の申請のためにのみ作成された委任状については、原本の還付を請求することができない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -272,8 +267,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "アウ"
     },
     {
         "id":  "H28-7",
@@ -286,7 +280,7 @@
                           "id":  "H28-7-l0",
                           "text":  "委任状において、Ａ，Ｂ及びＣの３人が登記の申請について代理人として選任されていることが明らかである場合には、Ａ，Ｂ及びＣは、特に共同代理の定めがされていないときであっても、共同して登記の申請の手続きをしなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -300,26 +294,25 @@
                           "id":  "H28-7-l2",
                           "text":  "委任による代理人により土地の分筆の登記を申請した後に、申請意思の撤回により当該代理人が当該登記の申請を取り下げるときは、当該登記の申請の取下げに関する委任状を添付しなければならない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-7-l3",
                           "text":  "未成年者が所有する土地の地積の更正の登記の申請の委任を親権者から受けた代理人は、その後に当該親権者について破産手続開始の決定がされたときは、当該登記を申請することができない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-7-l4",
                           "text":  "所有権の登記名義人から土地の地目の変更の登記の申請の委任を受けた代理人は、当該登記を申請するまでの間に所有権の登記名義人が死亡したときであっても、当該登記を申請することができる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "ウオ"
     },
     {
         "id":  "H28-8",
@@ -364,8 +357,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アオ",
-        "needsReview":  false
+        "correctCombo":  "アオ"
     },
     {
         "id":  "H28-9",
@@ -378,28 +370,28 @@
                           "id":  "H28-9-l0",
                           "text":  "土地の分筆の登記をし、分筆後の一筆の土地につき所有権の移転の登記をした後、当該分筆の登記の申請の際に添付情報として提供した地積測量図の分筆線に誤りがあることが発見された場合には、地図の訂正の申出により地図の分筆線を訂正することができる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-9-l1",
                           "text":  "Ａ及びＢが所有権の登記名義人である土地に共有物分割禁止の定めの登記がある場合であっても、Ａ及びＢは、当該土地の分筆の登記を申請することができる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-9-l2",
                           "text":  "Ａ及びＢが所有権の登記名義人である土地の分筆の登記を書面により申請する場合において、その申請書が２枚以上であるときは、Ａ又はＢのいずれかが、各用紙のつづり目に契印すれば足りる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-9-l3",
                           "text":  "市街地地域内の土地の分筆の登記を申請する場合において、その土地を管轄する登記所に備え付けられている地図が乙１の精度区分で作成されており、かつ、当該土地の分筆前の地積と分筆後の地積の差が分筆前の地積を基準にして乙１の精度区分の限度内であるときは、地積に関する更正の登記の申請を要しない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -410,8 +402,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "イウ"
     },
     {
         "id":  "H28-10",
@@ -438,14 +429,14 @@
                           "id":  "H28-10-l2",
                           "text":  "甲土地及び乙土地の地目がいずれも保安林であるときは、保安林としての指定が解除されない限り、甲土地を乙土地に合筆する合筆の登記を申請することができない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-10-l3",
                           "text":  "甲土地及び乙土地にいずれも質権の設定の登記がされている場合において、当該質権の設定の登記の申請の受付の年月日及び受付番号並びに登記原因及びその日付が同一であるときは、甲土地を乙土地に合筆する合筆の登記を申請することができる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -456,8 +447,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "アエ"
     },
     {
         "id":  "H28-11",
@@ -502,8 +492,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "",
-        "needsReview":  true
+        "correctCombo":  ""
     },
     {
         "id":  "H28-12",
@@ -516,28 +505,28 @@
                           "id":  "H28-12-l0",
                           "text":  "共同住宅として登記されている甲建物を、階層的に区分してその一部を１個の建物とする場合において、建物の構造を記録するときは、屋根の種類を記録することを要しない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-12-l1",
                           "text":  "２階建ての甲建物がガード下に新築された場合において、建物の構造を記録するときは、階数による区分として「ガード下２階建」と記録する。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-12-l2",
                           "text":  "一室の一部に天井の高さが1.5メートル未満の部分がある場合、その部分は当該一室の面積に算入しない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-12-l3",
                           "text":  "停車場の上屋を有する乗降場及び荷物積卸場の床面積は、地下道設備があるときは、その上屋の占める部分の乗降場及び荷物積卸場の面積に当該地下道設備の面積を算入して計算する。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -548,8 +537,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "ウエ"
     },
     {
         "id":  "H28-13",
@@ -569,7 +557,7 @@
                           "id":  "H28-13-l1",
                           "text":  "本件分割登記を申請する場合において、甲建物に共用部分である旨の登記があるときは、建物の所有権を証する情報の添付を要しない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -583,7 +571,7 @@
                           "id":  "H28-13-l3",
                           "text":  "本件分割登記に係る分割により不動産所在事項に変更が生じたときは、変更後の不動産所在事項、分割により変更した旨及び変更前の不動産所在事項を抹消する記号が記録される。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -594,8 +582,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "アエ"
     },
     {
         "id":  "H28-14",
@@ -640,8 +627,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "アエ"
     },
     {
         "id":  "H28-15",
@@ -654,7 +640,7 @@
                           "id":  "H28-15-l0",
                           "text":  "表題登記がない甲建物と所有権の登記がある乙建物が合体した後に合体前の乙建物の所有権の登記名義人となった者は、その者に係る所有権の登記があった日から１か月以内に、合体による登記等を申請しなければならない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -668,26 +654,25 @@
                           "id":  "H28-15-l2",
                           "text":  "Ａが所有者である表題登記がない甲建物とＢが表題部所有者である乙建物が合体した場合において、合体による登記等の申請は、Ａ又はＢが単独で申請することができる。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-15-l3",
                           "text":  "表題登記がある甲建物と所有権の登記がある乙建物が合体し、合体による登記等の申請がされた場合において、合体前の乙建物に賃借権の登記がされているときは、当該賃借権の登記を合体後の建物の登記記録の権利部の相当区に移記しなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-15-l4",
                           "text":  "主たる建物とその附属建物が合体した場合は、合体による登記等を申請しなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アウ",
-        "needsReview":  false
+        "correctCombo":  "エオ"
     },
     {
         "id":  "H28-16",
@@ -700,28 +685,28 @@
                           "id":  "H28-16-l0",
                           "text":  "区分建物である建物を新築した株式会社Ａを株式会社Ｂが吸収合併したときは、株式会社Ｂは、同社を表題部所有者とする区分建物の表題登記を申請することができる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-16-l1",
                           "text":  "区分建物の表題登記をその原始取得者の相続人が申請するときは、所有権を証する情報の一部として相続を証する情報を提供しなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-16-l2",
                           "text":  "敷地権があるのにその登記をしないで区分建物の表題登記がされていた場合において、建物の表題部の更正の登記を申請するときは、敷地権の表示の登記原因及びその日付も申請情報の内容としなければならない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
                           "id":  "H28-16-l3",
                           "text":  "表題登記がない区分建物の処分の制限の登記の嘱託は、当該区分建物が属することとなった一棟の建物に属する他の区分建物についての表題登記の嘱託と併せてすることを要しない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -732,8 +717,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "ウエ"
     },
     {
         "id":  "H28-17",
@@ -778,8 +762,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アエ",
-        "needsReview":  false
+        "correctCombo":  "アエ"
     },
     {
         "id":  "H28-18",
@@ -799,7 +782,7 @@
                           "id":  "H28-18-l1",
                           "text":  "筆界特定の申請をする場合において、関係土地の所有者が筆界として特定の線を主張しているときは、その線を筆界特定申請情報の内容としなければならない。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -813,7 +796,7 @@
                           "id":  "H28-18-l3",
                           "text":  "筆界特定登記官が筆界特定書を作成し、筆界特定の申請人に対して筆界特定の通知を発送した後は、当該申請人は、筆界特定の申請を取り下げることができない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       },
                       {
@@ -824,8 +807,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アイ",
-        "needsReview":  false
+        "correctCombo":  "アエ"
     },
     {
         "id":  "H28-19",
@@ -870,8 +852,7 @@
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "",
-        "needsReview":  true
+        "correctCombo":  ""
     },
     {
         "id":  "H28-20",
@@ -891,7 +872,7 @@
                           "id":  "H28-20-l1",
                           "text":  "ＸがＹの社員である場合には、Ｘは、Ｙの総社員の同意が得られたときに限り、自己又は第三者のために筆界特定手続代理関係業務を行うことができる。",
                           "context":  "",
-                          "correct":  true,
+                          "correct":  false,
                           "explanation":  ""
                       },
                       {
@@ -912,11 +893,10 @@
                           "id":  "H28-20-l4",
                           "text":  "ＸがＹの使用人であって、Ａから筆界特定手続代理関係業務に関する事件を受任している場合には、Ｙは、Ａが同意したときであっても、当該事件の相手方であるＢから、当該事件についての筆界特定手続代理関係業務を受任することができない。",
                           "context":  "",
-                          "correct":  false,
+                          "correct":  true,
                           "explanation":  ""
                       }
                   ],
-        "correctCombo":  "アオ",
-        "needsReview":  false
+        "correctCombo":  "アイ"
     }
 ]
