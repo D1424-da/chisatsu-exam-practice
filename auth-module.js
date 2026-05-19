@@ -1,4 +1,4 @@
-// Firebase Authentication Module
+﻿// Firebase Authentication Module
 // Firebase 認証と Firestore データベースの連携
 
 // ===== ユーティリティ関数 =====
@@ -200,7 +200,11 @@ function setupAuthStateListener() {
         displayName: user.displayName || user.email.split('@')[0]
       };
       
-      // ユーザー表示を更新
+      // 問題データを読み込む
+        if (typeof loadData === 'function') loadData();
+        if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+        
+        // ユーザー表示を更新
       const userDisplayEl = document.getElementById('user-display-name');
       if (userDisplayEl) {
         userDisplayEl.textContent = window.currentUser.displayName;
@@ -528,7 +532,11 @@ firebase.auth().onAuthStateChanged(async (user) => {
       displayName: user.displayName || user.email.split('@')[0]
     };
     
-    // ユーザー表示を更新
+    // 問題データを読み込む
+        if (typeof loadData === 'function') loadData();
+        if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+        
+        // ユーザー表示を更新
     const userDisplayEl = document.getElementById('user-display-name');
     if (userDisplayEl) {
       userDisplayEl.textContent = window.currentUser.displayName;
