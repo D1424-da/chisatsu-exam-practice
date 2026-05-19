@@ -1910,8 +1910,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await syncBundledQuestions();
 
   // ── 認証の初期表示 ────────────────────────────────────────
-  // ログイン不能を避けるため、起動時は確実にログイン画面を表示する。
-  showLoginOverlay();
+  // Firebase の onAuthStateChanged で認証状態を確認し、正しい UI を表示する。
+  // ページ読込時は何も表示しない（ちらつき防止）
+  // showLoginOverlay() は削除 - auth-module.js で必要に応じて表示される
 
   // ログイン・登録は auth-module.js で処理
   // Firebase Authentication のイベントハンドラは auth-module.js で設定済み
