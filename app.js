@@ -7,6 +7,7 @@
 const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<uid>
 const KEY_RECORDS_META = 'limb_records_meta'; // パーユーザーキー: limb_records_meta_<uid>
 const KEY_STUDY_TIME  = 'limb_study_time'; // パーユーザーキー: limb_study_time_<uid>
+const KEY_STUDY_SESSION = 'limb_study_session'; // パーユーザーキー: limb_study_session_<uid>
 const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
@@ -52,6 +53,10 @@ function getStudyTimeStorageKey(uid = getAuthUid()) {
   return uid ? `${KEY_STUDY_TIME}_${uid}` : KEY_STUDY_TIME;
 }
 
+function getStudySessionStorageKey(uid = getAuthUid()) {
+  return uid ? `${KEY_STUDY_SESSION}_${uid}` : KEY_STUDY_SESSION;
+}
+
 function normalizeStudyTimeData(data) {
   const totalMs = Math.max(0, Number(data?.totalMs || 0));
   const pendingDeltaMs = Math.max(0, Number(data?.pendingDeltaMs || 0));
@@ -72,6 +77,133 @@ function saveStudyTimeLocal(data, uid = getAuthUid()) {
   const normalized = normalizeStudyTimeData(data || {});
   localStorage.setItem(key, JSON.stringify(normalized));
   studyTime = normalized;
+}
+
+function getStudyFilters() {
+  return {
+    subject: document.getElementById('filter-subject')?.value || '',
+    category: document.getElementById('filter-category')?.value || '',
+    yearFrom: document.getElementById('filter-year-from')?.value || '',
+    yearTo: document.getElementById('filter-year-to')?.value || '',
+    mode: document.getElementById('filter-mode')?.value || 'all'
+  };
+}
+
+function setStudyFilters(filters = {}) {
+  const subjectEl = document.getElementById('filter-subject');
+  const categoryEl = document.getElementById('filter-category');
+  const yearFromEl = document.getElementById('filter-year-from');
+  const yearToEl = document.getElementById('filter-year-to');
+  const modeEl = document.getElementById('filter-mode');
+
+  if (subjectEl) subjectEl.value = filters.subject || '';
+  if (categoryEl && subjectEl) {
+    const categories = getCategories(subjectEl.value);
+    categoryEl.innerHTML = '<option value="">すべて</option>' + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    categoryEl.value = categories.includes(filters.category || '') ? (filters.category || '') : '';
+  }
+  if (yearFromEl) yearFromEl.value = filters.yearFrom || '';
+  if (yearToEl) yearToEl.value = filters.yearTo || '';
+  if (modeEl) modeEl.value = filters.mode || 'all';
+}
+
+function readSavedStudySession(uid = getAuthUid()) {
+  const key = getStudySessionStorageKey(uid);
+  try {
+    const saved = JSON.parse(localStorage.getItem(key));
+    if (!saved || typeof saved !== 'object' || !Array.isArray(saved.queueIds)) return null;
+    return {
+      queueIds: saved.queueIds.map(id => String(id || '')).filter(Boolean),
+      index: Math.max(0, Math.floor(Number(saved.index || 0))),
+      fromPage: saved.fromPage === 'stats' ? 'stats' : 'study',
+      filters: {
+        subject: saved.filters?.subject || '',
+        category: saved.filters?.category || '',
+        yearFrom: saved.filters?.yearFrom || '',
+        yearTo: saved.filters?.yearTo || '',
+        mode: saved.filters?.mode || 'all'
+      },
+      savedAt: Math.max(0, Number(saved.savedAt || 0))
+    };
+  } catch {
+    return null;
+  }
+}
+
+function updateResumeSessionButton() {
+  const btn = document.getElementById('btn-resume-session');
+  if (!btn) return;
+  if (session) {
+    btn.classList.add('hidden');
+    btn.disabled = true;
+    return;
+  }
+  const saved = readSavedStudySession();
+  if (!saved || saved.queueIds.length === 0 || saved.index >= saved.queueIds.length) {
+    btn.classList.add('hidden');
+    btn.disabled = true;
+    return;
+  }
+  btn.classList.remove('hidden');
+  btn.disabled = false;
+  const remaining = Math.max(1, saved.queueIds.length - saved.index);
+  btn.textContent = `前回の続きから（残り${remaining}問）`;
+}
+
+function saveStudySessionSnapshot() {
+  const uid = getAuthUid();
+  if (!uid || !session || !Array.isArray(session.queue) || session.queue.length === 0) return;
+  const key = getStudySessionStorageKey(uid);
+  const snapshot = {
+    queueIds: session.queue.map(limb => limb?.id).filter(Boolean),
+    index: Math.max(0, Math.floor(Number(session.index || 0))),
+    fromPage: session.fromPage || 'study',
+    filters: session.filters || getStudyFilters(),
+    savedAt: Date.now()
+  };
+  localStorage.setItem(key, JSON.stringify(snapshot));
+  updateResumeSessionButton();
+}
+
+function clearStudySessionSnapshot() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  localStorage.removeItem(getStudySessionStorageKey(uid));
+  updateResumeSessionButton();
+}
+
+function rebuildSessionQueue(queueIds) {
+  const limbMap = new Map(getAllLimbs('', '', false).map(limb => [limb.id, limb]));
+  return queueIds.map(id => limbMap.get(id)).filter(Boolean);
+}
+
+function restoreLastStudySession() {
+  const saved = readSavedStudySession();
+  if (!saved) {
+    alert('再開できる前回の学習セッションがありません。');
+    return false;
+  }
+
+  const queue = rebuildSessionQueue(saved.queueIds);
+  if (queue.length === 0 || saved.index >= queue.length) {
+    clearStudySessionSnapshot();
+    alert('前回の学習セッションを復元できませんでした。');
+    return false;
+  }
+
+  setStudyFilters(saved.filters);
+  session = {
+    queue,
+    index: Math.max(0, saved.index),
+    fromPage: saved.fromPage || 'study',
+    filters: saved.filters || getStudyFilters()
+  };
+  showPage('study');
+  document.getElementById('session-info').classList.remove('hidden');
+  document.getElementById('btn-start').textContent = '最初から';
+  startStudyTimerIfNeeded();
+  renderCurrentLimb();
+  return true;
 }
 
 function getRecordsMeta(uid = getAuthUid()) {
@@ -562,6 +694,7 @@ function loadData() {
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded();
   pullStudyTimeFromCloudIfNeeded();
+  updateResumeSessionButton();
 }
 
 async function syncBundledQuestions() {
@@ -1107,11 +1240,12 @@ function refreshFilterOptions() {
 // ── 学習セッション ────────────────────────────────────────────
 function startSession() {
   stopStudyTimerAndAccumulate();
-  const subject  = document.getElementById('filter-subject').value;
-  const category = document.getElementById('filter-category').value;
-  const yearFrom = document.getElementById('filter-year-from').value;
-  const yearTo   = document.getElementById('filter-year-to').value;
-  const mode     = document.getElementById('filter-mode').value;
+  const filters = getStudyFilters();
+  const subject  = filters.subject;
+  const category = filters.category;
+  const yearFrom = filters.yearFrom;
+  const yearTo   = filters.yearTo;
+  const mode     = filters.mode;
 
   let limbs = getAllLimbs(subject, category);
 
@@ -1148,10 +1282,11 @@ function startSession() {
     return;
   }
 
-  session = { queue: limbs, index: 0 };
+  session = { queue: limbs, index: 0, fromPage: 'study', filters };
   startStudyTimerIfNeeded();
   document.getElementById('session-info').classList.remove('hidden');
   document.getElementById('btn-start').textContent = '最初から';
+  saveStudySessionSnapshot();
   renderCurrentLimb();
 }
 
@@ -1167,20 +1302,26 @@ function startSessionWithLimbId(limbId) {
     return;
   }
 
-  session = { queue: [target], index: 0, fromPage: 'stats' };
+  session = { queue: [target], index: 0, fromPage: 'stats', filters: getStudyFilters() };
   startStudyTimerIfNeeded();
   showPage('study');
   document.getElementById('session-info').classList.remove('hidden');
   document.getElementById('btn-start').textContent = '最初から';
+  saveStudySessionSnapshot();
   renderCurrentLimb();
 }
 
-function endSession() {
+function endSession(opts = {}) {
   stopStudyTimerAndAccumulate();
   session = null;
   document.getElementById('session-info').classList.add('hidden');
   document.getElementById('btn-start').textContent = '学習開始';
   document.getElementById('limb-area').innerHTML = '<div id="empty-state" class="empty-state"><p>「学習開始」を押して問題を始めましょう。</p></div>';
+  if (opts.keepSnapshot === false) {
+    clearStudySessionSnapshot();
+  } else {
+    updateResumeSessionButton();
+  }
 }
 
 function renderCurrentLimb() {
@@ -1191,10 +1332,11 @@ function renderCurrentLimb() {
   document.getElementById('progress-text').textContent = `${index + 1} / ${queue.length}`;
   const pct = ((index + 1) / queue.length * 100).toFixed(1);
   document.getElementById('progress-bar').style.width = pct + '%';
+  saveStudySessionSnapshot();
 
   if (index >= queue.length) {
     const fromPage = session.fromPage || 'study';
-    endSession();
+    endSession({ keepSnapshot: false });
     if (fromPage === 'stats') {
       showPage('stats');
       renderStats();
@@ -2015,6 +2157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 学習ページ
   document.getElementById('btn-start').addEventListener('click', startSession);
+  document.getElementById('btn-resume-session').addEventListener('click', restoreLastStudySession);
   document.getElementById('btn-end-session').addEventListener('click', endSession);
 
   document.getElementById('filter-subject').addEventListener('change', (e) => {

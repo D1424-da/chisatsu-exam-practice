@@ -123,6 +123,13 @@ body {
   min-width: 140px;
 }
 
+.study-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
 /* 進捗バー */
 .session-info {
   margin-top: 12px;
