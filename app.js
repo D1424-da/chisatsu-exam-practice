@@ -38,6 +38,8 @@ let unsubscribeStudyRecordsRealtime = null;
 let realtimeSubscribedUid = null;
 let calendarPendingSync = false;
 let cloudCalendarFlushInFlight = false;
+let sessionSnapshotPendingSync = false;
+let cloudSessionSnapshotFlushInFlight = false;
 
 
 // ── ユーティリティ ───────────────────────────────────────────
@@ -184,6 +186,23 @@ function readSavedStudySession(uid = getAuthUid()) {
   }
 }
 
+function normalizeStudySessionSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || !Array.isArray(snapshot.queueIds)) return null;
+  return {
+    queueIds: snapshot.queueIds.map(id => String(id || '')).filter(Boolean),
+    index: Math.max(0, Math.floor(Number(snapshot.index || 0))),
+    fromPage: snapshot.fromPage === 'stats' ? 'stats' : 'study',
+    filters: {
+      subject: snapshot.filters?.subject || '',
+      category: snapshot.filters?.category || '',
+      yearFrom: snapshot.filters?.yearFrom || '',
+      yearTo: snapshot.filters?.yearTo || '',
+      mode: snapshot.filters?.mode || 'all'
+    },
+    savedAt: Math.max(0, Number(snapshot.savedAt || 0))
+  };
+}
+
 function updateResumeSessionButton() {
   const btn = document.getElementById('btn-resume-session');
   if (!btn) return;
@@ -216,6 +235,8 @@ function saveStudySessionSnapshot() {
     savedAt: Date.now()
   };
   localStorage.setItem(key, JSON.stringify(snapshot));
+  sessionSnapshotPendingSync = true;
+  flushStudySessionSnapshotToCloudIfNeeded();
   updateResumeSessionButton();
 }
 
@@ -223,6 +244,8 @@ function clearStudySessionSnapshot() {
   const uid = getAuthUid();
   if (!uid) return;
   localStorage.removeItem(getStudySessionStorageKey(uid));
+  sessionSnapshotPendingSync = true;
+  flushStudySessionSnapshotToCloudIfNeeded();
   updateResumeSessionButton();
 }
 
@@ -526,7 +549,11 @@ function startCloudRealtimeSubscriptions() {
       ? data.studyCalendarCheckedDates
       : null;
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
-    if (!remoteRecords && !remoteCalendar) return;
+    const hasRemoteSessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
+      || Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshotSavedAtMs');
+    const remoteSession = hasRemoteSessionField ? data.studySessionSnapshot : undefined;
+    const remoteSessionSavedAt = Number(data.studySessionSnapshotSavedAtMs || 0);
+    if (!remoteRecords && !remoteCalendar && !hasRemoteSessionField) return;
 
     const localKey = getRecordStorageKey(uid);
     let localRecords = {};
@@ -548,6 +575,7 @@ function startCloudRealtimeSubscriptions() {
 
     if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
+    if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
     tryRenderStatsIfOpen();
   }, (e) => {
     console.warn('クラウド成績リアルタイム同期エラー:', e);
@@ -646,9 +674,13 @@ async function pullRecordsFromCloudIfNeeded() {
       ? data.studyCalendarCheckedDates
       : null;
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
+    const hasRemoteSessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
+      || Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshotSavedAtMs');
+    const remoteSession = hasRemoteSessionField ? data.studySessionSnapshot : undefined;
+    const remoteSessionSavedAt = Number(data.studySessionSnapshotSavedAtMs || 0);
     const remoteEditedAt = Number(data.updatedAtMs || 0);
     const remoteAccessAt = Number(data.accessedAtMs || remoteEditedAt || 0);
-    if (!remoteRecords && !remoteCalendar) {
+    if (!remoteRecords && !remoteCalendar && !hasRemoteSessionField) {
       cloudRecordsLoadedUid = uid;
       return;
     }
@@ -677,6 +709,7 @@ async function pullRecordsFromCloudIfNeeded() {
       }, { merge: true });
     }
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
+    if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
     tryRenderStatsIfOpen();
     cloudRecordsLoadedUid = uid;
   } catch (e) {
@@ -825,6 +858,63 @@ async function flushStudyCalendarToCloudIfNeeded() {
   if (!(window.firebase && firebase.firestore)) return;
   if (!calendarPendingSync) return;
   await pushStudyCalendarToCloud();
+}
+
+function applyRemoteStudySessionSnapshot(remoteSnapshot, remoteSavedAtMs = 0) {
+  const uid = getAuthUid();
+  if (!uid) return;
+
+  const local = readSavedStudySession(uid);
+  const localSavedAt = Math.max(0, Number(local?.savedAt || 0));
+  const remoteSavedAt = Math.max(0, Number(remoteSavedAtMs || remoteSnapshot?.savedAt || 0));
+  if (remoteSavedAt < localSavedAt) return;
+
+  const key = getStudySessionStorageKey(uid);
+  if (!remoteSnapshot) {
+    localStorage.removeItem(key);
+    updateResumeSessionButton();
+    return;
+  }
+
+  const normalized = normalizeStudySessionSnapshot(remoteSnapshot);
+  if (!normalized) return;
+  localStorage.setItem(key, JSON.stringify(normalized));
+  updateResumeSessionButton();
+}
+
+async function pushStudySessionSnapshotToCloud() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (cloudSessionSnapshotFlushInFlight) return;
+
+  cloudSessionSnapshotFlushInFlight = true;
+  try {
+    while (sessionSnapshotPendingSync) {
+      sessionSnapshotPendingSync = false;
+      const snapshot = normalizeStudySessionSnapshot(readSavedStudySession(uid));
+      const savedAtMs = Math.max(0, Number(snapshot?.savedAt || Date.now()));
+      await firebase.firestore().collection('records').doc(uid).set({
+        uid,
+        studySessionSnapshot: snapshot || null,
+        studySessionSnapshotSavedAtMs: savedAtMs,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  } catch (e) {
+    sessionSnapshotPendingSync = true;
+    console.warn('続きスナップショット同期(保存)エラー:', e);
+  } finally {
+    cloudSessionSnapshotFlushInFlight = false;
+  }
+}
+
+async function flushStudySessionSnapshotToCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (!sessionSnapshotPendingSync) return;
+  await pushStudySessionSnapshotToCloud();
 }
 
 function renderStudyCalendar() {
@@ -1103,6 +1193,7 @@ function loadData() {
   studyTime = loadStudyTimeLocal();
   studyCalendar = loadStudyCalendarLocal();
   calendarPendingSync = false;
+  sessionSnapshotPendingSync = false;
   studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   renderStudyCalendar();
   pullQuestionsFromCloudIfNeeded();
@@ -1345,6 +1436,7 @@ async function logout() {
   stopStudyTimerAndAccumulate();
   await flushRecordsToCloudIfNeeded();
   await flushStudyCalendarToCloudIfNeeded();
+  await flushStudySessionSnapshotToCloudIfNeeded();
   await flushStudyTimePendingToCloud();
   stopCloudRealtimeSubscriptions();
   currentUser = null;
@@ -1359,6 +1451,7 @@ async function logout() {
   cloudStudyLoadedUid = null;
   studyTimeBackend = 'auto';
   calendarPendingSync = false;
+  sessionSnapshotPendingSync = false;
   showLoginOverlay();
 }
 
@@ -2693,6 +2786,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       stopStudyTimerAndAccumulate();
       flushRecordsToCloudIfNeeded();
       flushStudyCalendarToCloudIfNeeded();
+      flushStudySessionSnapshotToCloudIfNeeded();
       return;
     }
     if (session) startStudyTimerIfNeeded();
@@ -2703,5 +2797,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('beforeunload', () => {
     stopStudyTimerAndAccumulate();
     flushStudyCalendarToCloudIfNeeded();
+    flushStudySessionSnapshotToCloudIfNeeded();
   });
 });
