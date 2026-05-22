@@ -24,6 +24,8 @@ let cloudRecordsLoadedUid = null;
 let cloudRecordsPullInFlight = false;
 let cloudRecordsFlushInFlight = false;
 let recordsPendingSync = false;
+let pendingRecordDeltas = {};
+let cloudRecordDeltaFlushInFlight = false;
 let cloudStudyLoadedUid = null;
 let cloudStudyPullInFlight = false;
 let cloudStudyFlushInFlight = false;
@@ -755,6 +757,77 @@ async function flushRecordsToCloudIfNeeded() {
   await pushRecordsToCloud();
 }
 
+function addPendingRecordDelta(limbId, isCorrect) {
+  const key = String(limbId || '');
+  if (!key) return;
+  if (!pendingRecordDeltas[key]) {
+    pendingRecordDeltas[key] = { correct: 0, wrong: 0 };
+  }
+  if (isCorrect) pendingRecordDeltas[key].correct += 1;
+  else pendingRecordDeltas[key].wrong += 1;
+}
+
+function mergePendingRecordDeltas(target, source) {
+  const out = { ...(target || {}) };
+  for (const [limbId, delta] of Object.entries(source || {})) {
+    if (!out[limbId]) out[limbId] = { correct: 0, wrong: 0 };
+    out[limbId].correct += Math.max(0, Number(delta?.correct || 0));
+    out[limbId].wrong += Math.max(0, Number(delta?.wrong || 0));
+  }
+  return out;
+}
+
+function hasPendingRecordDeltas() {
+  return Object.values(pendingRecordDeltas).some(v => Number(v?.correct || 0) > 0 || Number(v?.wrong || 0) > 0);
+}
+
+async function flushRecordDeltasToCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (cloudRecordDeltaFlushInFlight) return;
+  if (!hasPendingRecordDeltas()) return;
+
+  cloudRecordDeltaFlushInFlight = true;
+  let lastAttemptDeltas = null;
+  try {
+    while (hasPendingRecordDeltas()) {
+      const now = Date.now();
+      const deltas = pendingRecordDeltas;
+      pendingRecordDeltas = {};
+      lastAttemptDeltas = deltas;
+
+      const recordsPatch = {};
+      for (const [limbId, delta] of Object.entries(deltas)) {
+        const c = Math.max(0, Number(delta?.correct || 0));
+        const w = Math.max(0, Number(delta?.wrong || 0));
+        if (c <= 0 && w <= 0) continue;
+        recordsPatch[limbId] = {};
+        if (c > 0) recordsPatch[limbId].correct = firebase.firestore.FieldValue.increment(c);
+        if (w > 0) recordsPatch[limbId].wrong = firebase.firestore.FieldValue.increment(w);
+      }
+
+      if (Object.keys(recordsPatch).length === 0) continue;
+
+      await firebase.firestore().collection('records').doc(uid).set({
+        uid,
+        records: recordsPatch,
+        updatedAtMs: now,
+        accessedAtMs: now,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      lastAttemptDeltas = null;
+    }
+  } catch (e) {
+    console.warn('クラウド成績データ同期(差分保存)エラー:', e);
+    // 直前の送信対象は pendingRecordDeltas を空にした後に失敗するため、再キューする。
+    pendingRecordDeltas = mergePendingRecordDeltas(lastAttemptDeltas, pendingRecordDeltas);
+  } finally {
+    cloudRecordDeltaFlushInFlight = false;
+  }
+}
+
 function formatStudyDuration(ms) {
   const totalSec = Math.floor(Math.max(0, Number(ms || 0)) / 1000);
   const h = Math.floor(totalSec / 3600);
@@ -1250,7 +1323,7 @@ function saveQuestions() {
   writeToFile();
 }
 
-function saveRecords() {
+function saveRecords(options = {}) {
   const uid = getAuthUid();
   const rk = getRecordStorageKey(uid);
   const now = Date.now();
@@ -1262,8 +1335,10 @@ function saveRecords() {
       lastAccessAt: now
     }, uid);
   }
-  recordsPendingSync = true;
-  pushRecordsToCloud();
+  if (!options.skipCloudSnapshot) {
+    recordsPendingSync = true;
+    pushRecordsToCloud();
+  }
   writeToFile();
 }
 
@@ -1434,6 +1509,7 @@ async function hashPassword(pw) {
 
 async function logout() {
   stopStudyTimerAndAccumulate();
+  await flushRecordDeltasToCloudIfNeeded();
   await flushRecordsToCloudIfNeeded();
   await flushStudyCalendarToCloudIfNeeded();
   await flushStudySessionSnapshotToCloudIfNeeded();
@@ -1452,6 +1528,7 @@ async function logout() {
   studyTimeBackend = 'auto';
   calendarPendingSync = false;
   sessionSnapshotPendingSync = false;
+  pendingRecordDeltas = {};
   showLoginOverlay();
 }
 
@@ -1600,7 +1677,9 @@ function addRecord(limbId, isCorrect) {
   if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0 };
   if (isCorrect) records[limbId].correct++;
   else           records[limbId].wrong++;
-  saveRecords();
+  saveRecords({ skipCloudSnapshot: true });
+  addPendingRecordDelta(limbId, isCorrect);
+  flushRecordDeltasToCloudIfNeeded();
 }
 
 function makeInlineRecordId(limbId, key) {
@@ -2784,6 +2863,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       stopStudyTimerAndAccumulate();
+      flushRecordDeltasToCloudIfNeeded();
       flushRecordsToCloudIfNeeded();
       flushStudyCalendarToCloudIfNeeded();
       flushStudySessionSnapshotToCloudIfNeeded();
@@ -2796,6 +2876,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   window.addEventListener('beforeunload', () => {
     stopStudyTimerAndAccumulate();
+    flushRecordDeltasToCloudIfNeeded();
     flushStudyCalendarToCloudIfNeeded();
     flushStudySessionSnapshotToCloudIfNeeded();
   });
