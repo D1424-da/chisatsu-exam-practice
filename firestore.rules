@@ -5,36 +5,41 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwnerUid(uid) {
-      return signedIn() && request.auth.uid == uid;
+    function matchesAuthUid(uid) {
+      return signedIn() && uid is string && uid == request.auth.uid;
     }
 
-    function hasOwnerUid(data) {
-      return signedIn() && data.uid is string && data.uid == request.auth.uid;
+    function ownsResource() {
+      return signedIn() && resource != null && resource.data.uid is string && resource.data.uid == request.auth.uid;
+    }
+
+    function ownsRequest() {
+      return signedIn() && request.resource != null && request.resource.data.uid is string && request.resource.data.uid == request.auth.uid;
     }
 
     // User profile
     match /users/{uid} {
-      allow read, write: if isOwnerUid(uid);
+      allow read, write: if matchesAuthUid(uid);
     }
 
     // Question set per user (doc id = auth uid)
     match /question_sets/{uid} {
-      allow read, write: if isOwnerUid(uid);
+      allow read: if matchesAuthUid(uid) || ownsResource();
+      allow create, update, delete: if matchesAuthUid(uid) || ownsRequest() || ownsResource();
     }
 
     // Study time per user (doc id = auth uid)
     match /study_stats/{uid} {
-      allow read, write: if isOwnerUid(uid);
+      allow read: if matchesAuthUid(uid) || ownsResource();
+      allow create, update, delete: if matchesAuthUid(uid) || ownsRequest() || ownsResource();
     }
 
     // Records collection supports both:
     // - current format: /records/{uid} (doc id equals uid)
     // - legacy format:  /records/{autoId} with field uid
     match /records/{recordId} {
-      allow create: if hasOwnerUid(request.resource.data);
-      allow read: if (signedIn() && recordId == request.auth.uid) || hasOwnerUid(resource.data);
-      allow update, delete: if (signedIn() && recordId == request.auth.uid) || hasOwnerUid(resource.data);
+      allow read: if matchesAuthUid(recordId) || ownsResource();
+      allow create, update, delete: if matchesAuthUid(recordId) || ownsRequest() || ownsResource();
     }
   }
 }
