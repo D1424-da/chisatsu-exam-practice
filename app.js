@@ -7,6 +7,7 @@
 const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<uid>
 const KEY_RECORDS_META = 'limb_records_meta'; // パーユーザーキー: limb_records_meta_<uid>
 const KEY_STUDY_TIME  = 'limb_study_time'; // パーユーザーキー: limb_study_time_<uid>
+const KEY_STUDY_CALENDAR = 'limb_study_calendar'; // パーユーザーキー: limb_study_calendar_<uid>
 const KEY_STUDY_SESSION = 'limb_study_session'; // パーユーザーキー: limb_study_session_<uid>
 const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
@@ -29,6 +30,8 @@ let cloudStudyFlushInFlight = false;
 let studyTime = { totalMs: 0, pendingDeltaMs: 0 };
 let sessionStudyStartedAt = 0;
 let studyTimeBackend = 'auto'; // 'study_stats' | 'records' | 'auto'
+let studyCalendar = { checkedDates: {} };
+let studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 
 // ── ユーティリティ ───────────────────────────────────────────
@@ -55,6 +58,10 @@ function getStudyTimeStorageKey(uid = getAuthUid()) {
   return uid ? `${KEY_STUDY_TIME}_${uid}` : KEY_STUDY_TIME;
 }
 
+function getStudyCalendarStorageKey(uid = getAuthUid()) {
+  return uid ? `${KEY_STUDY_CALENDAR}_${uid}` : KEY_STUDY_CALENDAR;
+}
+
 function getStudySessionStorageKey(uid = getAuthUid()) {
   return uid ? `${KEY_STUDY_SESSION}_${uid}` : KEY_STUDY_SESSION;
 }
@@ -79,6 +86,40 @@ function saveStudyTimeLocal(data, uid = getAuthUid()) {
   const normalized = normalizeStudyTimeData(data || {});
   localStorage.setItem(key, JSON.stringify(normalized));
   studyTime = normalized;
+}
+
+function normalizeStudyCalendarData(data) {
+  const src = (data && typeof data === 'object' && data.checkedDates && typeof data.checkedDates === 'object')
+    ? data.checkedDates
+    : {};
+  const checkedDates = {};
+  for (const [dateKey, checked] of Object.entries(src)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey)) && checked === true) {
+      checkedDates[dateKey] = true;
+    }
+  }
+  return { checkedDates };
+}
+
+function loadStudyCalendarLocal(uid = getAuthUid()) {
+  const key = getStudyCalendarStorageKey(uid);
+  try {
+    return normalizeStudyCalendarData(JSON.parse(localStorage.getItem(key)) || {});
+  } catch {
+    return { checkedDates: {} };
+  }
+}
+
+function saveStudyCalendarLocal(data, uid = getAuthUid()) {
+  const key = getStudyCalendarStorageKey(uid);
+  const normalized = normalizeStudyCalendarData(data || {});
+  localStorage.setItem(key, JSON.stringify(normalized));
+  studyCalendar = normalized;
+}
+
+function clearStudyCalendar(uid = getAuthUid()) {
+  localStorage.removeItem(getStudyCalendarStorageKey(uid));
+  studyCalendar = { checkedDates: {} };
 }
 
 function getStudyFilters() {
@@ -571,6 +612,70 @@ function formatStudyDuration(ms) {
   return `${s}秒`;
 }
 
+function toDateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function setStudyDayChecked(dateKey, checked = true) {
+  const key = String(dateKey || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+  const next = { ...studyCalendar.checkedDates };
+  if (checked) next[key] = true;
+  else delete next[key];
+  saveStudyCalendarLocal({ checkedDates: next });
+}
+
+function toggleStudyDayChecked(dateKey) {
+  const key = String(dateKey || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+  const checked = !!studyCalendar.checkedDates[key];
+  setStudyDayChecked(key, !checked);
+}
+
+function markTodayAsStudied() {
+  const key = toDateKey(new Date());
+  if (studyCalendar.checkedDates[key]) return;
+  setStudyDayChecked(key, true);
+}
+
+function renderStudyCalendar() {
+  const monthEl = document.getElementById('study-calendar-month');
+  const gridEl = document.getElementById('study-calendar-grid');
+  if (!monthEl || !gridEl) return;
+
+  const year = studyCalendarCursor.getFullYear();
+  const month = studyCalendarCursor.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const firstWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayKey = toDateKey(new Date());
+  const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+
+  monthEl.textContent = `${year}年${month + 1}月`;
+
+  let html = '';
+  for (const wd of weekdayLabels) {
+    html += `<div class="study-calendar-weekday">${wd}</div>`;
+  }
+
+  for (let i = 0; i < firstWeekday; i++) {
+    html += '<button type="button" class="study-calendar-day is-outside" disabled aria-hidden="true"></button>';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const dateKey = toDateKey(date);
+    const isToday = dateKey === todayKey;
+    const isChecked = !!studyCalendar.checkedDates[dateKey];
+    html += `<button type="button" class="study-calendar-day${isToday ? ' is-today' : ''}${isChecked ? ' is-checked' : ''}" data-date-key="${dateKey}" aria-label="${year}年${month + 1}月${day}日${isChecked ? ' 学習済み' : ''}">${day}${isChecked ? ' ✓' : ''}</button>`;
+  }
+
+  gridEl.innerHTML = html;
+}
+
 function isPermissionDeniedError(e) {
   return String(e?.code || '').includes('permission-denied');
 }
@@ -675,6 +780,7 @@ function applyStudyDuration(elapsedMs) {
     totalMs: local.totalMs + delta,
     pendingDeltaMs: local.pendingDeltaMs + delta
   }, uid);
+  markTodayAsStudied();
   flushStudyTimePendingToCloud();
   tryRenderStatsIfOpen();
 }
@@ -774,6 +880,7 @@ async function resetStudyTime() {
   stopStudyTimerAndAccumulate();
   const uid = getAuthUid();
   saveStudyTimeLocal({ totalMs: 0, pendingDeltaMs: 0 }, uid);
+  clearStudyCalendar(uid);
   if (!uid || !(window.firebase && firebase.firestore)) return;
   try {
     studyTimeBackend = await setCloudStudyTotal(uid, 0, studyTimeBackend);
@@ -807,6 +914,8 @@ function loadData() {
   }
 
   studyTime = loadStudyTimeLocal();
+  studyCalendar = loadStudyCalendarLocal();
+  studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded();
   pullStudyTimeFromCloudIfNeeded();
@@ -2106,6 +2215,7 @@ function renderStats() {
   document.getElementById('stat-weak').textContent   = weak.length;
   const studyEl = document.getElementById('stat-study-time');
   if (studyEl) studyEl.textContent = formatStudyDuration(studyTime.totalMs);
+  renderStudyCalendar();
 
   // 科目別
   const subjectMap = {};
@@ -2355,6 +2465,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     await resetStudyTime();
     saveRecords();
     renderStats();
+  });
+
+  document.getElementById('btn-calendar-prev').addEventListener('click', () => {
+    studyCalendarCursor = new Date(studyCalendarCursor.getFullYear(), studyCalendarCursor.getMonth() - 1, 1);
+    renderStudyCalendar();
+  });
+
+  document.getElementById('btn-calendar-next').addEventListener('click', () => {
+    studyCalendarCursor = new Date(studyCalendarCursor.getFullYear(), studyCalendarCursor.getMonth() + 1, 1);
+    renderStudyCalendar();
+  });
+
+  document.getElementById('study-calendar-grid').addEventListener('click', (e) => {
+    const btn = e.target.closest('.study-calendar-day[data-date-key]');
+    if (!btn || btn.disabled) return;
+    toggleStudyDayChecked(btn.dataset.dateKey);
+    renderStudyCalendar();
   });
 
   // 苦手肢リストから再挑戦
