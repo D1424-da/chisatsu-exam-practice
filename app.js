@@ -639,6 +639,7 @@ function markTodayAsStudied() {
   const key = toDateKey(new Date());
   if (studyCalendar.checkedDates[key]) return;
   setStudyDayChecked(key, true);
+  renderStudyCalendar();
 }
 
 function renderStudyCalendar() {
@@ -662,7 +663,7 @@ function renderStudyCalendar() {
   }
 
   for (let i = 0; i < firstWeekday; i++) {
-    html += '<button type="button" class="study-calendar-day is-outside" disabled aria-hidden="true"></button>';
+    html += '<div class="study-calendar-day is-outside" aria-hidden="true"></div>';
   }
 
   for (let day = 1; day <= daysInMonth; day++) {
@@ -670,7 +671,7 @@ function renderStudyCalendar() {
     const dateKey = toDateKey(date);
     const isToday = dateKey === todayKey;
     const isChecked = !!studyCalendar.checkedDates[dateKey];
-    html += `<button type="button" class="study-calendar-day${isToday ? ' is-today' : ''}${isChecked ? ' is-checked' : ''}" data-date-key="${dateKey}" aria-label="${year}年${month + 1}月${day}日${isChecked ? ' 学習済み' : ''}">${day}${isChecked ? ' ✓' : ''}</button>`;
+    html += `<div class="study-calendar-day${isToday ? ' is-today' : ''}${isChecked ? ' is-checked' : ''}" aria-label="${year}年${month + 1}月${day}日${isChecked ? ' 学習済み' : ''}">${day}${isChecked ? ' ✓' : ''}</div>`;
   }
 
   gridEl.innerHTML = html;
@@ -787,6 +788,7 @@ function applyStudyDuration(elapsedMs) {
 
 function startStudyTimerIfNeeded() {
   if (sessionStudyStartedAt > 0) return;
+  markTodayAsStudied();
   sessionStudyStartedAt = Date.now();
 }
 
@@ -916,6 +918,7 @@ function loadData() {
   studyTime = loadStudyTimeLocal();
   studyCalendar = loadStudyCalendarLocal();
   studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  renderStudyCalendar();
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded();
   pullStudyTimeFromCloudIfNeeded();
@@ -1428,6 +1431,9 @@ function showPage(name) {
     pullRecordsFromCloudIfNeeded();
     pullStudyTimeFromCloudIfNeeded();
     renderStats();
+  }
+  if (name === 'study') {
+    renderStudyCalendar();
   }
   if (name === 'manage') { renderManage(); renderUsers(); updateFileStatus(); }
 }
@@ -2474,13 +2480,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-calendar-next').addEventListener('click', () => {
     studyCalendarCursor = new Date(studyCalendarCursor.getFullYear(), studyCalendarCursor.getMonth() + 1, 1);
-    renderStudyCalendar();
-  });
-
-  document.getElementById('study-calendar-grid').addEventListener('click', (e) => {
-    const btn = e.target.closest('.study-calendar-day[data-date-key]');
-    if (!btn || btn.disabled) return;
-    toggleStudyDayChecked(btn.dataset.dateKey);
     renderStudyCalendar();
   });
 

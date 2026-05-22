@@ -653,23 +653,14 @@ body {
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
-  cursor: pointer;
+  cursor: default;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   font-size: .88rem;
   font-weight: 600;
-  transition: background var(--transition), border-color var(--transition), transform .1s ease;
-}
-
-.study-calendar-day:hover {
-  background: #f6f8ff;
-  border-color: #bfd0ff;
-}
-
-.study-calendar-day:active {
-  transform: scale(.98);
+  transition: background var(--transition), border-color var(--transition);
 }
 
 .study-calendar-day.is-today {
