@@ -603,10 +603,10 @@ function startCloudRealtimeSubscriptions() {
   realtimeSubscribedUid = uid;
 }
 
-async function pullRecordsFromCloudIfNeeded() {
+async function pullRecordsFromCloudIfNeeded(force = false) {
   const uid = getAuthUid();
   if (!uid || cloudRecordsPullInFlight) return;
-  if (cloudRecordsLoadedUid === uid) return;
+  if (!force && cloudRecordsLoadedUid === uid) return;
   if (!(window.firebase && firebase.firestore)) return;
 
   const localKey = getRecordStorageKey(uid);
@@ -1790,11 +1790,12 @@ function showPage(name) {
   document.getElementById(`page-${name}`).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
   if (name === 'stats') {
-    pullRecordsFromCloudIfNeeded();
+    pullRecordsFromCloudIfNeeded(true);
     pullStudyTimeFromCloudIfNeeded();
     renderStats();
   }
   if (name === 'study') {
+    pullRecordsFromCloudIfNeeded(true);
     renderStudyCalendar();
   }
   if (name === 'manage') { renderManage(); renderUsers(); updateFileStatus(); }
@@ -2870,7 +2871,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (session) startStudyTimerIfNeeded();
-    pullRecordsFromCloudIfNeeded();
+    pullRecordsFromCloudIfNeeded(true);
     pullStudyTimeFromCloudIfNeeded();
   });
 
