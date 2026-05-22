@@ -67,13 +67,12 @@ const firebaseConfig = {
 5. **「作成」**をクリック
 6. 表示される **Client ID** をコピー
 
-[auth-module.js](./auth-module.js) の以下の部分に貼り付けます：
+[firebase-config.js](./firebase-config.js) の `window.APP_CONFIG.googleClientId` に貼り付けます：
 
 ```javascript
-google.accounts.id.initialize({
-  client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",  // ← ここに貼り付け
-  callback: handleGoogleSignInCallback
-});
+window.APP_CONFIG = {
+  googleClientId: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+};
 ```
 
 ## 🗄️ Firestore Database を設定
@@ -85,7 +84,7 @@ google.accounts.id.initialize({
 4. **リージョン：asia-northeast1（東京）** を選択
 5. **「作成」**
 
-### テストセキュリティルール（開発用）
+### 推奨セキュリティルール（本番運用可）
 
 以下をアクセス許可 のセクションに設定：
 
@@ -96,11 +95,27 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if request.auth.uid == uid;
     }
+    match /question_sets/{uid} {
+      allow read, write: if request.auth.uid == uid;
+    }
+    match /study_stats/{uid} {
+      allow read, write: if request.auth.uid == uid;
+    }
     match /records/{recordId} {
-      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read: if (request.auth != null && recordId == request.auth.uid)
+        || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow update, delete: if (request.auth != null && recordId == request.auth.uid)
+        || (request.auth != null && resource.data.uid == request.auth.uid);
     }
   }
 }
+```
+
+このリポジトリには同内容の [firestore.rules](./firestore.rules) を追加済みです。Firebase CLI で反映する場合：
+
+```powershell
+firebase deploy --only firestore:rules
 ```
 
 ## 📊 ユーザーデータの同期
@@ -116,13 +131,32 @@ uid/
   └── photoURL: string (Google ログイン時)
 ```
 
-**records コレクション** （検索不可にするには後で設定）
+**question_sets コレクション**
+```
+uid/
+  ├── uid: string
+  ├── questions: array
+  ├── updatedAtMs: number
+  └── updatedAt: timestamp
+```
+
+**study_stats コレクション**
+```
+uid/
+  ├── uid: string
+  ├── totalMs: number
+  ├── updatedAtMs: number
+  └── updatedAt: timestamp
+```
+
+**records コレクション**
 ```
 {recordId}/
-  ├── uid: string (ユーザーID)
-  ├── limbId: string (問題ID)
-  ├── correct: boolean
-  └── timestamp: timestamp
+  ├── uid: string
+  ├── records: map<string,{correct:number,wrong:number}>
+  ├── updatedAtMs: number
+  ├── accessedAtMs: number
+  └── updatedAt: timestamp
 ```
 
 ## 🔒 本番環境でのセキュリティ設定
@@ -135,21 +169,7 @@ uid/
 - 不正なログイン試行を検出
 
 ### 2. Firestore セキュリティルール
-```firestore
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth.uid == uid;
-    }
-    match /records/{recordId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
-      allow read: if request.auth.uid == resource.data.uid;
-      allow update, delete: if request.auth.uid == resource.data.uid;
-    }
-  }
-}
-```
+- [firestore.rules](./firestore.rules) をそのまま利用してください。
 
 ## 🧪 テスト方法
 
@@ -170,11 +190,11 @@ service cloud.firestore {
 - メールアドレス形式が正しいか、パスワードが6文字以上か確認
 
 ### Google ログイン が表示されない
-- `auth-module.js` の `YOUR_GOOGLE_CLIENT_ID` を設定したか確認
+- `firebase-config.js` の `window.APP_CONFIG.googleClientId` を設定したか確認
 - Google Identity Services ライブラリが読み込まれているか（F12 → Network）確認
 
 ### Firestore にデータが保存されない
-- Firestore Database が「テストモード」になっているか確認
+- Firestore ルールに `question_sets` と `study_stats` が含まれているか確認
 - Authentication でログインしているか確認
 - セキュリティルールが正しいか確認
 

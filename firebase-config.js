@@ -10,6 +10,12 @@ const firebaseConfig = {
   measurementId: "G-W2X48FK30S"
 };
 
+// Optional app-level configuration.
+// Googleログインを使う場合のみ Client ID を設定してください。
+window.APP_CONFIG = {
+  googleClientId: ""
+};
+
 // Firebase を初期化（アプリ起動時に実行される）
 if (!window.firebaseInitialized) {
   try {

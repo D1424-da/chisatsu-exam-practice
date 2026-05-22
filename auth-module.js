@@ -15,6 +15,18 @@ function hideError(elementId) {
   el.classList.add('hidden');
 }
 
+function getGoogleClientId() {
+  const configured = window.APP_CONFIG?.googleClientId || '';
+  return String(configured).trim();
+}
+
+function setGoogleLoginVisibility(visible) {
+  const googleBtn = document.getElementById('google-login-btn');
+  const divider = document.querySelector('#login-form-area .divider');
+  if (googleBtn) googleBtn.classList.toggle('hidden', !visible);
+  if (divider) divider.classList.toggle('hidden', !visible);
+}
+
 // ===== ログイン処理 =====
 async function handleEmailLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -229,6 +241,9 @@ function setupAuthStateListener() {
 
 // ===== イベントリスナー登録 =====
 document.addEventListener('DOMContentLoaded', () => {
+  const hasGoogleClientId = !!getGoogleClientId();
+  setGoogleLoginVisibility(hasGoogleClientId);
+
   // Firebase 初期化を待つ
   if (!window.firebaseInitialized) {
     console.warn('⚠ Firebase が初期化されていません');
@@ -283,36 +298,36 @@ document.addEventListener('DOMContentLoaded', () => {
     btnLogout.addEventListener('click', handleLogout);
   }
 
-  // Google ログインボタン（Google Sign-In ライブラリが読み込まれたら初期化）
-  if (window.google && window.google.accounts && window.google.accounts.id) {
-    initGoogleSignIn();
-  } else {
-    // Google Sign-In ライブラリが遅延読み込みされた場合
-    const checkGoogle = setInterval(() => {
-      if (window.google && window.google.accounts && window.google.accounts.id && !window.googleSignInInitialized) {
-        initGoogleSignIn();
-        clearInterval(checkGoogle);
-      }
-    }, 100);
+  // Google ログインは Client ID 設定済みのときのみ初期化
+  if (hasGoogleClientId) {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      initGoogleSignIn();
+    } else {
+      // Google Sign-In ライブラリが遅延読み込みされた場合
+      const checkGoogle = setInterval(() => {
+        if (window.google && window.google.accounts && window.google.accounts.id && !window.googleSignInInitialized) {
+          initGoogleSignIn();
+          clearInterval(checkGoogle);
+        }
+      }, 100);
+    }
   }
 });
 
 // Google Sign-In の初期化
 function initGoogleSignIn() {
   if (window.googleSignInInitialized) return;
+  const GOOGLE_CLIENT_ID = getGoogleClientId();
+
+  if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('YOUR_')) {
+    setGoogleLoginVisibility(false);
+    return;
+  }
+
   window.googleSignInInitialized = true;
+  setGoogleLoginVisibility(true);
 
   try {
-    // 注意：Google Sign-In が不要な場合は、このセクション全体をコメントアウトしてください
-    // Google Cloud Console から取得した Client ID に置き換えてください
-    const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
-    
-    // Client ID が設定されていない場合はスキップ
-    if (GOOGLE_CLIENT_ID.includes("YOUR_")) {
-      console.warn('⚠ Google Sign-In が設定されていません（Google Client ID が必要）');
-      return;
-    }
-    
     google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleSignInCallback

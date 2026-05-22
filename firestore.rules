@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnerUid(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function hasOwnerUid(data) {
+      return signedIn() && data.uid is string && data.uid == request.auth.uid;
+    }
+
+    // User profile
+    match /users/{uid} {
+      allow read, write: if isOwnerUid(uid);
+    }
+
+    // Question set per user (doc id = auth uid)
+    match /question_sets/{uid} {
+      allow read, write: if isOwnerUid(uid);
+    }
+
+    // Study time per user (doc id = auth uid)
+    match /study_stats/{uid} {
+      allow read, write: if isOwnerUid(uid);
+    }
+
+    // Records collection supports both:
+    // - current format: /records/{uid} (doc id equals uid)
+    // - legacy format:  /records/{autoId} with field uid
+    match /records/{recordId} {
+      allow create: if hasOwnerUid(request.resource.data);
+      allow read: if (signedIn() && recordId == request.auth.uid) || hasOwnerUid(resource.data);
+      allow update, delete: if (signedIn() && recordId == request.auth.uid) || hasOwnerUid(resource.data);
+    }
+  }
+}
