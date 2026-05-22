@@ -1000,8 +1000,9 @@ async function hashPassword(pw) {
 // Old local authentication functions removed (no longer needed with Firebase)
 // NOTE: Use Firebase Auth API instead: firebase.auth().signInWithEmailAndPassword(email, password)
 
-function logout() {
+async function logout() {
   stopStudyTimerAndAccumulate();
+  await flushStudyTimePendingToCloud();
   currentUser = null;
   sessionStorage.removeItem(KEY_SESSION_USER);
   session = null;
@@ -1388,6 +1389,7 @@ function startSessionWithLimbId(limbId) {
 
 function endSession(opts = {}) {
   stopStudyTimerAndAccumulate();
+  flushStudyTimePendingToCloud();
   session = null;
   document.getElementById('session-info').classList.add('hidden');
   document.getElementById('btn-start').textContent = '学習開始';
