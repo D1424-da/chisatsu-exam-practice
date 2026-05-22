@@ -352,6 +352,32 @@ async function pullQuestionsFromCloudIfNeeded() {
       return;
     }
 
+    const localQuestionCount = Array.isArray(questions) ? questions.length : 0;
+    const remoteQuestionCount = remoteQuestions.length;
+    const hasBundledBase = Number(meta.lastBundledSyncAt || 0) > 0 && !meta.localDirty;
+    // 同梱データを持つ端末で、クラウド側だけ極端に少ない件数なら誤上書きを防止する。
+    const suspiciousDownsync =
+      hasBundledBase &&
+      localQuestionCount >= 50 &&
+      remoteQuestionCount > 0 &&
+      remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
+
+    if (suspiciousDownsync) {
+      await ref.set({
+        uid,
+        questions,
+        updatedAtMs: Date.now(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      saveQuestionsMeta({
+        ...meta,
+        lastCloudPullAt: Date.now(),
+        lastCloudHealAt: Date.now()
+      });
+      cloudQuestionsLoadedUid = uid;
+      return;
+    }
+
     // Prefer remote when local is empty or remote is newer.
     const shouldUseRemote = !Array.isArray(questions) || questions.length === 0 || remoteEditedAt >= localEditedAt;
     if (shouldUseRemote) {
