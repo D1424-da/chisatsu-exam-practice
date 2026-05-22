@@ -257,6 +257,7 @@ function rebuildSessionQueue(queueIds) {
 }
 
 async function restoreLastStudySession() {
+  await pullRecordsFromCloudIfNeeded(true);
   const saved = readSavedStudySession();
   if (!saved) {
     alert('再開できる前回の学習セッションがありません。');
@@ -558,14 +559,10 @@ function startCloudRealtimeSubscriptions() {
     if (!remoteRecords && !remoteCalendar && !hasRemoteSessionField) return;
 
     const localKey = getRecordStorageKey(uid);
-    let localRecords = {};
-    try { localRecords = normalizeRecordMap(JSON.parse(localStorage.getItem(localKey)) || {}); }
-    catch { localRecords = {}; }
-
     if (remoteRecords) {
-      const merged = mergeRecordsNoLoss(localRecords, remoteRecords);
-      records = merged;
-      localStorage.setItem(localKey, JSON.stringify(merged));
+      const remoteNormalized = normalizeRecordMap(remoteRecords);
+      records = remoteNormalized;
+      localStorage.setItem(localKey, JSON.stringify(remoteNormalized));
       const now = Date.now();
       saveRecordsMeta({
         ...getRecordsMeta(uid),
@@ -681,34 +678,22 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     const remoteSession = hasRemoteSessionField ? data.studySessionSnapshot : undefined;
     const remoteSessionSavedAt = Number(data.studySessionSnapshotSavedAtMs || 0);
     const remoteEditedAt = Number(data.updatedAtMs || 0);
-    const remoteAccessAt = Number(data.accessedAtMs || remoteEditedAt || 0);
     if (!remoteRecords && !remoteCalendar && !hasRemoteSessionField) {
       cloudRecordsLoadedUid = uid;
       return;
     }
 
-    // 空データ上書きを避けるため、履歴は「減らさない」統合を行う。
+    // クラウド正本: remoteRecords がある場合はクラウド値を採用する。
     if (remoteRecords) {
-      const mergedRecords = mergeRecordsNoLoss(localRecords, remoteRecords);
-      const preferRemoteByAccess = remoteAccessAt > localAccessAt;
-      const winnerEditedAt = preferRemoteByAccess ? (remoteEditedAt || now) : (localEditedAt || now);
-      records = mergedRecords;
-      localStorage.setItem(localKey, JSON.stringify(records));
+      const remoteNormalized = normalizeRecordMap(remoteRecords);
+      records = remoteNormalized;
+      localStorage.setItem(localKey, JSON.stringify(remoteNormalized));
       saveRecordsMeta({
         ...meta,
-        localEditedAt: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
+        localEditedAt: Math.max(remoteEditedAt, localEditedAt, now),
         lastAccessAt: now,
         lastCloudPullAt: now
       }, uid);
-
-      // 判定結果をクラウドにも反映し、次回は同じ勝者が再現されるようにする。
-      await ref.set({
-        uid,
-        records,
-        updatedAtMs: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
-        accessedAtMs: now,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
     }
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
     if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
