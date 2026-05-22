@@ -116,6 +116,8 @@ service cloud.firestore {
 
 ```powershell
 firebase deploy --only firestore:rules
+# もし firebase コマンドが見つからない場合
+npx firebase-tools deploy --only firestore:rules --project chisatsu-exam-practice
 ```
 
 ## 📊 ユーザーデータの同期
