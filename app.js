@@ -177,24 +177,44 @@ function rebuildSessionQueue(queueIds) {
   return queueIds.map(id => limbMap.get(id)).filter(Boolean);
 }
 
-function restoreLastStudySession() {
+async function restoreLastStudySession() {
   const saved = readSavedStudySession();
   if (!saved) {
     alert('再開できる前回の学習セッションがありません。');
     return false;
   }
 
-  const queue = rebuildSessionQueue(saved.queueIds);
-  if (queue.length === 0 || saved.index >= queue.length) {
+  let queue = rebuildSessionQueue(saved.queueIds);
+
+  // 画面表示直後はクラウド問題データ取得前の場合があるため、1回だけ再試行する。
+  if (queue.length === 0) {
+    await pullQuestionsFromCloudIfNeeded();
+    queue = rebuildSessionQueue(saved.queueIds);
+  }
+
+  if (queue.length === 0) {
+    if (getAllLimbs('', '', false).length === 0) {
+      alert('問題データを読み込み中です。数秒後にもう一度お試しください。');
+      updateResumeSessionButton();
+      return false;
+    }
     clearStudySessionSnapshot();
     alert('前回の学習セッションを復元できませんでした。');
     return false;
   }
 
+  const savedIndex = Math.max(0, Math.floor(Number(saved.index || 0)));
+  let startIndex = Math.min(savedIndex, queue.length - 1);
+  const resumeId = saved.queueIds[savedIndex];
+  if (resumeId) {
+    const exactIndex = queue.findIndex(l => l && l.id === resumeId);
+    if (exactIndex >= 0) startIndex = exactIndex;
+  }
+
   setStudyFilters(saved.filters);
   session = {
     queue,
-    index: Math.max(0, saved.index),
+    index: startIndex,
     fromPage: saved.fromPage || 'study',
     filters: saved.filters || getStudyFilters()
   };
@@ -310,6 +330,8 @@ async function pullQuestionsFromCloudIfNeeded() {
         localDirty: false,
         lastCloudPullAt: Date.now()
       });
+      if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+      if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
     }
     cloudQuestionsLoadedUid = uid;
   } catch (e) {
