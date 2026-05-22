@@ -32,6 +32,10 @@ let sessionStudyStartedAt = 0;
 let studyTimeBackend = 'auto'; // 'study_stats' | 'records' | 'auto'
 let studyCalendar = { checkedDates: {} };
 let studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let unsubscribeRecordsRealtime = null;
+let unsubscribeStudyStatsRealtime = null;
+let unsubscribeStudyRecordsRealtime = null;
+let realtimeSubscribedUid = null;
 
 
 // ── ユーティリティ ───────────────────────────────────────────
@@ -465,6 +469,96 @@ function tryRenderStatsIfOpen() {
   if (typeof renderStats === 'function') renderStats();
 }
 
+function stopCloudRealtimeSubscriptions() {
+  if (typeof unsubscribeRecordsRealtime === 'function') {
+    unsubscribeRecordsRealtime();
+  }
+  if (typeof unsubscribeStudyStatsRealtime === 'function') {
+    unsubscribeStudyStatsRealtime();
+  }
+  if (typeof unsubscribeStudyRecordsRealtime === 'function') {
+    unsubscribeStudyRecordsRealtime();
+  }
+  unsubscribeRecordsRealtime = null;
+  unsubscribeStudyStatsRealtime = null;
+  unsubscribeStudyRecordsRealtime = null;
+  realtimeSubscribedUid = null;
+}
+
+function applyRemoteStudyTotal(remoteTotalMs, backend) {
+  const uid = getAuthUid();
+  if (!uid) return;
+  const remoteTotal = Math.max(0, Number(remoteTotalMs || 0));
+  const local = loadStudyTimeLocal(uid);
+  const pending = Math.max(0, Number(local.pendingDeltaMs || 0));
+  const localSynced = Math.max(0, Number(local.totalMs || 0) - pending);
+  const mergedSynced = Math.max(remoteTotal, localSynced);
+  const mergedTotal = mergedSynced + pending;
+  saveStudyTimeLocal({ totalMs: mergedTotal, pendingDeltaMs: pending }, uid);
+  studyTimeBackend = backend || studyTimeBackend;
+  tryRenderStatsIfOpen();
+}
+
+function startCloudRealtimeSubscriptions() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (realtimeSubscribedUid === uid) return;
+
+  stopCloudRealtimeSubscriptions();
+
+  const db = firebase.firestore();
+
+  unsubscribeRecordsRealtime = db.collection('records').doc(uid).onSnapshot((snap) => {
+    if (!snap || !snap.exists) return;
+    const data = snap.data() || {};
+    const remoteRecords = (data.records && typeof data.records === 'object')
+      ? normalizeRecordMap(data.records)
+      : null;
+    if (!remoteRecords) return;
+
+    const localKey = getRecordStorageKey(uid);
+    let localRecords = {};
+    try { localRecords = normalizeRecordMap(JSON.parse(localStorage.getItem(localKey)) || {}); }
+    catch { localRecords = {}; }
+
+    const merged = mergeRecordsNoLoss(localRecords, remoteRecords);
+    records = merged;
+    localStorage.setItem(localKey, JSON.stringify(merged));
+    const now = Date.now();
+    saveRecordsMeta({
+      ...getRecordsMeta(uid),
+      localEditedAt: Math.max(Number(data.updatedAtMs || 0), now),
+      lastAccessAt: now,
+      lastCloudPullAt: now
+    }, uid);
+
+    if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+    tryRenderStatsIfOpen();
+  }, (e) => {
+    console.warn('クラウド成績リアルタイム同期エラー:', e);
+  });
+
+  unsubscribeStudyStatsRealtime = db.collection('study_stats').doc(uid).onSnapshot((snap) => {
+    if (!snap || !snap.exists) return;
+    const totalMs = Number((snap.data() || {}).totalMs || 0);
+    applyRemoteStudyTotal(totalMs, 'study_stats');
+  }, (e) => {
+    console.warn('学習時間リアルタイム同期(study_stats)エラー:', e);
+  });
+
+  unsubscribeStudyRecordsRealtime = db.collection('records').doc(uid).onSnapshot((snap) => {
+    if (!snap || !snap.exists) return;
+    const totalMs = Number((snap.data() || {}).studyTotalMs || 0);
+    if (totalMs <= 0) return;
+    applyRemoteStudyTotal(totalMs, 'records');
+  }, (e) => {
+    console.warn('学習時間リアルタイム同期(records)エラー:', e);
+  });
+
+  realtimeSubscribedUid = uid;
+}
+
 async function pullRecordsFromCloudIfNeeded() {
   const uid = getAuthUid();
   if (!uid || cloudRecordsPullInFlight) return;
@@ -576,18 +670,23 @@ async function pushRecordsToCloud() {
   if (!uid) return;
   if (!(window.firebase && firebase.firestore)) return;
   if (cloudRecordsFlushInFlight) return;
-  const now = Date.now();
   cloudRecordsFlushInFlight = true;
   try {
-    await firebase.firestore().collection('records').doc(uid).set({
-      uid,
-      records,
-      updatedAtMs: now,
-      accessedAtMs: now,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    recordsPendingSync = false;
+    // 送信中に新しい回答が追加された場合も取りこぼさない。
+    while (recordsPendingSync) {
+      recordsPendingSync = false;
+      const now = Date.now();
+      const snapshot = normalizeRecordMap(records);
+      await firebase.firestore().collection('records').doc(uid).set({
+        uid,
+        records: snapshot,
+        updatedAtMs: now,
+        accessedAtMs: now,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
   } catch (e) {
+    recordsPendingSync = true;
     console.warn('クラウド成績データ同期(保存)エラー:', e);
   } finally {
     cloudRecordsFlushInFlight = false;
@@ -922,6 +1021,7 @@ function loadData() {
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded();
   pullStudyTimeFromCloudIfNeeded();
+  startCloudRealtimeSubscriptions();
   updateResumeSessionButton();
 }
 
@@ -1158,6 +1258,7 @@ async function logout() {
   stopStudyTimerAndAccumulate();
   await flushRecordsToCloudIfNeeded();
   await flushStudyTimePendingToCloud();
+  stopCloudRealtimeSubscriptions();
   currentUser = null;
   sessionStorage.removeItem(KEY_SESSION_USER);
   session = null;
