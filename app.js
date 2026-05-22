@@ -21,6 +21,8 @@ let cloudQuestionsLoadedUid = null;
 let cloudPullInFlight = false;
 let cloudRecordsLoadedUid = null;
 let cloudRecordsPullInFlight = false;
+let cloudRecordsFlushInFlight = false;
+let recordsPendingSync = false;
 let cloudStudyLoadedUid = null;
 let cloudStudyPullInFlight = false;
 let cloudStudyFlushInFlight = false;
@@ -532,7 +534,9 @@ async function pushRecordsToCloud() {
   const uid = getAuthUid();
   if (!uid) return;
   if (!(window.firebase && firebase.firestore)) return;
+  if (cloudRecordsFlushInFlight) return;
   const now = Date.now();
+  cloudRecordsFlushInFlight = true;
   try {
     await firebase.firestore().collection('records').doc(uid).set({
       uid,
@@ -541,9 +545,20 @@ async function pushRecordsToCloud() {
       accessedAtMs: now,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    recordsPendingSync = false;
   } catch (e) {
     console.warn('クラウド成績データ同期(保存)エラー:', e);
+  } finally {
+    cloudRecordsFlushInFlight = false;
   }
+}
+
+async function flushRecordsToCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (!recordsPendingSync) return;
+  await pushRecordsToCloud();
 }
 
 function formatStudyDuration(ms) {
@@ -857,6 +872,7 @@ function saveRecords() {
       lastAccessAt: now
     }, uid);
   }
+  recordsPendingSync = true;
   pushRecordsToCloud();
   writeToFile();
 }
@@ -1028,6 +1044,7 @@ async function hashPassword(pw) {
 
 async function logout() {
   stopStudyTimerAndAccumulate();
+  await flushRecordsToCloudIfNeeded();
   await flushStudyTimePendingToCloud();
   currentUser = null;
   sessionStorage.removeItem(KEY_SESSION_USER);
@@ -1298,7 +1315,11 @@ function showPage(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`page-${name}`).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
-  if (name === 'stats') renderStats();
+  if (name === 'stats') {
+    pullRecordsFromCloudIfNeeded();
+    pullStudyTimeFromCloudIfNeeded();
+    renderStats();
+  }
   if (name === 'manage') { renderManage(); renderUsers(); updateFileStatus(); }
 }
 
@@ -2354,9 +2375,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       stopStudyTimerAndAccumulate();
+      flushRecordsToCloudIfNeeded();
       return;
     }
     if (session) startStudyTimerIfNeeded();
+    pullRecordsFromCloudIfNeeded();
+    pullStudyTimeFromCloudIfNeeded();
   });
 
   window.addEventListener('beforeunload', () => {
