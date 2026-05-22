@@ -36,6 +36,8 @@ let unsubscribeRecordsRealtime = null;
 let unsubscribeStudyStatsRealtime = null;
 let unsubscribeStudyRecordsRealtime = null;
 let realtimeSubscribedUid = null;
+let calendarPendingSync = false;
+let cloudCalendarFlushInFlight = false;
 
 
 // ── ユーティリティ ───────────────────────────────────────────
@@ -102,7 +104,8 @@ function normalizeStudyCalendarData(data) {
       checkedDates[dateKey] = true;
     }
   }
-  return { checkedDates };
+  const updatedAtMs = Math.max(0, Number(data?.updatedAtMs || 0));
+  return { checkedDates, updatedAtMs };
 }
 
 function loadStudyCalendarLocal(uid = getAuthUid()) {
@@ -110,20 +113,24 @@ function loadStudyCalendarLocal(uid = getAuthUid()) {
   try {
     return normalizeStudyCalendarData(JSON.parse(localStorage.getItem(key)) || {});
   } catch {
-    return { checkedDates: {} };
+    return { checkedDates: {}, updatedAtMs: 0 };
   }
 }
 
 function saveStudyCalendarLocal(data, uid = getAuthUid()) {
   const key = getStudyCalendarStorageKey(uid);
-  const normalized = normalizeStudyCalendarData(data || {});
+  const normalized = normalizeStudyCalendarData({
+    ...(data || {}),
+    updatedAtMs: Number(data?.updatedAtMs || Date.now())
+  });
   localStorage.setItem(key, JSON.stringify(normalized));
   studyCalendar = normalized;
 }
 
 function clearStudyCalendar(uid = getAuthUid()) {
-  localStorage.removeItem(getStudyCalendarStorageKey(uid));
-  studyCalendar = { checkedDates: {} };
+  saveStudyCalendarLocal({ checkedDates: {}, updatedAtMs: Date.now() }, uid);
+  calendarPendingSync = true;
+  flushStudyCalendarToCloudIfNeeded();
 }
 
 function getStudyFilters() {
@@ -515,25 +522,32 @@ function startCloudRealtimeSubscriptions() {
     const remoteRecords = (data.records && typeof data.records === 'object')
       ? normalizeRecordMap(data.records)
       : null;
-    if (!remoteRecords) return;
+    const remoteCalendar = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+      ? data.studyCalendarCheckedDates
+      : null;
+    const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
+    if (!remoteRecords && !remoteCalendar) return;
 
     const localKey = getRecordStorageKey(uid);
     let localRecords = {};
     try { localRecords = normalizeRecordMap(JSON.parse(localStorage.getItem(localKey)) || {}); }
     catch { localRecords = {}; }
 
-    const merged = mergeRecordsNoLoss(localRecords, remoteRecords);
-    records = merged;
-    localStorage.setItem(localKey, JSON.stringify(merged));
-    const now = Date.now();
-    saveRecordsMeta({
-      ...getRecordsMeta(uid),
-      localEditedAt: Math.max(Number(data.updatedAtMs || 0), now),
-      lastAccessAt: now,
-      lastCloudPullAt: now
-    }, uid);
+    if (remoteRecords) {
+      const merged = mergeRecordsNoLoss(localRecords, remoteRecords);
+      records = merged;
+      localStorage.setItem(localKey, JSON.stringify(merged));
+      const now = Date.now();
+      saveRecordsMeta({
+        ...getRecordsMeta(uid),
+        localEditedAt: Math.max(Number(data.updatedAtMs || 0), now),
+        lastAccessAt: now,
+        lastCloudPullAt: now
+      }, uid);
+    }
 
     if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+    if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
     tryRenderStatsIfOpen();
   }, (e) => {
     console.warn('クラウド成績リアルタイム同期エラー:', e);
@@ -628,34 +642,41 @@ async function pullRecordsFromCloudIfNeeded() {
 
     const data = snap.data() || {};
     const remoteRecords = (data.records && typeof data.records === 'object') ? normalizeRecordMap(data.records) : null;
+    const remoteCalendar = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+      ? data.studyCalendarCheckedDates
+      : null;
+    const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
     const remoteEditedAt = Number(data.updatedAtMs || 0);
     const remoteAccessAt = Number(data.accessedAtMs || remoteEditedAt || 0);
-    if (!remoteRecords) {
+    if (!remoteRecords && !remoteCalendar) {
       cloudRecordsLoadedUid = uid;
       return;
     }
 
     // 空データ上書きを避けるため、履歴は「減らさない」統合を行う。
-    const mergedRecords = mergeRecordsNoLoss(localRecords, remoteRecords);
-    const preferRemoteByAccess = remoteAccessAt > localAccessAt;
-    const winnerEditedAt = preferRemoteByAccess ? (remoteEditedAt || now) : (localEditedAt || now);
-    records = mergedRecords;
-    localStorage.setItem(localKey, JSON.stringify(records));
-    saveRecordsMeta({
-      ...meta,
-      localEditedAt: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
-      lastAccessAt: now,
-      lastCloudPullAt: now
-    }, uid);
+    if (remoteRecords) {
+      const mergedRecords = mergeRecordsNoLoss(localRecords, remoteRecords);
+      const preferRemoteByAccess = remoteAccessAt > localAccessAt;
+      const winnerEditedAt = preferRemoteByAccess ? (remoteEditedAt || now) : (localEditedAt || now);
+      records = mergedRecords;
+      localStorage.setItem(localKey, JSON.stringify(records));
+      saveRecordsMeta({
+        ...meta,
+        localEditedAt: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
+        lastAccessAt: now,
+        lastCloudPullAt: now
+      }, uid);
 
-    // 判定結果をクラウドにも反映し、次回は同じ勝者が再現されるようにする。
-    await ref.set({
-      uid,
-      records,
-      updatedAtMs: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
-      accessedAtMs: now,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+      // 判定結果をクラウドにも反映し、次回は同じ勝者が再現されるようにする。
+      await ref.set({
+        uid,
+        records,
+        updatedAtMs: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
+        accessedAtMs: now,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+    if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
     tryRenderStatsIfOpen();
     cloudRecordsLoadedUid = uid;
   } catch (e) {
@@ -724,7 +745,9 @@ function setStudyDayChecked(dateKey, checked = true) {
   const next = { ...studyCalendar.checkedDates };
   if (checked) next[key] = true;
   else delete next[key];
-  saveStudyCalendarLocal({ checkedDates: next });
+  saveStudyCalendarLocal({ checkedDates: next, updatedAtMs: Date.now() });
+  calendarPendingSync = true;
+  flushStudyCalendarToCloudIfNeeded();
 }
 
 function toggleStudyDayChecked(dateKey) {
@@ -739,6 +762,69 @@ function markTodayAsStudied() {
   if (studyCalendar.checkedDates[key]) return;
   setStudyDayChecked(key, true);
   renderStudyCalendar();
+}
+
+function mergeStudyCalendarDates(localData, remoteData) {
+  const local = normalizeStudyCalendarData(localData || {});
+  const remote = normalizeStudyCalendarData(remoteData || {});
+
+  if (remote.updatedAtMs > local.updatedAtMs) return remote;
+  if (local.updatedAtMs > remote.updatedAtMs) return local;
+
+  const mergedDates = { ...local.checkedDates };
+  for (const [key, checked] of Object.entries(remote.checkedDates)) {
+    if (checked === true) mergedDates[key] = true;
+  }
+  return {
+    checkedDates: mergedDates,
+    updatedAtMs: Math.max(local.updatedAtMs, remote.updatedAtMs)
+  };
+}
+
+function applyRemoteStudyCalendar(remoteCheckedDates, remoteUpdatedAtMs = 0) {
+  const uid = getAuthUid();
+  if (!uid) return;
+  const local = loadStudyCalendarLocal(uid);
+  const merged = mergeStudyCalendarDates(local, {
+    checkedDates: remoteCheckedDates || {},
+    updatedAtMs: Number(remoteUpdatedAtMs || 0)
+  });
+  saveStudyCalendarLocal(merged, uid);
+  renderStudyCalendar();
+}
+
+async function pushStudyCalendarToCloud() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (cloudCalendarFlushInFlight) return;
+
+  cloudCalendarFlushInFlight = true;
+  try {
+    while (calendarPendingSync) {
+      calendarPendingSync = false;
+      const latest = loadStudyCalendarLocal(uid);
+      await firebase.firestore().collection('records').doc(uid).set({
+        uid,
+        studyCalendarCheckedDates: latest.checkedDates,
+        studyCalendarUpdatedAtMs: Math.max(0, Number(latest.updatedAtMs || Date.now())),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  } catch (e) {
+    calendarPendingSync = true;
+    console.warn('学習日カレンダー同期(保存)エラー:', e);
+  } finally {
+    cloudCalendarFlushInFlight = false;
+  }
+}
+
+async function flushStudyCalendarToCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (!calendarPendingSync) return;
+  await pushStudyCalendarToCloud();
 }
 
 function renderStudyCalendar() {
@@ -1016,6 +1102,7 @@ function loadData() {
 
   studyTime = loadStudyTimeLocal();
   studyCalendar = loadStudyCalendarLocal();
+  calendarPendingSync = false;
   studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   renderStudyCalendar();
   pullQuestionsFromCloudIfNeeded();
@@ -1257,6 +1344,7 @@ async function hashPassword(pw) {
 async function logout() {
   stopStudyTimerAndAccumulate();
   await flushRecordsToCloudIfNeeded();
+  await flushStudyCalendarToCloudIfNeeded();
   await flushStudyTimePendingToCloud();
   stopCloudRealtimeSubscriptions();
   currentUser = null;
@@ -1270,6 +1358,7 @@ async function logout() {
   cloudRecordsLoadedUid = null;
   cloudStudyLoadedUid = null;
   studyTimeBackend = 'auto';
+  calendarPendingSync = false;
   showLoginOverlay();
 }
 
@@ -2603,6 +2692,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.hidden) {
       stopStudyTimerAndAccumulate();
       flushRecordsToCloudIfNeeded();
+      flushStudyCalendarToCloudIfNeeded();
       return;
     }
     if (session) startStudyTimerIfNeeded();
@@ -2612,5 +2702,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   window.addEventListener('beforeunload', () => {
     stopStudyTimerAndAccumulate();
+    flushStudyCalendarToCloudIfNeeded();
   });
 });
