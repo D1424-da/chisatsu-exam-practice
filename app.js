@@ -284,6 +284,39 @@ function aggregateLegacyRecordDocs(docs) {
   return out;
 }
 
+function normalizeRecordMap(map) {
+  const src = (map && typeof map === 'object') ? map : {};
+  const out = {};
+  for (const [limbId, stat] of Object.entries(src)) {
+    const key = String(limbId || '');
+    if (!key) continue;
+    out[key] = {
+      correct: Math.max(0, Number(stat?.correct || 0)),
+      wrong: Math.max(0, Number(stat?.wrong || 0))
+    };
+  }
+  return out;
+}
+
+function isRecordMapEmpty(map) {
+  return Object.keys(normalizeRecordMap(map)).length === 0;
+}
+
+function mergeRecordsNoLoss(localMap, remoteMap) {
+  const local = normalizeRecordMap(localMap);
+  const remote = normalizeRecordMap(remoteMap);
+  const merged = {};
+  const ids = new Set([...Object.keys(local), ...Object.keys(remote)]);
+  for (const id of ids) {
+    merged[id] = {
+      // カウンタは減らさない方針で統合し、空データ上書きによる履歴消失を防ぐ。
+      correct: Math.max(0, Number(local[id]?.correct || 0), Number(remote[id]?.correct || 0)),
+      wrong: Math.max(0, Number(local[id]?.wrong || 0), Number(remote[id]?.wrong || 0))
+    };
+  }
+  return merged;
+}
+
 async function pullQuestionsFromCloudIfNeeded() {
   const uid = getAuthUid();
   if (!uid || cloudPullInFlight) return;
@@ -374,6 +407,7 @@ async function pullRecordsFromCloudIfNeeded() {
   try {
     let localRecords = {};
     try { localRecords = JSON.parse(localStorage.getItem(localKey)) || {}; } catch { localRecords = {}; }
+    localRecords = normalizeRecordMap(localRecords);
 
     const ref = firebase.firestore().collection('records').doc(uid);
     const snap = await ref.get();
@@ -409,7 +443,7 @@ async function pullRecordsFromCloudIfNeeded() {
         return;
       }
 
-      if (localRecords && Object.keys(localRecords).length > 0) {
+      if (!isRecordMapEmpty(localRecords)) {
         const seedAt = localAccessAt || now;
         await ref.set({
           uid,
@@ -430,7 +464,7 @@ async function pullRecordsFromCloudIfNeeded() {
     }
 
     const data = snap.data() || {};
-    const remoteRecords = (data.records && typeof data.records === 'object') ? data.records : null;
+    const remoteRecords = (data.records && typeof data.records === 'object') ? normalizeRecordMap(data.records) : null;
     const remoteEditedAt = Number(data.updatedAtMs || 0);
     const remoteAccessAt = Number(data.accessedAtMs || remoteEditedAt || 0);
     if (!remoteRecords) {
@@ -438,15 +472,15 @@ async function pullRecordsFromCloudIfNeeded() {
       return;
     }
 
-    // アクセス時刻優先: より最近アクセスされた側の成績を勝者として上書きする。
+    // 空データ上書きを避けるため、履歴は「減らさない」統合を行う。
+    const mergedRecords = mergeRecordsNoLoss(localRecords, remoteRecords);
     const preferRemoteByAccess = remoteAccessAt > localAccessAt;
-    const winnerRecords = preferRemoteByAccess ? remoteRecords : localRecords;
     const winnerEditedAt = preferRemoteByAccess ? (remoteEditedAt || now) : (localEditedAt || now);
-    records = winnerRecords;
+    records = mergedRecords;
     localStorage.setItem(localKey, JSON.stringify(records));
     saveRecordsMeta({
       ...meta,
-      localEditedAt: winnerEditedAt,
+      localEditedAt: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
       lastAccessAt: now,
       lastCloudPullAt: now
     }, uid);
@@ -455,7 +489,7 @@ async function pullRecordsFromCloudIfNeeded() {
     await ref.set({
       uid,
       records,
-      updatedAtMs: winnerEditedAt,
+      updatedAtMs: Math.max(winnerEditedAt, remoteEditedAt, localEditedAt, now),
       accessedAtMs: now,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
@@ -710,8 +744,27 @@ async function resetStudyTime() {
 function loadData() {
   currentUser = getActiveUser();
   try { questions = JSON.parse(localStorage.getItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
-  const rk = getRecordStorageKey();
-  try { records   = JSON.parse(localStorage.getItem(rk)) || {}; } catch { records = {}; }
+  const authUid = getAuthUid();
+  const rk = getRecordStorageKey(authUid);
+  try { records = normalizeRecordMap(JSON.parse(localStorage.getItem(rk)) || {}); } catch { records = {}; }
+
+  // 旧バージョン（単一キー保存）からの移行: uidキーが空なら legacy キーを引き継ぐ。
+  if (authUid && isRecordMapEmpty(records)) {
+    let legacy = {};
+    try { legacy = normalizeRecordMap(JSON.parse(localStorage.getItem(KEY_RECORDS)) || {}); } catch { legacy = {}; }
+    if (!isRecordMapEmpty(legacy)) {
+      records = legacy;
+      localStorage.setItem(rk, JSON.stringify(records));
+      const now = Date.now();
+      saveRecordsMeta({
+        ...getRecordsMeta(authUid),
+        localEditedAt: now,
+        lastAccessAt: now,
+        migratedFromLegacyAt: now
+      }, authUid);
+    }
+  }
+
   studyTime = loadStudyTimeLocal();
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded();
