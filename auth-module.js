@@ -211,6 +211,93 @@ function updateStatsNavAvailability(isLoggedIn) {
   }
 }
 
+function updateManageNavAvailability(canManage) {
+  const manageBtn = document.getElementById('nav-manage-btn');
+  if (!manageBtn) return;
+  manageBtn.classList.remove('hidden');
+  manageBtn.setAttribute('aria-hidden', 'false');
+  if (canManage) {
+    manageBtn.removeAttribute('title');
+  } else {
+    manageBtn.title = '問題管理ページは管理者ログイン後に利用できます';
+  }
+}
+
+function openAdminLoginOverlay() {
+  const overlay = document.getElementById('admin-login-overlay');
+  if (!overlay) return;
+
+  const auth = firebase.auth();
+  const current = auth.currentUser;
+  if (current && typeof isAdminUser === 'function') {
+    const canManage = isAdminUser({ uid: current.uid, email: current.email, displayName: current.displayName || '' });
+    if (canManage) {
+      if (typeof showPage === 'function') showPage('manage');
+      return;
+    }
+  }
+
+  const usernameEl = document.getElementById('admin-login-username');
+  const passwordEl = document.getElementById('admin-login-password');
+  hideError('admin-login-error');
+  if (usernameEl) usernameEl.value = '';
+  if (passwordEl) passwordEl.value = '';
+
+  overlay.classList.remove('hidden');
+  if (usernameEl) usernameEl.focus();
+}
+
+function closeAdminLoginOverlay() {
+  const overlay = document.getElementById('admin-login-overlay');
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+  hideError('admin-login-error');
+}
+
+async function handleAdminLogin() {
+  const username = document.getElementById('admin-login-username')?.value.trim() || '';
+  const password = document.getElementById('admin-login-password')?.value || '';
+  const btn = document.getElementById('btn-admin-login');
+
+  if (!username || !password) {
+    showError('admin-login-error', 'ユーザー名とパスワードを入力してください');
+    return;
+  }
+
+  try {
+    hideError('admin-login-error');
+    if (btn) btn.disabled = true;
+
+    const auth = firebase.auth();
+    const result = await auth.signInWithEmailAndPassword(username, password);
+    const canManage = typeof isAdminUser === 'function'
+      ? isAdminUser({ uid: result.user.uid, email: result.user.email, displayName: result.user.displayName || '' })
+      : false;
+
+    if (!canManage) {
+      await auth.signOut();
+      showError('admin-login-error', 'このアカウントには管理者権限がありません');
+      return;
+    }
+
+    closeAdminLoginOverlay();
+    if (typeof showPage === 'function') showPage('manage');
+  } catch (error) {
+    console.error('✗ 管理者ログイン失敗:', error.code);
+    let msg = '管理者ログインに失敗しました';
+    if (error.code === 'auth/user-not-found') msg = 'ユーザーが見つかりません';
+    if (error.code === 'auth/wrong-password') msg = 'パスワードが正しくありません';
+    if (error.code === 'auth/invalid-email') msg = 'メールアドレスが無効です';
+    if (error.code === 'auth/too-many-requests') msg = '試行回数が多すぎます。しばらく待ってから再試行してください';
+    showError('admin-login-error', msg);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+window.openAdminLoginOverlay = openAdminLoginOverlay;
+window.closeAdminLoginOverlay = closeAdminLoginOverlay;
+
 // ===== 認証状態の監視 =====
 function setupAuthStateListener() {
   const auth = firebase.auth();
@@ -239,6 +326,10 @@ function setupAuthStateListener() {
       if (typeof loadData === 'function') loadData();
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       updateStatsNavAvailability(true);
+      const canManage = typeof isAdminUser === 'function' ? isAdminUser(window.currentUser) : false;
+      updateManageNavAvailability(canManage);
+      if (!canManage && typeof showPage === 'function') showPage('study');
+      if (canManage) closeAdminLoginOverlay();
 
       if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
       if (btnLogout) btnLogout.textContent = 'ログアウト';
@@ -257,6 +348,7 @@ function setupAuthStateListener() {
       if (typeof syncBundledQuestions === 'function') await syncBundledQuestions();
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       updateStatsNavAvailability(false);
+      updateManageNavAvailability(false);
 
       if (userNameEl) userNameEl.textContent = 'ゲスト';
       if (btnLogout) btnLogout.textContent = 'ログイン';
@@ -316,6 +408,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnShowLoginFromReset = document.getElementById('btn-show-login-from-reset');
   if (btnShowLoginFromReset) {
     btnShowLoginFromReset.addEventListener('click', () => switchAuthForm('login'));
+  }
+
+  // 管理者ログインモーダル
+  const btnAdminLogin = document.getElementById('btn-admin-login');
+  if (btnAdminLogin) {
+    btnAdminLogin.addEventListener('click', handleAdminLogin);
+  }
+
+  const btnAdminLoginCancel = document.getElementById('btn-admin-login-cancel');
+  if (btnAdminLoginCancel) {
+    btnAdminLoginCancel.addEventListener('click', closeAdminLoginOverlay);
+  }
+
+  const adminOverlay = document.getElementById('admin-login-overlay');
+  if (adminOverlay) {
+    adminOverlay.addEventListener('click', (e) => {
+      if (e.target === adminOverlay) closeAdminLoginOverlay();
+    });
   }
 
   // ログアウトボタン
@@ -385,6 +495,12 @@ async function handleGoogleSignInCallback(response) {
 // メールアドレス入力時にEnter キーでログイン
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
+    const adminOverlay = document.getElementById('admin-login-overlay');
+    if (adminOverlay && !adminOverlay.classList.contains('hidden')) {
+      handleAdminLogin();
+      return;
+    }
+
     if (!document.getElementById('login-form-area').classList.contains('hidden')) {
       handleEmailLogin();
     } else if (!document.getElementById('register-form-area').classList.contains('hidden')) {

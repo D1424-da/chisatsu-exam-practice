@@ -13,7 +13,10 @@ const firebaseConfig = {
 // Optional app-level configuration.
 // Googleログインを使う場合のみ Client ID を設定してください。
 window.APP_CONFIG = {
-  googleClientId: ""
+  googleClientId: "",
+  adminEmails: [
+    "d.i.a.0101@gmail.com"
+  ]
 };
 
 // Firebase を初期化（アプリ起動時に実行される）

@@ -391,6 +391,14 @@ function getAuthUid() {
   return getActiveUserId();
 }
 
+function isAdminUser(user = getActiveUser()) {
+  const email = String(user?.email || '').trim().toLowerCase();
+  if (!email) return false;
+  const configured = Array.isArray(window.APP_CONFIG?.adminEmails) ? window.APP_CONFIG.adminEmails : [];
+  const normalized = configured.map(v => String(v || '').trim().toLowerCase()).filter(Boolean);
+  return normalized.includes(email);
+}
+
 function aggregateLegacyRecordDocs(docs) {
   const out = {};
   for (const snap of docs) {
@@ -1861,6 +1869,15 @@ async function showPage(name) {
     if (typeof switchAuthForm === 'function') switchAuthForm('login');
     const overlay = document.getElementById('login-overlay');
     if (overlay) overlay.classList.remove('hidden');
+    return;
+  }
+
+  if (name === 'manage' && !isAdminUser()) {
+    if (typeof openAdminLoginOverlay === 'function') {
+      openAdminLoginOverlay();
+      return;
+    }
+    alert('問題管理ページは管理者のみ利用できます。');
     return;
   }
 
