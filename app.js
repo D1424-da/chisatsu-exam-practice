@@ -275,6 +275,7 @@ function updateResumeSessionButton() {
 function saveStudySessionSnapshot() {
   const uid = getAuthUid();
   if (!uid || !session || !Array.isArray(session.queue) || session.queue.length === 0) return;
+  if (session.resumeEligible === false) return;
   const key = getStudySessionStorageKey(uid);
   const snapshot = {
     queueIds: session.queue.map(limb => limb?.id).filter(Boolean),
@@ -345,7 +346,9 @@ async function restoreLastStudySession() {
     queue,
     index: startIndex,
     fromPage: saved.fromPage || 'study',
-    filters: saved.filters || getStudyFilters()
+    filters: saved.filters || getStudyFilters(),
+    answeredCount: 0,
+    resumeEligible: true
   };
   showPage('study');
   document.getElementById('session-info').classList.remove('hidden');
@@ -1756,6 +1759,11 @@ function addRecord(limbId, isCorrect) {
   if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0 };
   if (isCorrect) records[limbId].correct++;
   else           records[limbId].wrong++;
+
+  if (session && typeof session.answeredCount === 'number') {
+    session.answeredCount += 1;
+  }
+
   saveRecords({ skipCloudSnapshot: true });
   addPendingRecordDelta(limbId, isCorrect);
   flushRecordDeltasToCloudIfNeeded();
@@ -1998,7 +2006,7 @@ function startSession() {
     return;
   }
 
-  session = { queue: limbs, index: 0, fromPage: 'study', filters };
+  session = { queue: limbs, index: 0, fromPage: 'study', filters, answeredCount: 0, resumeEligible: true };
   startStudyTimerIfNeeded();
   document.getElementById('session-info').classList.remove('hidden');
   document.getElementById('btn-start').textContent = '最初から';
@@ -2018,7 +2026,8 @@ function startSessionWithLimbId(limbId) {
     return;
   }
 
-  session = { queue: [target], index: 0, fromPage: 'stats', filters: getStudyFilters() };
+  // 苦手肢からの再挑戦は「前回の続きから」の対象外。
+  session = { queue: [target], index: 0, fromPage: 'stats', filters: getStudyFilters(), answeredCount: 0, resumeEligible: false };
   startStudyTimerIfNeeded();
   showPage('study');
   document.getElementById('session-info').classList.remove('hidden');
@@ -2028,13 +2037,22 @@ function startSessionWithLimbId(limbId) {
 }
 
 function endSession(opts = {}) {
+  const resumeEligible = !!session && session.resumeEligible !== false;
+  const shouldKeepSnapshot = opts.keepSnapshot !== false
+    && resumeEligible
+    && Number(session.answeredCount || 0) > 0;
+
   stopStudyTimerAndAccumulate();
   flushStudyTimePendingToCloud();
   session = null;
   document.getElementById('session-info').classList.add('hidden');
   document.getElementById('btn-start').textContent = '学習開始';
   document.getElementById('limb-area').innerHTML = '<div id="empty-state" class="empty-state"><p>「学習開始」を押して問題を始めましょう。</p></div>';
-  if (opts.keepSnapshot === false) {
+  if (!resumeEligible) {
+    updateResumeSessionButton();
+    return;
+  }
+  if (!shouldKeepSnapshot) {
     clearStudySessionSnapshot();
   } else {
     updateResumeSessionButton();
