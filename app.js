@@ -927,6 +927,7 @@ function setStudyDayChecked(dateKey, checked = true) {
   if (checked) next[key] = true;
   else delete next[key];
   saveStudyCalendarLocal({ checkedDates: next, updatedAtMs: Date.now() });
+  renderStudyCalendar();
   calendarPendingSync = true;
   flushStudyCalendarToCloudIfNeeded();
 }
@@ -940,8 +941,10 @@ function toggleStudyDayChecked(dateKey) {
 
 function markTodayAsStudied() {
   const key = toDateKey(new Date());
-  if (studyCalendar.checkedDates[key]) return;
-  setStudyDayChecked(key, true);
+  if (!studyCalendar.checkedDates[key]) {
+    setStudyDayChecked(key, true);
+    return;
+  }
   renderStudyCalendar();
 }
 
@@ -1890,6 +1893,8 @@ function updateMembersOnlyPanels() {
   const statsGuestCta = document.getElementById('stats-guest-cta');
   if (statsAuthContent) statsAuthContent.classList.toggle('hidden', !loggedIn);
   if (statsGuestCta) statsGuestCta.classList.toggle('hidden', loggedIn);
+
+  if (loggedIn) renderStudyCalendar();
 }
 
 function openAuthOverlay(form = 'register') {
