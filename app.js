@@ -1345,7 +1345,7 @@ function loadData() {
   renderStudyCalendar();
   renderSyncStatus();
   pullQuestionsFromCloudIfNeeded();
-  pullRecordsFromCloudIfNeeded();
+  pullRecordsFromCloudIfNeeded(true);
   pullStudyTimeFromCloudIfNeeded();
   startCloudRealtimeSubscriptions();
   updateResumeSessionButton();
@@ -1859,14 +1859,14 @@ function getAvailableYears() {
 }
 
 // ── ページ切り替え ────────────────────────────────────────────
-function showPage(name) {
+async function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`page-${name}`).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
   if (name === 'stats') {
-    pullRecordsFromCloudIfNeeded(true);
-    pullStudyTimeFromCloudIfNeeded();
+    await pullRecordsFromCloudIfNeeded(true);
+    await pullStudyTimeFromCloudIfNeeded();
     renderStats();
   }
   if (name === 'study') {
