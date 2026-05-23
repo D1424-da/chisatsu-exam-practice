@@ -55,12 +55,7 @@ let syncStatus = {
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-function isMobileDevice() {
-  const ua = navigator.userAgent || '';
-  return /Android|iPhone|iPad|iPod/i.test(ua);
-}
-
-const useLocalStorage = !isMobileDevice();
+const useLocalStorage = false;
 
 function storageGetItem(key) {
   if (!useLocalStorage) return null;
