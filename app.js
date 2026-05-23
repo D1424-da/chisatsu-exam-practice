@@ -1875,7 +1875,7 @@ function getAvailableYears() {
 }
 
 function updateMembersOnlyPanels() {
-  const loggedIn = !!getAuthUid();
+  const loggedIn = !!(getAuthUid() || window.currentUser?.uid);
   const canManage = typeof isAdminUser === 'function' ? isAdminUser() : false;
 
   const studyCalendarSection = document.getElementById('study-calendar-section');
@@ -1933,10 +1933,8 @@ async function showPage(name) {
     renderStats();
   }
   if (name === 'study') {
-    if (getAuthUid()) {
-      pullRecordsFromCloudIfNeeded(true);
-      renderStudyCalendar();
-    }
+    if (getAuthUid()) pullRecordsFromCloudIfNeeded(true);
+    renderStudyCalendar();
   }
   if (name === 'manage') { renderManage(); renderUsers(); updateFileStatus(); }
 }
