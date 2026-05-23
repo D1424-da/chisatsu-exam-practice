@@ -727,9 +727,31 @@ body {
 
 /* ─── レスポンシブ ──────────────────────────────────────── */
 @media (max-width: 600px) {
-  .header-inner { padding: 0 10px; }
+  .header-inner {
+    padding: 8px 10px;
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+  }
   .logo { font-size: 1rem; }
+  .logo { flex: 1 1 auto; }
+  .nav {
+    order: 2;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
   .nav-btn { padding: 5px 10px; font-size: .82rem; }
+  .user-badge {
+    order: 1;
+    margin-left: 0;
+    flex: 0 0 auto;
+  }
   .page { padding: 0 10px 40px; }
   .filter-row { flex-direction: column; align-items: stretch; }
   .filter-group select { min-width: unset; }
@@ -740,7 +762,7 @@ body {
   .inline-next-area { flex-direction: column; align-items: stretch; }
   .manage-header { flex-direction: column; align-items: flex-start; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .user-badge-name { max-width: 60px; }
+  .user-badge-name { max-width: 56px; }
 }
 
 /* ─── ログインオーバーレイ ──────────────────────────────── */
