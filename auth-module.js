@@ -261,6 +261,26 @@ function closeAdminLoginOverlay() {
   hideError('admin-login-error');
 }
 
+function getAdminLoginId() {
+  return String(window.APP_CONFIG?.adminLoginId || '管理').trim();
+}
+
+function getAdminLoginPassword() {
+  return String(window.APP_CONFIG?.adminLoginPassword || '123456');
+}
+
+function resolveAdminLoginEmail(inputId) {
+  const raw = String(inputId || '').trim();
+  const adminId = getAdminLoginId();
+  if (raw === adminId) {
+    const configuredEmail = String(window.APP_CONFIG?.adminLoginEmail || '').trim();
+    if (configuredEmail) return configuredEmail;
+    const configured = Array.isArray(window.APP_CONFIG?.adminEmails) ? window.APP_CONFIG.adminEmails : [];
+    return String(configured[0] || '').trim();
+  }
+  return raw;
+}
+
 async function handleAdminLogin() {
   const username = document.getElementById('admin-login-username')?.value.trim() || '';
   const password = document.getElementById('admin-login-password')?.value || '';
@@ -275,8 +295,20 @@ async function handleAdminLogin() {
     hideError('admin-login-error');
     if (btn) btn.disabled = true;
 
+    const adminId = getAdminLoginId();
+    if (username === adminId && password !== getAdminLoginPassword()) {
+      showError('admin-login-error', 'パスワードが正しくありません');
+      return;
+    }
+
+    const loginEmail = resolveAdminLoginEmail(username);
+    if (!loginEmail || !loginEmail.includes('@')) {
+      showError('admin-login-error', '管理者IDが正しく設定されていません');
+      return;
+    }
+
     const auth = firebase.auth();
-    const result = await auth.signInWithEmailAndPassword(username, password);
+    const result = await auth.signInWithEmailAndPassword(loginEmail, password);
     const canManage = typeof isAdminUser === 'function'
       ? isAdminUser({ uid: result.user.uid, email: result.user.email, displayName: result.user.displayName || '' })
       : false;
