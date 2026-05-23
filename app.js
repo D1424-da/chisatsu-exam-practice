@@ -42,6 +42,7 @@ let calendarPendingSync = false;
 let cloudCalendarFlushInFlight = false;
 let sessionSnapshotPendingSync = false;
 let cloudSessionSnapshotFlushInFlight = false;
+let studySessionSnapshotCache = {};
 
 
 // ── ユーティリティ ───────────────────────────────────────────
@@ -205,11 +206,16 @@ function setStudyFilters(filters = {}) {
 }
 
 function readSavedStudySession(uid = getAuthUid()) {
+  if (uid && studySessionSnapshotCache[uid]) {
+    const cached = normalizeStudySessionSnapshot(studySessionSnapshotCache[uid]);
+    if (cached) return cached;
+  }
+
   const key = getStudySessionStorageKey(uid);
   try {
     const saved = JSON.parse(storageGetItem(key));
     if (!saved || typeof saved !== 'object' || !Array.isArray(saved.queueIds)) return null;
-    return {
+    const normalized = {
       queueIds: saved.queueIds.map(id => String(id || '')).filter(Boolean),
       index: Math.max(0, Math.floor(Number(saved.index || 0))),
       fromPage: saved.fromPage === 'stats' ? 'stats' : 'study',
@@ -222,6 +228,8 @@ function readSavedStudySession(uid = getAuthUid()) {
       },
       savedAt: Math.max(0, Number(saved.savedAt || 0))
     };
+    if (uid && normalized) studySessionSnapshotCache[uid] = normalized;
+    return normalized;
   } catch {
     return null;
   }
@@ -275,6 +283,7 @@ function saveStudySessionSnapshot() {
     filters: session.filters || getStudyFilters(),
     savedAt: Date.now()
   };
+  studySessionSnapshotCache[uid] = snapshot;
   storageSetItem(key, JSON.stringify(snapshot));
   sessionSnapshotPendingSync = true;
   flushStudySessionSnapshotToCloudIfNeeded();
@@ -284,6 +293,7 @@ function saveStudySessionSnapshot() {
 function clearStudySessionSnapshot() {
   const uid = getAuthUid();
   if (!uid) return;
+  delete studySessionSnapshotCache[uid];
   storageRemoveItem(getStudySessionStorageKey(uid));
   sessionSnapshotPendingSync = true;
   flushStudySessionSnapshotToCloudIfNeeded();
@@ -995,6 +1005,7 @@ function applyRemoteStudySessionSnapshot(remoteSnapshot, remoteSavedAtMs = 0) {
 
   const key = getStudySessionStorageKey(uid);
   if (!remoteSnapshot) {
+    delete studySessionSnapshotCache[uid];
     storageRemoveItem(key);
     updateResumeSessionButton();
     return;
@@ -1002,6 +1013,7 @@ function applyRemoteStudySessionSnapshot(remoteSnapshot, remoteSavedAtMs = 0) {
 
   const normalized = normalizeStudySessionSnapshot(remoteSnapshot);
   if (!normalized) return;
+  studySessionSnapshotCache[uid] = normalized;
   storageSetItem(key, JSON.stringify(normalized));
   updateResumeSessionButton();
 }
@@ -1016,7 +1028,7 @@ async function pushStudySessionSnapshotToCloud() {
   try {
     while (sessionSnapshotPendingSync) {
       sessionSnapshotPendingSync = false;
-      const snapshot = normalizeStudySessionSnapshot(readSavedStudySession(uid));
+      const snapshot = normalizeStudySessionSnapshot(studySessionSnapshotCache[uid] || readSavedStudySession(uid));
       const savedAtMs = Math.max(0, Number(snapshot?.savedAt || Date.now()));
       await firebase.firestore().collection('records').doc(uid).set({
         uid,
@@ -1585,6 +1597,7 @@ async function logout() {
   studyTimeBackend = 'auto';
   calendarPendingSync = false;
   sessionSnapshotPendingSync = false;
+  studySessionSnapshotCache = {};
   pendingRecordDeltas = {};
   showLoginOverlay();
 }
