@@ -27,6 +27,25 @@ function setGoogleLoginVisibility(visible) {
   if (divider) divider.classList.toggle('hidden', !visible);
 }
 
+const LOCAL_ADMIN_AUTH_KEY = 'limb_local_admin_auth';
+
+function isLocalAdminAuthenticated() {
+  try {
+    return sessionStorage.getItem(LOCAL_ADMIN_AUTH_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setLocalAdminAuthenticated(enabled) {
+  try {
+    if (enabled) sessionStorage.setItem(LOCAL_ADMIN_AUTH_KEY, '1');
+    else sessionStorage.removeItem(LOCAL_ADMIN_AUTH_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 // ===== ログイン処理 =====
 async function handleEmailLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -174,6 +193,16 @@ async function handleLogout() {
   try {
     const auth = firebase.auth();
     if (!auth.currentUser) {
+      if (isLocalAdminAuthenticated()) {
+        setLocalAdminAuthenticated(false);
+        updateManageNavAvailability(false);
+        const userNameEl = document.getElementById('current-user-name');
+        const btnLogout = document.getElementById('btn-logout');
+        if (userNameEl) userNameEl.textContent = 'ゲスト';
+        if (btnLogout) btnLogout.textContent = 'ログイン';
+        if (typeof showPage === 'function') showPage('study');
+        return;
+      }
       switchAuthForm('login');
       const overlay = document.getElementById('login-overlay');
       if (overlay) overlay.classList.remove('hidden');
@@ -243,6 +272,11 @@ function openAdminLoginOverlay() {
   const overlay = document.getElementById('admin-login-overlay');
   if (!overlay) return;
 
+  if (isLocalAdminAuthenticated()) {
+    if (typeof showPage === 'function') showPage('manage');
+    return;
+  }
+
   const auth = firebase.auth();
   const current = auth.currentUser;
   if (current && typeof isAdminUser === 'function') {
@@ -305,16 +339,31 @@ async function handleAdminLogin() {
     if (btn) btn.disabled = true;
 
     const adminId = getAdminLoginId();
-    if (username.toLowerCase() === adminId.toLowerCase() && password !== getAdminLoginPassword()) {
+    const usingAdminId = username.toLowerCase() === adminId.toLowerCase();
+    if (usingAdminId && password !== getAdminLoginPassword()) {
       showError('admin-login-error', 'パスワードが正しくありません');
       return;
     }
 
     const loginEmail = resolveAdminLoginEmail(username);
+    if (usingAdminId && (!loginEmail || !loginEmail.includes('@') || loginEmail.includes('['))) {
+      setLocalAdminAuthenticated(true);
+      closeAdminLoginOverlay();
+      updateManageNavAvailability(true);
+      const userNameEl = document.getElementById('current-user-name');
+      const btnLogout = document.getElementById('btn-logout');
+      if (userNameEl) userNameEl.textContent = '管理者';
+      if (btnLogout) btnLogout.textContent = 'ログアウト';
+      if (typeof showPage === 'function') showPage('manage');
+      return;
+    }
+
     if (!loginEmail || !loginEmail.includes('@')) {
       showError('admin-login-error', '管理者IDが正しく設定されていません');
       return;
     }
+
+    setLocalAdminAuthenticated(false);
 
     const auth = firebase.auth();
     const result = await auth.signInWithEmailAndPassword(loginEmail, password);
@@ -345,6 +394,7 @@ async function handleAdminLogin() {
 
 window.openAdminLoginOverlay = openAdminLoginOverlay;
 window.closeAdminLoginOverlay = closeAdminLoginOverlay;
+window.isLocalAdminAuthenticated = isLocalAdminAuthenticated;
 
 // ===== 認証状態の監視 =====
 function setupAuthStateListener() {
@@ -358,6 +408,8 @@ function setupAuthStateListener() {
 
     if (user) {
       console.log('✓ ユーザーはログイン中:', user.email);
+
+      setLocalAdminAuthenticated(false);
       
       // ログインオーバーレイを隠す
       if (overlayEl) overlayEl.classList.add('hidden');
@@ -396,11 +448,12 @@ function setupAuthStateListener() {
       if (typeof syncBundledQuestions === 'function') await syncBundledQuestions();
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       updateStatsNavAvailability(false);
-      updateManageNavAvailability(false);
+      const canManage = isLocalAdminAuthenticated();
+      updateManageNavAvailability(canManage);
 
-      if (userNameEl) userNameEl.textContent = 'ゲスト';
+      if (userNameEl) userNameEl.textContent = canManage ? '管理者' : 'ゲスト';
       if (btnLogout) btnLogout.textContent = 'ログイン';
-      if (typeof showPage === 'function') showPage('study');
+      if (!canManage && typeof showPage === 'function') showPage('study');
     }
   });
 }

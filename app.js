@@ -395,6 +395,10 @@ function getAuthUid() {
 }
 
 function isAdminUser(user = getActiveUser()) {
+  if (typeof window.isLocalAdminAuthenticated === 'function' && window.isLocalAdminAuthenticated()) {
+    return true;
+  }
+
   const email = String(user?.email || '').trim().toLowerCase();
   if (!email) return false;
   const configured = Array.isArray(window.APP_CONFIG?.adminEmails) ? window.APP_CONFIG.adminEmails : [];
