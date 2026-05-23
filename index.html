@@ -149,7 +149,7 @@
         </div>
       </section>
 
-      <section class="stats-detail card">
+      <section id="study-calendar-section" class="stats-detail card hidden">
         <h3>学習日カレンダー</h3>
         <div class="study-calendar-toolbar">
           <button id="btn-calendar-prev" class="btn btn-ghost btn-sm" type="button">◀ 前月</button>
@@ -158,6 +158,15 @@
         </div>
         <div id="study-calendar-grid" class="study-calendar-grid"></div>
         <p class="study-calendar-note">学習した日は自動でチェックされます（手動入力は不要です）。</p>
+      </section>
+
+      <section id="study-calendar-guest-cta" class="stats-detail card hidden members-only-cta">
+        <h3>学習日カレンダーはログインで利用できます</h3>
+        <p>学習日の自動記録と端末間同期を使うには、無料のユーザー登録が必要です。</p>
+        <div class="members-only-actions">
+          <button id="btn-open-register-from-calendar" class="btn btn-primary" type="button">新規ユーザー作成（無料）</button>
+          <button id="btn-open-login-from-calendar" class="btn btn-ghost" type="button">ログイン</button>
+        </div>
       </section>
 
     </main>
@@ -286,37 +295,48 @@
     <!-- 成績ページ -->
     <main id="page-stats" class="page">
       <h2>成績・統計</h2>
-      <div class="stats-grid">
-        <div class="stat-card card">
-          <div class="stat-label">総回答数</div>
-          <div id="stat-total" class="stat-value">0</div>
+      <section id="stats-guest-cta" class="card hidden members-only-cta">
+        <h3>成績・統計はログインで利用できます</h3>
+        <p>正答率、苦手肢、学習時間の推移を保存・同期するには、ユーザー登録してください。</p>
+        <div class="members-only-actions">
+          <button id="btn-open-register-from-stats" class="btn btn-primary" type="button">新規ユーザー作成（無料）</button>
+          <button id="btn-open-login-from-stats" class="btn btn-ghost" type="button">ログイン</button>
         </div>
-        <div class="stat-card card">
-          <div class="stat-label">正答率</div>
-          <div id="stat-rate" class="stat-value">-%</div>
+      </section>
+
+      <div id="stats-auth-content" class="hidden">
+        <div class="stats-grid">
+          <div class="stat-card card">
+            <div class="stat-label">総回答数</div>
+            <div id="stat-total" class="stat-value">0</div>
+          </div>
+          <div class="stat-card card">
+            <div class="stat-label">正答率</div>
+            <div id="stat-rate" class="stat-value">-%</div>
+          </div>
+          <div class="stat-card card">
+            <div class="stat-label">学習肢数</div>
+            <div id="stat-limbs" class="stat-value">0</div>
+          </div>
+          <div class="stat-card card">
+            <div class="stat-label">苦手肢</div>
+            <div id="stat-weak" class="stat-value">0</div>
+          </div>
+          <div class="stat-card card">
+            <div class="stat-label">総学習時間</div>
+            <div id="stat-study-time" class="stat-value">0秒</div>
+          </div>
         </div>
-        <div class="stat-card card">
-          <div class="stat-label">学習肢数</div>
-          <div id="stat-limbs" class="stat-value">0</div>
+        <div class="stats-detail card">
+          <h3>科目別成績</h3>
+          <div id="subject-stats"></div>
         </div>
-        <div class="stat-card card">
-          <div class="stat-label">苦手肢</div>
-          <div id="stat-weak" class="stat-value">0</div>
+        <div class="stats-detail card">
+            <h3>苦手肢トップ50</h3>
+          <div id="weak-limbs-list"></div>
         </div>
-        <div class="stat-card card">
-          <div class="stat-label">総学習時間</div>
-          <div id="stat-study-time" class="stat-value">0秒</div>
-        </div>
+        <button id="btn-reset-stats" class="btn btn-danger btn-sm" style="margin-top:16px;">統計をリセット</button>
       </div>
-      <div class="stats-detail card">
-        <h3>科目別成績</h3>
-        <div id="subject-stats"></div>
-      </div>
-      <div class="stats-detail card">
-          <h3>苦手肢トップ50</h3>
-        <div id="weak-limbs-list"></div>
-      </div>
-      <button id="btn-reset-stats" class="btn btn-danger btn-sm" style="margin-top:16px;">統計をリセット</button>
     </main>
   </div>
 
@@ -387,7 +407,7 @@
     </div>
   </div>
 
-  <script src="auth-module.js?v=20260523e"></script>
-  <script src="app.js?v=20260523v"></script>
+  <script src="auth-module.js?v=20260523f"></script>
+  <script src="app.js?v=20260523w"></script>
 </body>
 </html>

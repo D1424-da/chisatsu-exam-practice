@@ -202,12 +202,12 @@ function switchAuthForm(form) {
 function updateStatsNavAvailability(isLoggedIn) {
   const statsBtn = document.getElementById('nav-stats-btn');
   if (!statsBtn) return;
-  statsBtn.disabled = !isLoggedIn;
-  statsBtn.setAttribute('aria-disabled', String(!isLoggedIn));
+  statsBtn.disabled = false;
+  statsBtn.setAttribute('aria-disabled', 'false');
   if (isLoggedIn) {
     statsBtn.removeAttribute('title');
   } else {
-    statsBtn.title = '成績ページはログイン後に利用できます';
+    statsBtn.title = '成績・学習日カレンダーはログインまたは新規登録で利用できます';
   }
 }
 

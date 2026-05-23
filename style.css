@@ -702,6 +702,29 @@ body {
 .weak-limb-text { font-size: .9rem; }
 .weak-limb-meta { font-size: .8rem; color: var(--text-muted); margin-top: 2px; }
 
+.members-only-cta {
+  text-align: center;
+  padding: 20px;
+}
+
+.members-only-cta h3 {
+  margin-bottom: 8px;
+  font-size: 1.05rem;
+}
+
+.members-only-cta p {
+  color: var(--text-muted);
+  font-size: .9rem;
+  margin-bottom: 14px;
+}
+
+.members-only-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 /* ─── レスポンシブ ──────────────────────────────────────── */
 @media (max-width: 600px) {
   .header-inner { padding: 0 10px; }
