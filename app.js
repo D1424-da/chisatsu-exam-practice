@@ -42,14 +42,6 @@ let calendarPendingSync = false;
 let cloudCalendarFlushInFlight = false;
 let sessionSnapshotPendingSync = false;
 let cloudSessionSnapshotFlushInFlight = false;
-let syncStatus = {
-  questions: { lastCloudAt: 0, lastError: '' },
-  records: { lastCloudAt: 0, lastError: '' },
-  studyTime: { lastCloudAt: 0, lastError: '' },
-  calendar: { lastCloudAt: 0, lastError: '' },
-  session: { lastCloudAt: 0, lastError: '' },
-  globalLastError: ''
-};
 
 
 // ── ユーティリティ ───────────────────────────────────────────
@@ -84,52 +76,14 @@ function storageRemoveItem(key) {
   }
 }
 
-function formatSyncTimestamp(ts) {
-  const n = Math.max(0, Number(ts || 0));
-  if (!n) return '未同期';
-  const d = new Date(n);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return `${y}/${m}/${day} ${hh}:${mm}:${ss}`;
-}
-
-function renderSyncStatus() {
-  const map = [
-    ['questions', 'sync-questions-time'],
-    ['records', 'sync-records-time'],
-    ['studyTime', 'sync-study-time-time'],
-    ['calendar', 'sync-calendar-time'],
-    ['session', 'sync-session-time']
-  ];
-  for (const [key, id] of map) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    el.textContent = formatSyncTimestamp(syncStatus[key]?.lastCloudAt || 0);
-  }
-  const errEl = document.getElementById('sync-last-error');
-  if (errEl) {
-    errEl.textContent = syncStatus.globalLastError
-      ? `直近の同期エラー: ${syncStatus.globalLastError}`
-      : '直近の同期エラー: なし';
-  }
-}
-
 function markSyncSuccess(kind, atMs = Date.now()) {
-  if (!syncStatus[kind]) return;
-  syncStatus[kind].lastCloudAt = Math.max(Number(syncStatus[kind].lastCloudAt || 0), Number(atMs || Date.now()));
-  syncStatus[kind].lastError = '';
-  renderSyncStatus();
+  void kind;
+  void atMs;
 }
 
 function markSyncError(kind, err) {
-  const msg = err?.message || String(err || 'unknown');
-  if (syncStatus[kind]) syncStatus[kind].lastError = msg;
-  syncStatus.globalLastError = `[${kind}] ${msg}`;
-  renderSyncStatus();
+  void kind;
+  void err;
 }
 
 function getQuestionsMeta() {
@@ -1372,7 +1326,6 @@ function loadData() {
   sessionSnapshotPendingSync = false;
   studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   renderStudyCalendar();
-  renderSyncStatus();
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded(true);
   pullStudyTimeFromCloudIfNeeded();
