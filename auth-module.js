@@ -271,7 +271,7 @@ function closeAdminLoginOverlay() {
 }
 
 function getAdminLoginId() {
-  return String(window.APP_CONFIG?.adminLoginId || '管理').trim();
+  return String(window.APP_CONFIG?.adminLoginId || 'admin').trim();
 }
 
 function getAdminLoginPassword() {
@@ -281,7 +281,7 @@ function getAdminLoginPassword() {
 function resolveAdminLoginEmail(inputId) {
   const raw = String(inputId || '').trim();
   const adminId = getAdminLoginId();
-  if (raw === adminId) {
+  if (raw.toLowerCase() === adminId.toLowerCase()) {
     const configuredEmail = String(window.APP_CONFIG?.adminLoginEmail || '').trim();
     if (configuredEmail) return configuredEmail;
     const configured = Array.isArray(window.APP_CONFIG?.adminEmails) ? window.APP_CONFIG.adminEmails : [];
@@ -305,7 +305,7 @@ async function handleAdminLogin() {
     if (btn) btn.disabled = true;
 
     const adminId = getAdminLoginId();
-    if (username === adminId && password !== getAdminLoginPassword()) {
+    if (username.toLowerCase() === adminId.toLowerCase() && password !== getAdminLoginPassword()) {
       showError('admin-login-error', 'パスワードが正しくありません');
       return;
     }

@@ -14,7 +14,7 @@ const firebaseConfig = {
 // Googleログインを使う場合のみ Client ID を設定してください。
 window.APP_CONFIG = {
   googleClientId: "",
-  adminLoginId: "管理",
+  adminLoginId: "admin",
   adminLoginPassword: "123456",
   adminLoginEmail: "[admin]",
   adminEmails: ["[admin]"]
