@@ -214,8 +214,8 @@ function updateStatsNavAvailability(isLoggedIn) {
 function updateManageNavAvailability(canManage) {
   const manageBtn = document.getElementById('nav-manage-btn');
   if (!manageBtn) return;
-  manageBtn.classList.remove('hidden');
-  manageBtn.setAttribute('aria-hidden', 'false');
+  manageBtn.classList.toggle('hidden', !canManage);
+  manageBtn.setAttribute('aria-hidden', String(!canManage));
   if (canManage) {
     manageBtn.removeAttribute('title');
   } else {
