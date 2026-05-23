@@ -453,10 +453,10 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
   return merged;
 }
 
-async function pullQuestionsFromCloudIfNeeded() {
+async function pullQuestionsFromCloudIfNeeded(force = false) {
   const uid = getAuthUid();
   if (!uid || cloudPullInFlight) return;
-  if (cloudQuestionsLoadedUid === uid) return;
+  if (!force && cloudQuestionsLoadedUid === uid) return;
   if (!(window.firebase && firebase.firestore)) return;
 
   cloudPullInFlight = true;
@@ -531,6 +531,7 @@ async function pullQuestionsFromCloudIfNeeded() {
       });
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+      tryRenderStatsIfOpen();
     }
     markSyncSuccess('questions', remoteEditedAt || Date.now());
     cloudQuestionsLoadedUid = uid;
@@ -1865,11 +1866,13 @@ function showPage(name) {
   document.getElementById(`page-${name}`).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
   if (name === 'stats') {
+    pullQuestionsFromCloudIfNeeded(true);
     pullRecordsFromCloudIfNeeded(true);
     pullStudyTimeFromCloudIfNeeded();
     renderStats();
   }
   if (name === 'study') {
+    pullQuestionsFromCloudIfNeeded(true);
     pullRecordsFromCloudIfNeeded(true);
     renderStudyCalendar();
   }
@@ -2946,6 +2949,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (session) startStudyTimerIfNeeded();
+    pullQuestionsFromCloudIfNeeded(true);
     pullRecordsFromCloudIfNeeded(true);
     pullStudyTimeFromCloudIfNeeded();
   });
