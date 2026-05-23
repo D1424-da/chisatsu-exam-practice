@@ -453,10 +453,10 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
   return merged;
 }
 
-async function pullQuestionsFromCloudIfNeeded(force = false) {
+async function pullQuestionsFromCloudIfNeeded() {
   const uid = getAuthUid();
   if (!uid || cloudPullInFlight) return;
-  if (!force && cloudQuestionsLoadedUid === uid) return;
+  if (cloudQuestionsLoadedUid === uid) return;
   if (!(window.firebase && firebase.firestore)) return;
 
   cloudPullInFlight = true;
@@ -531,7 +531,6 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
       });
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
-      tryRenderStatsIfOpen();
     }
     markSyncSuccess('questions', remoteEditedAt || Date.now());
     cloudQuestionsLoadedUid = uid;
@@ -1866,13 +1865,11 @@ function showPage(name) {
   document.getElementById(`page-${name}`).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
   if (name === 'stats') {
-    pullQuestionsFromCloudIfNeeded(true);
     pullRecordsFromCloudIfNeeded(true);
     pullStudyTimeFromCloudIfNeeded();
     renderStats();
   }
   if (name === 'study') {
-    pullQuestionsFromCloudIfNeeded(true);
     pullRecordsFromCloudIfNeeded(true);
     renderStudyCalendar();
   }
@@ -2644,22 +2641,28 @@ function importJSONFiles(files) {
 // ── 成績ページ ────────────────────────────────────────────────
 function renderStats() {
   const allLimbs = getAllLimbs('', '', true);
-  let total = 0, correct = 0;
+  let total = 0;
+  let correct = 0;
+  let answeredCount = 0;
+  let weakCount = 0;
 
-  for (const limb of allLimbs) {
-    const r = getRecord(limb.id);
-    total   += r.correct + r.wrong;
-    correct += r.correct;
+  // 端末差をなくすため、上段カードの集計は問題一覧ではなく records 正本を使う。
+  for (const v of Object.values(records || {})) {
+    const c = Math.max(0, Number(v?.correct || 0));
+    const w = Math.max(0, Number(v?.wrong || 0));
+    const t = c + w;
+    total += t;
+    correct += c;
+    if (t > 0) answeredCount++;
+    if (w > c) weakCount++;
   }
 
   const rate = total > 0 ? Math.round(correct / total * 100) : null;
-  const answered = allLimbs.filter(l => { const r = getRecord(l.id); return r.correct + r.wrong > 0; });
-  const weak     = allLimbs.filter(l => { const r = getRecord(l.id); return r.wrong > r.correct; });
 
   document.getElementById('stat-total').textContent  = total;
   document.getElementById('stat-rate').textContent   = rate !== null ? rate + '%' : '-%';
-  document.getElementById('stat-limbs').textContent  = answered.length;
-  document.getElementById('stat-weak').textContent   = weak.length;
+  document.getElementById('stat-limbs').textContent  = answeredCount;
+  document.getElementById('stat-weak').textContent   = weakCount;
   const studyEl = document.getElementById('stat-study-time');
   if (studyEl) studyEl.textContent = formatStudyDuration(studyTime.totalMs);
   renderStudyCalendar();
@@ -2949,7 +2952,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (session) startStudyTimerIfNeeded();
-    pullQuestionsFromCloudIfNeeded(true);
     pullRecordsFromCloudIfNeeded(true);
     pullStudyTimeFromCloudIfNeeded();
   });
