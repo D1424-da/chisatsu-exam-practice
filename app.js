@@ -1862,16 +1862,30 @@ function getAvailableYears() {
   return keys.sort((a, b) => yearOrdinal(a) - yearOrdinal(b));
 }
 
+function updateMembersOnlyPanels() {
+  const loggedIn = !!getAuthUid();
+
+  const studyCalendarSection = document.getElementById('study-calendar-section');
+  const studyCalendarGuestCta = document.getElementById('study-calendar-guest-cta');
+  if (studyCalendarSection) studyCalendarSection.classList.toggle('hidden', !loggedIn);
+  if (studyCalendarGuestCta) studyCalendarGuestCta.classList.toggle('hidden', loggedIn);
+
+  const statsAuthContent = document.getElementById('stats-auth-content');
+  const statsGuestCta = document.getElementById('stats-guest-cta');
+  if (statsAuthContent) statsAuthContent.classList.toggle('hidden', !loggedIn);
+  if (statsGuestCta) statsGuestCta.classList.toggle('hidden', loggedIn);
+}
+
+function openAuthOverlay(form = 'register') {
+  if (typeof switchAuthForm === 'function') {
+    switchAuthForm(form);
+  }
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+
 // ── ページ切り替え ────────────────────────────────────────────
 async function showPage(name) {
-  if (name === 'stats' && !getAuthUid()) {
-    alert('成績ページはログイン後に利用できます。');
-    if (typeof switchAuthForm === 'function') switchAuthForm('login');
-    const overlay = document.getElementById('login-overlay');
-    if (overlay) overlay.classList.remove('hidden');
-    return;
-  }
-
   if (name === 'manage' && !isAdminUser()) {
     if (typeof openAdminLoginOverlay === 'function') {
       openAdminLoginOverlay();
@@ -1885,14 +1899,19 @@ async function showPage(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`page-${name}`).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
+  updateMembersOnlyPanels();
   if (name === 'stats') {
-    await pullRecordsFromCloudIfNeeded(true);
-    await pullStudyTimeFromCloudIfNeeded();
+    if (getAuthUid()) {
+      await pullRecordsFromCloudIfNeeded(true);
+      await pullStudyTimeFromCloudIfNeeded();
+    }
     renderStats();
   }
   if (name === 'study') {
-    if (getAuthUid()) pullRecordsFromCloudIfNeeded(true);
-    renderStudyCalendar();
+    if (getAuthUid()) {
+      pullRecordsFromCloudIfNeeded(true);
+      renderStudyCalendar();
+    }
   }
   if (name === 'manage') { renderManage(); renderUsers(); updateFileStatus(); }
 }
@@ -2661,6 +2680,9 @@ function importJSONFiles(files) {
 
 // ── 成績ページ ────────────────────────────────────────────────
 function renderStats() {
+  updateMembersOnlyPanels();
+  if (!getAuthUid()) return;
+
   const allLimbs = getAllLimbs('', '', true);
   let total = 0;
   let correct = 0;
@@ -2853,6 +2875,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => showPage(btn.dataset.page));
   });
+
+  [
+    ['btn-open-register-from-stats', 'register'],
+    ['btn-open-login-from-stats', 'login'],
+    ['btn-open-register-from-calendar', 'register'],
+    ['btn-open-login-from-calendar', 'login']
+  ].forEach(([id, form]) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('click', () => openAuthOverlay(form));
+  });
+
+  updateMembersOnlyPanels();
 
   // 学習ページ
   document.getElementById('btn-start').addEventListener('click', startSession);
