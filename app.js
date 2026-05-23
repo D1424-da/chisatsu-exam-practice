@@ -1842,6 +1842,14 @@ function getAvailableYears() {
 
 // ── ページ切り替え ────────────────────────────────────────────
 async function showPage(name) {
+  if (name === 'stats' && !getAuthUid()) {
+    alert('成績ページはログイン後に利用できます。');
+    if (typeof switchAuthForm === 'function') switchAuthForm('login');
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+    return;
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`page-${name}`).classList.add('active');
@@ -2719,12 +2727,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // フォーム切替は auth-module.js で処理 (switchAuthForm())
 
   // パスワードリセットは Firebase 版 UI/auth-module.js 側で処理
-
-  // ログアウト
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    if (!confirm('ログアウトしますか？')) return;
-    logout();
-  });
 
   // ユーザー追加フォーム
   document.getElementById('btn-show-add-user').addEventListener('click', () => {

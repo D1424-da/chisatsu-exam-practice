@@ -68,6 +68,17 @@ body {
   color: #fff;
 }
 
+.nav-btn:disabled {
+  background: #eceff3;
+  color: #9aa4af;
+  cursor: not-allowed;
+}
+
+.nav-btn:disabled:hover {
+  background: #eceff3;
+  color: #9aa4af;
+}
+
 /* ─── ページ ────────────────────────────────────────────── */
 .page { display: none; max-width: 900px; margin: 24px auto; padding: 0 16px 40px; }
 .page.active { display: block; }

@@ -173,6 +173,12 @@ async function handleGoogleSignIn() {
 async function handleLogout() {
   try {
     const auth = firebase.auth();
+    if (!auth.currentUser) {
+      switchAuthForm('login');
+      const overlay = document.getElementById('login-overlay');
+      if (overlay) overlay.classList.remove('hidden');
+      return;
+    }
     await auth.signOut();
     console.log('✓ ログアウト');
   } catch (error) {
@@ -193,17 +199,34 @@ function switchAuthForm(form) {
   document.getElementById('reset-success').classList.add('hidden');
 }
 
+function updateStatsNavAvailability(isLoggedIn) {
+  const statsBtn = document.getElementById('nav-stats-btn');
+  if (!statsBtn) return;
+  statsBtn.disabled = !isLoggedIn;
+  statsBtn.setAttribute('aria-disabled', String(!isLoggedIn));
+  if (isLoggedIn) {
+    statsBtn.removeAttribute('title');
+  } else {
+    statsBtn.title = '成績ページはログイン後に利用できます';
+  }
+}
+
 // ===== 認証状態の監視 =====
 function setupAuthStateListener() {
   const auth = firebase.auth();
   
   auth.onAuthStateChanged(async (user) => {
+    const appEl = document.getElementById('app');
+    const overlayEl = document.getElementById('login-overlay');
+    const userNameEl = document.getElementById('current-user-name');
+    const btnLogout = document.getElementById('btn-logout');
+
     if (user) {
       console.log('✓ ユーザーはログイン中:', user.email);
       
       // ログインオーバーレイを隠す
-      document.getElementById('login-overlay').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
+      if (overlayEl) overlayEl.classList.add('hidden');
+      if (appEl) appEl.classList.remove('hidden');
       
       // グローバル変数にユーザー情報を保存
       window.currentUser = {
@@ -213,28 +236,28 @@ function setupAuthStateListener() {
       };
       
       // 問題データを読み込む
-        if (typeof loadData === 'function') loadData();
-        if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
-        
-        // ユーザー表示を更新
-      const userDisplayEl = document.getElementById('user-display-name');
-      if (userDisplayEl) {
-        userDisplayEl.textContent = window.currentUser.displayName;
-      }
+      if (typeof loadData === 'function') loadData();
+      if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+      updateStatsNavAvailability(true);
+
+      if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
+      if (btnLogout) btnLogout.textContent = 'ログアウト';
     } else {
       console.log('✗ ユーザーはログインしていません');
-      
-      // アプリを隠す、ログイン画面を表示
-      document.getElementById('app').classList.add('hidden');
-      document.getElementById('login-overlay').classList.remove('hidden');
-      
-      // ログインフォームにリセット
-      switchAuthForm('login');
-      document.getElementById('login-email').value = '';
-      document.getElementById('login-password').value = '';
-      
+      if (overlayEl) overlayEl.classList.add('hidden');
+      if (appEl) appEl.classList.remove('hidden');
+
       // グローバル変数をクリア
       window.currentUser = null;
+
+      // ゲストでも問題データは利用可能にする
+      if (typeof syncBundledQuestions === 'function') await syncBundledQuestions();
+      if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+      updateStatsNavAvailability(false);
+
+      if (userNameEl) userNameEl.textContent = 'ゲスト';
+      if (btnLogout) btnLogout.textContent = 'ログイン';
+      if (typeof showPage === 'function') showPage('study');
     }
   });
 }
