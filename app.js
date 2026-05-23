@@ -1876,11 +1876,15 @@ function getAvailableYears() {
 
 function updateMembersOnlyPanels() {
   const loggedIn = !!getAuthUid();
+  const canManage = typeof isAdminUser === 'function' ? isAdminUser() : false;
 
   const studyCalendarSection = document.getElementById('study-calendar-section');
   const studyCalendarGuestCta = document.getElementById('study-calendar-guest-cta');
   if (studyCalendarSection) studyCalendarSection.classList.toggle('hidden', !loggedIn);
   if (studyCalendarGuestCta) studyCalendarGuestCta.classList.toggle('hidden', loggedIn);
+
+  const adminPage = document.getElementById('page-admin');
+  if (adminPage) adminPage.classList.toggle('hidden', !canManage);
 
   const statsAuthContent = document.getElementById('stats-auth-content');
   const statsGuestCta = document.getElementById('stats-guest-cta');
@@ -1898,6 +1902,15 @@ function openAuthOverlay(form = 'register') {
 
 // ── ページ切り替え ────────────────────────────────────────────
 async function showPage(name) {
+  if (name === 'admin' && !isAdminUser()) {
+    if (typeof openAdminLoginOverlay === 'function') {
+      openAdminLoginOverlay();
+      return;
+    }
+    alert('管理者ページは管理者のみ利用できます。');
+    return;
+  }
+
   if (name === 'manage' && !isAdminUser()) {
     if (typeof openAdminLoginOverlay === 'function') {
       openAdminLoginOverlay();
@@ -2042,9 +2055,7 @@ function startSessionWithLimbId(limbId) {
 
 function endSession(opts = {}) {
   const resumeEligible = !!session && session.resumeEligible !== false;
-  const shouldKeepSnapshot = opts.keepSnapshot !== false
-    && resumeEligible
-    && Number(session.answeredCount || 0) > 0;
+  const shouldKeepSnapshot = opts.keepSnapshot !== false && resumeEligible;
 
   stopStudyTimerAndAccumulate();
   flushStudyTimePendingToCloud();

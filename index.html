@@ -86,6 +86,7 @@
         <h1 class="logo">📚 肢別問題集</h1>
         <nav class="nav">
           <button class="nav-btn active" data-page="study">学習</button>
+          <button id="nav-admin-btn" class="nav-btn hidden" data-page="admin">管理者ページ</button>
           <button id="nav-manage-btn" class="nav-btn hidden" data-page="manage">問題管理</button>
           <button id="nav-stats-btn" class="nav-btn" data-page="stats">成績</button>
         </nav>
@@ -171,6 +172,18 @@
         </div>
       </section>
 
+    </main>
+
+    <!-- 管理者ページ -->
+    <main id="page-admin" class="page">
+      <div class="card">
+        <h2>管理者ページ</h2>
+        <p class="login-reset-note">ここは管理者専用の入口ページです。問題管理へ進む前の確認画面として使えます。</p>
+        <div class="members-only-actions" style="justify-content:flex-start; margin-top: 16px;">
+          <button id="btn-open-manage-from-admin" class="btn btn-primary" type="button">問題管理へ進む</button>
+          <button id="btn-admin-logout" class="btn btn-ghost" type="button">ログアウト</button>
+        </div>
+      </div>
     </main>
 
     <!-- 問題管理ページ -->

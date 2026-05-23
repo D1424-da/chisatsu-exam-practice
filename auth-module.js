@@ -268,12 +268,24 @@ function updateManageNavAvailability(canManage) {
   }
 }
 
+function updateAdminNavAvailability(canManage) {
+  const adminBtn = document.getElementById('nav-admin-btn');
+  if (!adminBtn) return;
+  adminBtn.classList.toggle('hidden', !canManage);
+  adminBtn.setAttribute('aria-hidden', String(!canManage));
+  if (canManage) {
+    adminBtn.removeAttribute('title');
+  } else {
+    adminBtn.title = '管理者ページは管理者ログイン後に利用できます';
+  }
+}
+
 function openAdminLoginOverlay() {
   const overlay = document.getElementById('admin-login-overlay');
   if (!overlay) return;
 
   if (isLocalAdminAuthenticated()) {
-    if (typeof showPage === 'function') showPage('manage');
+    if (typeof showPage === 'function') showPage('admin');
     return;
   }
 
@@ -282,7 +294,7 @@ function openAdminLoginOverlay() {
   if (current && typeof isAdminUser === 'function') {
     const canManage = isAdminUser({ uid: current.uid, email: current.email, displayName: current.displayName || '' });
     if (canManage) {
-      if (typeof showPage === 'function') showPage('manage');
+      if (typeof showPage === 'function') showPage('admin');
       return;
     }
   }
@@ -349,12 +361,13 @@ async function handleAdminLogin() {
     if (usingAdminId && (!loginEmail || !loginEmail.includes('@') || loginEmail.includes('['))) {
       setLocalAdminAuthenticated(true);
       closeAdminLoginOverlay();
+      updateAdminNavAvailability(true);
       updateManageNavAvailability(true);
       const userNameEl = document.getElementById('current-user-name');
       const btnLogout = document.getElementById('btn-logout');
       if (userNameEl) userNameEl.textContent = '管理者';
       if (btnLogout) btnLogout.textContent = 'ログアウト';
-      if (typeof showPage === 'function') showPage('manage');
+      if (typeof showPage === 'function') showPage('admin');
       return;
     }
 
@@ -378,7 +391,8 @@ async function handleAdminLogin() {
     }
 
     closeAdminLoginOverlay();
-    if (typeof showPage === 'function') showPage('manage');
+    updateAdminNavAvailability(true);
+    if (typeof showPage === 'function') showPage('admin');
   } catch (error) {
     console.error('✗ 管理者ログイン失敗:', error.code);
     let msg = '管理者ログインに失敗しました';
@@ -395,6 +409,7 @@ async function handleAdminLogin() {
 window.openAdminLoginOverlay = openAdminLoginOverlay;
 window.closeAdminLoginOverlay = closeAdminLoginOverlay;
 window.isLocalAdminAuthenticated = isLocalAdminAuthenticated;
+window.updateAdminNavAvailability = updateAdminNavAvailability;
 
 // ===== 認証状態の監視 =====
 function setupAuthStateListener() {
@@ -427,6 +442,7 @@ function setupAuthStateListener() {
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       updateStatsNavAvailability(true);
       const canManage = typeof isAdminUser === 'function' ? isAdminUser(window.currentUser) : false;
+      updateAdminNavAvailability(canManage);
       updateManageNavAvailability(canManage);
       if (!canManage && typeof showPage === 'function') showPage('study');
       if (canManage) closeAdminLoginOverlay();
@@ -449,10 +465,12 @@ function setupAuthStateListener() {
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       updateStatsNavAvailability(false);
       const canManage = isLocalAdminAuthenticated();
+      updateAdminNavAvailability(canManage);
       updateManageNavAvailability(canManage);
 
       if (userNameEl) userNameEl.textContent = canManage ? '管理者' : 'ゲスト';
       if (btnLogout) btnLogout.textContent = 'ログイン';
+      if (canManage && typeof showPage === 'function') showPage('admin');
       if (!canManage && typeof showPage === 'function') showPage('study');
     }
   });
@@ -538,6 +556,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnLogout = document.getElementById('btn-logout');
   if (btnLogout) {
     btnLogout.addEventListener('click', handleLogout);
+  }
+
+  const btnAdminLogout = document.getElementById('btn-admin-logout');
+  if (btnAdminLogout) {
+    btnAdminLogout.addEventListener('click', handleLogout);
+  }
+
+  const btnOpenManageFromAdmin = document.getElementById('btn-open-manage-from-admin');
+  if (btnOpenManageFromAdmin) {
+    btnOpenManageFromAdmin.addEventListener('click', () => {
+      if (typeof showPage === 'function') showPage('manage');
+    });
   }
 
   // Google ログインは Client ID 設定済みのときのみ初期化
