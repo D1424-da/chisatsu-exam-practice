@@ -199,6 +199,13 @@ function switchAuthForm(form) {
   document.getElementById('reset-success').classList.add('hidden');
 }
 
+function closeLoginOverlayToHome() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  switchAuthForm('login');
+  if (typeof showPage === 'function') showPage('study');
+}
+
 function updateStatsNavAvailability(isLoggedIn) {
   const statsBtn = document.getElementById('nav-stats-btn');
   if (!statsBtn) return;
@@ -408,6 +415,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnShowLoginFromReset = document.getElementById('btn-show-login-from-reset');
   if (btnShowLoginFromReset) {
     btnShowLoginFromReset.addEventListener('click', () => switchAuthForm('login'));
+  }
+
+  const btnCloseLoginOverlay = document.getElementById('btn-close-login-overlay');
+  if (btnCloseLoginOverlay) {
+    btnCloseLoginOverlay.addEventListener('click', closeLoginOverlayToHome);
   }
 
   // 管理者ログインモーダル
