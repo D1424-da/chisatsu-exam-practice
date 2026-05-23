@@ -20,6 +20,16 @@ window.APP_CONFIG = {
 if (!window.firebaseInitialized) {
   try {
     firebase.initializeApp(firebaseConfig);
+
+    // WebChannel Listen 404/transport error が出る環境向けに
+    // Firestore の接続方式を long-polling 優先へ寄せる。
+    if (firebase.firestore) {
+      firebase.firestore().settings({
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false
+      });
+    }
+
     window.firebaseInitialized = true;
     console.log("✓ Firebase initialized");
   } catch (e) {
