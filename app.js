@@ -55,6 +55,40 @@ let syncStatus = {
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
+function isMobileDevice() {
+  const ua = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod/i.test(ua);
+}
+
+const useLocalStorage = !isMobileDevice();
+
+function storageGetItem(key) {
+  if (!useLocalStorage) return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSetItem(key, value) {
+  if (!useLocalStorage) return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
+
+function storageRemoveItem(key) {
+  if (!useLocalStorage) return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 function formatSyncTimestamp(ts) {
   const n = Math.max(0, Number(ts || 0));
   if (!n) return '未同期';
@@ -105,7 +139,7 @@ function markSyncError(kind, err) {
 
 function getQuestionsMeta() {
   try {
-    const m = JSON.parse(localStorage.getItem(KEY_QUESTIONS_META));
+    const m = JSON.parse(storageGetItem(KEY_QUESTIONS_META));
     return (m && typeof m === 'object') ? m : {};
   } catch {
     return {};
@@ -113,7 +147,7 @@ function getQuestionsMeta() {
 }
 
 function saveQuestionsMeta(meta) {
-  localStorage.setItem(KEY_QUESTIONS_META, JSON.stringify(meta || {}));
+  storageSetItem(KEY_QUESTIONS_META, JSON.stringify(meta || {}));
 }
 
 function getRecordStorageKey(uid = getAuthUid()) {
@@ -141,7 +175,7 @@ function normalizeStudyTimeData(data) {
 function loadStudyTimeLocal(uid = getAuthUid()) {
   const key = getStudyTimeStorageKey(uid);
   try {
-    return normalizeStudyTimeData(JSON.parse(localStorage.getItem(key)) || {});
+    return normalizeStudyTimeData(JSON.parse(storageGetItem(key)) || {});
   } catch {
     return { totalMs: 0, pendingDeltaMs: 0 };
   }
@@ -150,7 +184,7 @@ function loadStudyTimeLocal(uid = getAuthUid()) {
 function saveStudyTimeLocal(data, uid = getAuthUid()) {
   const key = getStudyTimeStorageKey(uid);
   const normalized = normalizeStudyTimeData(data || {});
-  localStorage.setItem(key, JSON.stringify(normalized));
+  storageSetItem(key, JSON.stringify(normalized));
   studyTime = normalized;
 }
 
@@ -171,7 +205,7 @@ function normalizeStudyCalendarData(data) {
 function loadStudyCalendarLocal(uid = getAuthUid()) {
   const key = getStudyCalendarStorageKey(uid);
   try {
-    return normalizeStudyCalendarData(JSON.parse(localStorage.getItem(key)) || {});
+    return normalizeStudyCalendarData(JSON.parse(storageGetItem(key)) || {});
   } catch {
     return { checkedDates: {}, updatedAtMs: 0 };
   }
@@ -183,7 +217,7 @@ function saveStudyCalendarLocal(data, uid = getAuthUid()) {
     ...(data || {}),
     updatedAtMs: Number(data?.updatedAtMs || Date.now())
   });
-  localStorage.setItem(key, JSON.stringify(normalized));
+  storageSetItem(key, JSON.stringify(normalized));
   studyCalendar = normalized;
 }
 
@@ -224,7 +258,7 @@ function setStudyFilters(filters = {}) {
 function readSavedStudySession(uid = getAuthUid()) {
   const key = getStudySessionStorageKey(uid);
   try {
-    const saved = JSON.parse(localStorage.getItem(key));
+    const saved = JSON.parse(storageGetItem(key));
     if (!saved || typeof saved !== 'object' || !Array.isArray(saved.queueIds)) return null;
     return {
       queueIds: saved.queueIds.map(id => String(id || '')).filter(Boolean),
@@ -292,7 +326,7 @@ function saveStudySessionSnapshot() {
     filters: session.filters || getStudyFilters(),
     savedAt: Date.now()
   };
-  localStorage.setItem(key, JSON.stringify(snapshot));
+  storageSetItem(key, JSON.stringify(snapshot));
   sessionSnapshotPendingSync = true;
   flushStudySessionSnapshotToCloudIfNeeded();
   updateResumeSessionButton();
@@ -301,7 +335,7 @@ function saveStudySessionSnapshot() {
 function clearStudySessionSnapshot() {
   const uid = getAuthUid();
   if (!uid) return;
-  localStorage.removeItem(getStudySessionStorageKey(uid));
+  storageRemoveItem(getStudySessionStorageKey(uid));
   sessionSnapshotPendingSync = true;
   flushStudySessionSnapshotToCloudIfNeeded();
   updateResumeSessionButton();
@@ -365,7 +399,7 @@ async function restoreLastStudySession() {
 function getRecordsMeta(uid = getAuthUid()) {
   if (!uid) return {};
   try {
-    const m = JSON.parse(localStorage.getItem(`${KEY_RECORDS_META}_${uid}`));
+    const m = JSON.parse(storageGetItem(`${KEY_RECORDS_META}_${uid}`));
     return (m && typeof m === 'object') ? m : {};
   } catch {
     return {};
@@ -374,7 +408,7 @@ function getRecordsMeta(uid = getAuthUid()) {
 
 function saveRecordsMeta(meta, uid = getAuthUid()) {
   if (!uid) return;
-  localStorage.setItem(`${KEY_RECORDS_META}_${uid}`, JSON.stringify(meta || {}));
+  storageSetItem(`${KEY_RECORDS_META}_${uid}`, JSON.stringify(meta || {}));
 }
 
 function getActiveUser() {
@@ -522,7 +556,7 @@ async function pullQuestionsFromCloudIfNeeded() {
     const shouldUseRemote = !Array.isArray(questions) || questions.length === 0 || remoteEditedAt >= localEditedAt;
     if (shouldUseRemote) {
       questions = remoteQuestions;
-      localStorage.setItem(KEY_QUESTIONS, JSON.stringify(questions));
+      storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
       saveQuestionsMeta({
         ...meta,
         localEditedAt: remoteEditedAt || Date.now(),
@@ -627,7 +661,7 @@ function startCloudRealtimeSubscriptions() {
     if (remoteRecords) {
       const remoteNormalized = normalizeRecordMap(remoteRecords);
       records = remoteNormalized;
-      localStorage.setItem(localKey, JSON.stringify(remoteNormalized));
+      storageSetItem(localKey, JSON.stringify(remoteNormalized));
       const now = Date.now();
       saveRecordsMeta({
         ...getRecordsMeta(uid),
@@ -683,7 +717,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
   cloudRecordsPullInFlight = true;
   try {
     let localRecords = {};
-    try { localRecords = JSON.parse(localStorage.getItem(localKey)) || {}; } catch { localRecords = {}; }
+    try { localRecords = JSON.parse(storageGetItem(localKey)) || {}; } catch { localRecords = {}; }
     localRecords = normalizeRecordMap(localRecords);
 
     const ref = firebase.firestore().collection('records').doc(uid);
@@ -699,7 +733,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
       const aggregatedLegacy = aggregateLegacyRecordDocs(legacyQuery.docs || []);
       if (Object.keys(aggregatedLegacy).length > 0) {
         records = aggregatedLegacy;
-        localStorage.setItem(localKey, JSON.stringify(records));
+        storageSetItem(localKey, JSON.stringify(records));
         const migratedAt = now;
         saveRecordsMeta({
           ...meta,
@@ -762,7 +796,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     if (remoteRecords) {
       const remoteNormalized = normalizeRecordMap(remoteRecords);
       records = remoteNormalized;
-      localStorage.setItem(localKey, JSON.stringify(remoteNormalized));
+      storageSetItem(localKey, JSON.stringify(remoteNormalized));
       saveRecordsMeta({
         ...meta,
         localEditedAt: Math.max(remoteEditedAt, localEditedAt, now),
@@ -1012,14 +1046,14 @@ function applyRemoteStudySessionSnapshot(remoteSnapshot, remoteSavedAtMs = 0) {
 
   const key = getStudySessionStorageKey(uid);
   if (!remoteSnapshot) {
-    localStorage.removeItem(key);
+    storageRemoveItem(key);
     updateResumeSessionButton();
     return;
   }
 
   const normalized = normalizeStudySessionSnapshot(remoteSnapshot);
   if (!normalized) return;
-  localStorage.setItem(key, JSON.stringify(normalized));
+  storageSetItem(key, JSON.stringify(normalized));
   updateResumeSessionButton();
 }
 
@@ -1315,18 +1349,18 @@ async function resetStudyTime() {
 
 function loadData() {
   currentUser = getActiveUser();
-  try { questions = JSON.parse(localStorage.getItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
+  try { questions = JSON.parse(storageGetItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
   const authUid = getAuthUid();
   const rk = getRecordStorageKey(authUid);
-  try { records = normalizeRecordMap(JSON.parse(localStorage.getItem(rk)) || {}); } catch { records = {}; }
+  try { records = normalizeRecordMap(JSON.parse(storageGetItem(rk)) || {}); } catch { records = {}; }
 
   // 旧バージョン（単一キー保存）からの移行: uidキーが空なら legacy キーを引き継ぐ。
   if (authUid && isRecordMapEmpty(records)) {
     let legacy = {};
-    try { legacy = normalizeRecordMap(JSON.parse(localStorage.getItem(KEY_RECORDS)) || {}); } catch { legacy = {}; }
+    try { legacy = normalizeRecordMap(JSON.parse(storageGetItem(KEY_RECORDS)) || {}); } catch { legacy = {}; }
     if (!isRecordMapEmpty(legacy)) {
       records = legacy;
-      localStorage.setItem(rk, JSON.stringify(records));
+      storageSetItem(rk, JSON.stringify(records));
       const now = Date.now();
       saveRecordsMeta({
         ...getRecordsMeta(authUid),
@@ -1353,7 +1387,7 @@ function loadData() {
 
 async function syncBundledQuestions() {
   try {
-    const local = JSON.parse(localStorage.getItem(KEY_QUESTIONS) || '[]');
+    const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
     const meta = getQuestionsMeta();
     // Preserve explicit local edits/imports on this device.
     if (meta.localDirty) return;
@@ -1374,7 +1408,7 @@ async function syncBundledQuestions() {
       return;
     }
 
-    localStorage.setItem(KEY_QUESTIONS, JSON.stringify(bundled));
+    storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
     questions = bundled;
     saveQuestionsMeta({
       ...meta,
@@ -1388,7 +1422,7 @@ async function syncBundledQuestions() {
 }
 
 function saveQuestions() {
-  localStorage.setItem(KEY_QUESTIONS, JSON.stringify(questions));
+  storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
   saveQuestionsMeta({
     ...getQuestionsMeta(),
     localDirty: true,
@@ -1402,7 +1436,7 @@ function saveRecords(options = {}) {
   const uid = getAuthUid();
   const rk = getRecordStorageKey(uid);
   const now = Date.now();
-  localStorage.setItem(rk, JSON.stringify(records));
+  storageSetItem(rk, JSON.stringify(records));
   if (uid) {
     saveRecordsMeta({
       ...getRecordsMeta(uid),
@@ -1419,10 +1453,10 @@ function saveRecords(options = {}) {
 
 // ── 認証関連 ────────────────────────────────────────────
 function getUsers() {
-  try { return JSON.parse(localStorage.getItem(KEY_USERS)) || []; } catch { return []; }
+  try { return JSON.parse(storageGetItem(KEY_USERS)) || []; } catch { return []; }
 }
 function saveUsers(users) {
-  localStorage.setItem(KEY_USERS, JSON.stringify(users));
+  storageSetItem(KEY_USERS, JSON.stringify(users));
   writeToFile();
 }
 
@@ -1478,12 +1512,12 @@ const IDB = (() => {
 function getAllRecords() {
   const out = {};
   for (const u of getUsers()) {
-    try { out[u.id] = JSON.parse(localStorage.getItem(`${KEY_RECORDS}_${u.id}`)) || {}; }
+    try { out[u.id] = JSON.parse(storageGetItem(`${KEY_RECORDS}_${u.id}`)) || {}; }
     catch { out[u.id] = {}; }
   }
   const authUid = getAuthUid();
   if (authUid && !(authUid in out)) {
-    try { out[authUid] = JSON.parse(localStorage.getItem(getRecordStorageKey(authUid))) || {}; }
+    try { out[authUid] = JSON.parse(storageGetItem(getRecordStorageKey(authUid))) || {}; }
     catch { out[authUid] = {}; }
   }
   return out;
@@ -1501,11 +1535,11 @@ async function writeToFile() {
 
 async function applyFileData(data) {
   if (!data || typeof data !== 'object') throw new Error('不正なデータ形式');
-  if (Array.isArray(data.users) && data.users.length > 0) localStorage.setItem(KEY_USERS, JSON.stringify(data.users));
-  if (Array.isArray(data.questions)) { questions = data.questions; localStorage.setItem(KEY_QUESTIONS, JSON.stringify(questions)); }
+  if (Array.isArray(data.users) && data.users.length > 0) storageSetItem(KEY_USERS, JSON.stringify(data.users));
+  if (Array.isArray(data.questions)) { questions = data.questions; storageSetItem(KEY_QUESTIONS, JSON.stringify(questions)); }
   if (data.records && typeof data.records === 'object') {
     for (const [uid, recs] of Object.entries(data.records)) {
-      localStorage.setItem(`${KEY_RECORDS}_${uid}`, JSON.stringify(recs));
+      storageSetItem(`${KEY_RECORDS}_${uid}`, JSON.stringify(recs));
     }
   }
 }
@@ -1667,7 +1701,7 @@ function deleteUserById(id) {
   if (!user) return;
   if (!confirm(`「${user.name}」を削除しますか？学習記録も削除されます。`)) return;
   saveUsers(users.filter(u => u.id !== id));
-  localStorage.removeItem(`${KEY_RECORDS}_${id}`);
+  storageRemoveItem(`${KEY_RECORDS}_${id}`);
   renderUsers();
 }
 
