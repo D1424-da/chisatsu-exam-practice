@@ -685,6 +685,32 @@ body {
   font-size: .82rem;
   color: var(--text-muted);
 }
+
+.sync-status-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: .9rem;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sync-status-row:last-child {
+  border-bottom: none;
+}
+
+.sync-last-error {
+  margin-top: 10px;
+  font-size: .82rem;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}
 .weak-limb-info { flex: 1; }
 .weak-limb-text { font-size: .9rem; }
 .weak-limb-meta { font-size: .8rem; color: var(--text-muted); margin-top: 2px; }

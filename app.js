@@ -42,10 +42,66 @@ let calendarPendingSync = false;
 let cloudCalendarFlushInFlight = false;
 let sessionSnapshotPendingSync = false;
 let cloudSessionSnapshotFlushInFlight = false;
+let syncStatus = {
+  questions: { lastCloudAt: 0, lastError: '' },
+  records: { lastCloudAt: 0, lastError: '' },
+  studyTime: { lastCloudAt: 0, lastError: '' },
+  calendar: { lastCloudAt: 0, lastError: '' },
+  session: { lastCloudAt: 0, lastError: '' },
+  globalLastError: ''
+};
 
 
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+function formatSyncTimestamp(ts) {
+  const n = Math.max(0, Number(ts || 0));
+  if (!n) return '未同期';
+  const d = new Date(n);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}/${m}/${day} ${hh}:${mm}:${ss}`;
+}
+
+function renderSyncStatus() {
+  const map = [
+    ['questions', 'sync-questions-time'],
+    ['records', 'sync-records-time'],
+    ['studyTime', 'sync-study-time-time'],
+    ['calendar', 'sync-calendar-time'],
+    ['session', 'sync-session-time']
+  ];
+  for (const [key, id] of map) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.textContent = formatSyncTimestamp(syncStatus[key]?.lastCloudAt || 0);
+  }
+  const errEl = document.getElementById('sync-last-error');
+  if (errEl) {
+    errEl.textContent = syncStatus.globalLastError
+      ? `直近の同期エラー: ${syncStatus.globalLastError}`
+      : '直近の同期エラー: なし';
+  }
+}
+
+function markSyncSuccess(kind, atMs = Date.now()) {
+  if (!syncStatus[kind]) return;
+  syncStatus[kind].lastCloudAt = Math.max(Number(syncStatus[kind].lastCloudAt || 0), Number(atMs || Date.now()));
+  syncStatus[kind].lastError = '';
+  renderSyncStatus();
+}
+
+function markSyncError(kind, err) {
+  const msg = err?.message || String(err || 'unknown');
+  if (syncStatus[kind]) syncStatus[kind].lastError = msg;
+  syncStatus.globalLastError = `[${kind}] ${msg}`;
+  renderSyncStatus();
+}
 
 function getQuestionsMeta() {
   try {
@@ -413,12 +469,14 @@ async function pullQuestionsFromCloudIfNeeded() {
     if (!snap.exists) {
       // First login on this account: seed cloud with current local questions if any.
       if (Array.isArray(questions) && questions.length > 0) {
+        const now = Date.now();
         await ref.set({
           uid,
           questions,
-          updatedAtMs: Date.now(),
+          updatedAtMs: now,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+        markSyncSuccess('questions', now);
       }
       cloudQuestionsLoadedUid = uid;
       return;
@@ -443,10 +501,11 @@ async function pullQuestionsFromCloudIfNeeded() {
       remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
 
     if (suspiciousDownsync) {
+      const now = Date.now();
       await ref.set({
         uid,
         questions,
-        updatedAtMs: Date.now(),
+        updatedAtMs: now,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
       saveQuestionsMeta({
@@ -455,6 +514,7 @@ async function pullQuestionsFromCloudIfNeeded() {
         lastCloudHealAt: Date.now()
       });
       cloudQuestionsLoadedUid = uid;
+      markSyncSuccess('questions', now);
       return;
     }
 
@@ -472,8 +532,10 @@ async function pullQuestionsFromCloudIfNeeded() {
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
     }
+    markSyncSuccess('questions', remoteEditedAt || Date.now());
     cloudQuestionsLoadedUid = uid;
   } catch (e) {
+    markSyncError('questions', e);
     console.warn('クラウド問題データ同期(取得)エラー:', e);
   } finally {
     cloudPullInFlight = false;
@@ -485,13 +547,16 @@ async function pushQuestionsToCloud() {
   if (!uid) return;
   if (!(window.firebase && firebase.firestore)) return;
   try {
+    const now = Date.now();
     await firebase.firestore().collection('question_sets').doc(uid).set({
       uid,
       questions,
-      updatedAtMs: Date.now(),
+      updatedAtMs: now,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    markSyncSuccess('questions', now);
   } catch (e) {
+    markSyncError('questions', e);
     console.warn('クラウド問題データ同期(保存)エラー:', e);
   }
 }
@@ -575,8 +640,12 @@ function startCloudRealtimeSubscriptions() {
     if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
     if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
+    if (remoteRecords) markSyncSuccess('records', Number(data.updatedAtMs || Date.now()));
+    if (remoteCalendar) markSyncSuccess('calendar', remoteCalendarUpdatedAt || Date.now());
+    if (hasRemoteSessionField) markSyncSuccess('session', remoteSessionSavedAt || Date.now());
     tryRenderStatsIfOpen();
   }, (e) => {
+    markSyncError('records', e);
     console.warn('クラウド成績リアルタイム同期エラー:', e);
   });
 
@@ -584,7 +653,9 @@ function startCloudRealtimeSubscriptions() {
     if (!snap || !snap.exists) return;
     const totalMs = Number((snap.data() || {}).totalMs || 0);
     applyRemoteStudyTotal(totalMs, 'study_stats');
+    markSyncSuccess('studyTime', Number((snap.data() || {}).updatedAtMs || Date.now()));
   }, (e) => {
+    markSyncError('studyTime', e);
     console.warn('学習時間リアルタイム同期(study_stats)エラー:', e);
   });
 
@@ -593,7 +664,9 @@ function startCloudRealtimeSubscriptions() {
     const totalMs = Number((snap.data() || {}).studyTotalMs || 0);
     if (totalMs <= 0) return;
     applyRemoteStudyTotal(totalMs, 'records');
+    markSyncSuccess('studyTime', Number((snap.data() || {}).studyUpdatedAtMs || Date.now()));
   }, (e) => {
+    markSyncError('studyTime', e);
     console.warn('学習時間リアルタイム同期(records)エラー:', e);
   });
 
@@ -642,6 +715,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
           migratedFromLegacy: true,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+        markSyncSuccess('records', migratedAt);
         tryRenderStatsIfOpen();
         cloudRecordsLoadedUid = uid;
         return;
@@ -656,6 +730,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
           accessedAtMs: seedAt,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+        markSyncSuccess('records', localEditedAt || seedAt);
       }
       saveRecordsMeta({
         ...meta,
@@ -697,9 +772,13 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     }
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
     if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
+    if (remoteRecords) markSyncSuccess('records', remoteEditedAt || now);
+    if (remoteCalendar) markSyncSuccess('calendar', remoteCalendarUpdatedAt || now);
+    if (hasRemoteSessionField) markSyncSuccess('session', remoteSessionSavedAt || now);
     tryRenderStatsIfOpen();
     cloudRecordsLoadedUid = uid;
   } catch (e) {
+    markSyncError('records', e);
     console.warn('クラウド成績データ同期(取得)エラー:', e);
   } finally {
     cloudRecordsPullInFlight = false;
@@ -801,10 +880,12 @@ async function flushRecordDeltasToCloudIfNeeded() {
         accessedAtMs: now,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+      markSyncSuccess('records', now);
 
       lastAttemptDeltas = null;
     }
   } catch (e) {
+    markSyncError('records', e);
     console.warn('クラウド成績データ同期(差分保存)エラー:', e);
     // 直前の送信対象は pendingRecordDeltas を空にした後に失敗するため、再キューする。
     pendingRecordDeltas = mergePendingRecordDeltas(lastAttemptDeltas, pendingRecordDeltas);
@@ -901,9 +982,11 @@ async function pushStudyCalendarToCloud() {
         studyCalendarUpdatedAtMs: Math.max(0, Number(latest.updatedAtMs || Date.now())),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+      markSyncSuccess('calendar', Number(latest.updatedAtMs || Date.now()));
     }
   } catch (e) {
     calendarPendingSync = true;
+    markSyncError('calendar', e);
     console.warn('学習日カレンダー同期(保存)エラー:', e);
   } finally {
     cloudCalendarFlushInFlight = false;
@@ -958,9 +1041,11 @@ async function pushStudySessionSnapshotToCloud() {
         studySessionSnapshotSavedAtMs: savedAtMs,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+      markSyncSuccess('session', savedAtMs);
     }
   } catch (e) {
     sessionSnapshotPendingSync = true;
+    markSyncError('session', e);
     console.warn('続きスナップショット同期(保存)エラー:', e);
   } finally {
     cloudSessionSnapshotFlushInFlight = false;
@@ -1152,7 +1237,9 @@ async function flushStudyTimePendingToCloud() {
       totalMs: latest.totalMs,
       pendingDeltaMs: Math.max(0, latest.pendingDeltaMs - delta)
     }, uid);
+    markSyncSuccess('studyTime', Date.now());
   } catch (e) {
+    markSyncError('studyTime', e);
     console.warn('学習時間同期(保存)エラー:', e);
   } finally {
     cloudStudyFlushInFlight = false;
@@ -1203,8 +1290,10 @@ async function pullStudyTimeFromCloudIfNeeded() {
     }
 
     tryRenderStatsIfOpen();
+    markSyncSuccess('studyTime', Date.now());
     cloudStudyLoadedUid = uid;
   } catch (e) {
+    markSyncError('studyTime', e);
     console.warn('学習時間同期(取得)エラー:', e);
   } finally {
     cloudStudyPullInFlight = false;
@@ -1254,6 +1343,7 @@ function loadData() {
   sessionSnapshotPendingSync = false;
   studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   renderStudyCalendar();
+  renderSyncStatus();
   pullQuestionsFromCloudIfNeeded();
   pullRecordsFromCloudIfNeeded();
   pullStudyTimeFromCloudIfNeeded();
