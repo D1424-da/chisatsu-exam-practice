@@ -16,8 +16,8 @@ window.APP_CONFIG = {
   googleClientId: "",
   adminLoginId: "管理",
   adminLoginPassword: "123456",
-  adminLoginEmail: "",
-  adminEmails: []
+  adminLoginEmail: "[admin]",
+  adminEmails: ["[admin]"]
 };
 
 // Firebase を初期化（アプリ起動時に実行される）
