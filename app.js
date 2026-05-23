@@ -381,8 +381,9 @@ function getActiveUserId() {
 
 function getAuthUid() {
   try {
-    if (window.firebase && firebase.auth && firebase.auth().currentUser) {
-      return firebase.auth().currentUser.uid;
+    if (window.firebase && firebase.auth) {
+      const auth = firebase.auth();
+      return auth && auth.currentUser ? auth.currentUser.uid : null;
     }
   } catch {
     // ignore
@@ -1873,7 +1874,7 @@ async function showPage(name) {
     renderStats();
   }
   if (name === 'study') {
-    pullRecordsFromCloudIfNeeded(true);
+    if (getAuthUid()) pullRecordsFromCloudIfNeeded(true);
     renderStudyCalendar();
   }
   if (name === 'manage') { renderManage(); renderUsers(); updateFileStatus(); }

@@ -244,6 +244,9 @@ function setupAuthStateListener() {
       if (btnLogout) btnLogout.textContent = 'ログアウト';
     } else {
       console.log('✗ ユーザーはログインしていません');
+      if (typeof stopCloudRealtimeSubscriptions === 'function') {
+        stopCloudRealtimeSubscriptions();
+      }
       if (overlayEl) overlayEl.classList.add('hidden');
       if (appEl) appEl.classList.remove('hidden');
 
