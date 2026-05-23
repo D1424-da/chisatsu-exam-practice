@@ -179,6 +179,15 @@ async function handleLogout() {
       if (overlay) overlay.classList.remove('hidden');
       return;
     }
+
+    // ログアウト時は「前回の続きから」を残さない。
+    if (typeof endSession === 'function') {
+      endSession({ keepSnapshot: false });
+    }
+    if (typeof clearStudySessionSnapshot === 'function') {
+      clearStudySessionSnapshot();
+    }
+
     await auth.signOut();
     console.log('✓ ログアウト');
   } catch (error) {
