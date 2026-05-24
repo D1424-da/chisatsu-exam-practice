@@ -46,6 +46,28 @@ function setLocalAdminAuthenticated(enabled) {
   }
 }
 
+function startLocalAdminSession() {
+  setLocalAdminAuthenticated(true);
+  closeAdminLoginOverlay();
+  updateAdminNavAvailability(true);
+  updateManageNavAvailability(true);
+
+  const userNameEl = document.getElementById('current-user-name');
+  const btnLogout = document.getElementById('btn-logout');
+  if (userNameEl) userNameEl.textContent = '管理者';
+  if (btnLogout) btnLogout.textContent = 'ログアウト';
+  if (typeof showPage === 'function') showPage('admin');
+}
+
+function matchesConfiguredAdminId(input) {
+  const normalized = String(input || '').trim().toLowerCase();
+  if (!normalized) return false;
+
+  const adminId = String(window.APP_CONFIG?.adminLoginId || 'admin').trim().toLowerCase();
+  const adminEmail = String(window.APP_CONFIG?.adminLoginEmail || '').trim().toLowerCase();
+  return normalized === adminId || (!!adminEmail && normalized === adminEmail);
+}
+
 // ===== ログイン処理 =====
 async function handleEmailLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -59,6 +81,11 @@ async function handleEmailLogin() {
   try {
     hideError('login-error');
     document.getElementById('btn-login').disabled = true;
+
+    if (matchesConfiguredAdminId(email) && password === getAdminLoginPassword()) {
+      startLocalAdminSession();
+      return;
+    }
     
     const auth = firebase.auth();
     const result = await auth.signInWithEmailAndPassword(email, password);
@@ -359,15 +386,7 @@ async function handleAdminLogin() {
     }
 
     if (usingAdminId) {
-      setLocalAdminAuthenticated(true);
-      closeAdminLoginOverlay();
-      updateAdminNavAvailability(true);
-      updateManageNavAvailability(true);
-      const userNameEl = document.getElementById('current-user-name');
-      const btnLogout = document.getElementById('btn-logout');
-      if (userNameEl) userNameEl.textContent = '管理者';
-      if (btnLogout) btnLogout.textContent = 'ログアウト';
-      if (typeof showPage === 'function') showPage('admin');
+      startLocalAdminSession();
       return;
     }
 
