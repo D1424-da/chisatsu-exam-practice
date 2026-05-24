@@ -195,6 +195,7 @@ async function handleLogout() {
     if (!auth.currentUser) {
       if (isLocalAdminAuthenticated()) {
         setLocalAdminAuthenticated(false);
+        updateAdminNavAvailability(false);
         updateManageNavAvailability(false);
         const userNameEl = document.getElementById('current-user-name');
         const btnLogout = document.getElementById('btn-logout');
