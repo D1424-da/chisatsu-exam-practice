@@ -49,9 +49,12 @@ let studySessionSnapshotCache = {};
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 const useLocalStorage = false;
+const volatileStorage = new Map();
 
 function storageGetItem(key) {
-  if (!useLocalStorage) return null;
+  if (!useLocalStorage) {
+    return volatileStorage.has(key) ? volatileStorage.get(key) : null;
+  }
   try {
     return window.localStorage.getItem(key);
   } catch {
@@ -60,7 +63,10 @@ function storageGetItem(key) {
 }
 
 function storageSetItem(key, value) {
-  if (!useLocalStorage) return;
+  if (!useLocalStorage) {
+    volatileStorage.set(key, String(value));
+    return;
+  }
   try {
     window.localStorage.setItem(key, value);
   } catch {
@@ -69,7 +75,10 @@ function storageSetItem(key, value) {
 }
 
 function storageRemoveItem(key) {
-  if (!useLocalStorage) return;
+  if (!useLocalStorage) {
+    volatileStorage.delete(key);
+    return;
+  }
   try {
     window.localStorage.removeItem(key);
   } catch {
@@ -1766,6 +1775,9 @@ function addRecord(limbId, isCorrect) {
   if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0 };
   if (isCorrect) records[limbId].correct++;
   else           records[limbId].wrong++;
+
+  // 回答が発生した時点で当日を学習済みにする（タイマー更新の取りこぼし対策）。
+  markTodayAsStudied();
 
   if (session && typeof session.answeredCount === 'number') {
     session.answeredCount += 1;
