@@ -357,8 +357,7 @@ async function handleAdminLogin() {
       return;
     }
 
-    const loginEmail = resolveAdminLoginEmail(username);
-    if (usingAdminId && (!loginEmail || !loginEmail.includes('@') || loginEmail.includes('['))) {
+    if (usingAdminId) {
       setLocalAdminAuthenticated(true);
       closeAdminLoginOverlay();
       updateAdminNavAvailability(true);
@@ -371,6 +370,7 @@ async function handleAdminLogin() {
       return;
     }
 
+    const loginEmail = resolveAdminLoginEmail(username);
     if (!loginEmail || !loginEmail.includes('@')) {
       showError('admin-login-error', '管理者IDが正しく設定されていません');
       return;
