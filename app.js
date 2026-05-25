@@ -1375,6 +1375,10 @@ function loadData() {
 
 async function syncBundledQuestions() {
   try {
+    if (window.location.protocol === 'file:') {
+      return;
+    }
+
     const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
     const meta = getQuestionsMeta();
     // Preserve explicit local edits/imports on this device.
