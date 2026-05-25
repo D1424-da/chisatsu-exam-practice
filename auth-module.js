@@ -481,14 +481,6 @@ function setupAuthStateListener() {
           console.log('ℹ 前回の学習セッションは見つかりませんでした');
         }
 
-        if (!session && savedSnapshot) {
-          if (typeof restoreLastStudySession === 'function' && await restoreLastStudySession()) {
-            if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
-            if (btnLogout) btnLogout.textContent = 'ログアウト';
-            return;
-          }
-        }
-
         if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
         if (typeof showPage === 'function') showPage('study');
       }
