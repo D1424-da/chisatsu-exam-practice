@@ -48,6 +48,8 @@ function setLocalAdminAuthenticated(enabled) {
 
 function startLocalAdminSession() {
   setLocalAdminAuthenticated(true);
+  if (typeof loadData === 'function') loadData();
+  if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
   const loginOverlay = document.getElementById('login-overlay');
   if (loginOverlay) loginOverlay.classList.add('hidden');
   closeAdminLoginOverlay();
@@ -499,6 +501,9 @@ function setupAuthStateListener() {
 
       // グローバル変数をクリア
       window.currentUser = null;
+
+      // ローカル保存データを再読込して、管理者編集を含む最新状態を反映する。
+      if (typeof loadData === 'function') loadData();
 
       // ゲストでも問題データは利用可能にする
       if (typeof syncBundledQuestions === 'function') await syncBundledQuestions();
