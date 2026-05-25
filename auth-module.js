@@ -467,15 +467,26 @@ function setupAuthStateListener() {
       updateAdminNavAvailability(canManage);
       updateManageNavAvailability(canManage);
 
-      if (!session && typeof readSavedStudySession === 'function' && readSavedStudySession(window.currentUser.uid)) {
-        if (typeof restoreLastStudySession === 'function' && await restoreLastStudySession()) {
-          if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
-          if (btnLogout) btnLogout.textContent = 'ログアウト';
-          return;
+      if (!canManage) {
+        if (typeof pullRecordsFromCloudIfNeeded === 'function') {
+          await pullRecordsFromCloudIfNeeded(true);
         }
+        if (typeof pullQuestionsFromCloudIfNeeded === 'function') {
+          await pullQuestionsFromCloudIfNeeded();
+        }
+
+        if (!session && typeof readSavedStudySession === 'function' && readSavedStudySession(window.currentUser.uid)) {
+          if (typeof restoreLastStudySession === 'function' && await restoreLastStudySession()) {
+            if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
+            if (btnLogout) btnLogout.textContent = 'ログアウト';
+            return;
+          }
+        }
+
+        if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+        if (typeof showPage === 'function') showPage('study');
       }
 
-      if (!canManage && typeof showPage === 'function') showPage('study');
       if (canManage) closeAdminLoginOverlay();
 
       if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
