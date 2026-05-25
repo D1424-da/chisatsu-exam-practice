@@ -348,6 +348,22 @@
         </div>
         <div class="stats-detail card">
             <h3>苦手肢トップ50</h3>
+          <div class="weak-filter-bar">
+            <label class="weak-filter-check">
+              <input id="weak-hide-high-rate" type="checkbox" />
+              正答率の高いものを表示しない
+            </label>
+            <label class="weak-filter-threshold">
+              非表示の閾値
+              <select id="weak-hide-threshold">
+                <option value="60">60%以上</option>
+                <option value="70">70%以上</option>
+                <option value="80" selected>80%以上</option>
+                <option value="90">90%以上</option>
+                <option value="95">95%以上</option>
+              </select>
+            </label>
+          </div>
           <div id="weak-limbs-list"></div>
         </div>
         <button id="btn-reset-stats" class="btn btn-danger btn-sm" style="margin-top:16px;">統計をリセット</button>
@@ -423,6 +439,6 @@
   </div>
 
   <script src="auth-module.js?v=20260525g"></script>
-  <script src="app.js?v=20260525z"></script>
+  <script src="app.js?v=20260525aa"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@ const KEY_STUDY_SESSION = 'limb_study_session'; // パーユーザーキー: lim
 const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
+const KEY_WEAK_LIST_PREF = 'limb_weak_list_pref';
 
 // ── 状態 ────────────────────────────────────────────
 let questions   = [];   // 全問題
@@ -107,6 +108,26 @@ function getQuestionsMeta() {
 
 function saveQuestionsMeta(meta) {
   storageSetItem(KEY_QUESTIONS_META, JSON.stringify(meta || {}));
+}
+
+function getWeakListPref() {
+  try {
+    const raw = JSON.parse(storageGetItem(KEY_WEAK_LIST_PREF) || '{}');
+    return {
+      hideHighRate: !!raw.hideHighRate,
+      threshold: [60, 70, 80, 90, 95].includes(Number(raw.threshold)) ? Number(raw.threshold) : 80
+    };
+  } catch {
+    return { hideHighRate: false, threshold: 80 };
+  }
+}
+
+function saveWeakListPref(pref) {
+  const safe = {
+    hideHighRate: !!pref?.hideHighRate,
+    threshold: [60, 70, 80, 90, 95].includes(Number(pref?.threshold)) ? Number(pref.threshold) : 80
+  };
+  storageSetItem(KEY_WEAK_LIST_PREF, JSON.stringify(safe));
 }
 
 function getRecordStorageKey(uid = getAuthUid()) {
@@ -2797,6 +2818,13 @@ function renderStats() {
   updateMembersOnlyPanels();
   if (!getAuthUid()) return;
 
+  const weakHideHighRateEl = document.getElementById('weak-hide-high-rate');
+  const weakThresholdEl = document.getElementById('weak-hide-threshold');
+  const hideHighRate = !!weakHideHighRateEl?.checked;
+  const threshold = [60, 70, 80, 90, 95].includes(Number(weakThresholdEl?.value))
+    ? Number(weakThresholdEl.value)
+    : 80;
+
   const allLimbs = getAllLimbs('', '', true);
   let total = 0;
   let correct = 0;
@@ -2846,6 +2874,14 @@ function renderStats() {
   // 苦手肢トップ50
   const weakSorted = allLimbs
     .filter(l => getRecord(l.id).wrong > 0)
+    .filter((l) => {
+      if (!hideHighRate) return true;
+      const r = getRecord(l.id);
+      const t = r.correct + r.wrong;
+      if (t <= 0) return true;
+      const rt = Math.round(r.correct / t * 100);
+      return rt < threshold;
+    })
     .sort((a, b) => weakScore(b.id) - weakScore(a.id))
     .slice(0, 50);
 
@@ -3006,6 +3042,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   updateMembersOnlyPanels();
+
+  const weakHideHighRateEl = document.getElementById('weak-hide-high-rate');
+  const weakThresholdEl = document.getElementById('weak-hide-threshold');
+  const weakListPref = getWeakListPref();
+  if (weakHideHighRateEl) weakHideHighRateEl.checked = weakListPref.hideHighRate;
+  if (weakThresholdEl) weakThresholdEl.value = String(weakListPref.threshold);
+
+  if (weakHideHighRateEl) {
+    weakHideHighRateEl.addEventListener('change', () => {
+      saveWeakListPref({
+        hideHighRate: weakHideHighRateEl.checked,
+        threshold: Number(weakThresholdEl?.value || 80)
+      });
+      renderStats();
+    });
+  }
+
+  if (weakThresholdEl) {
+    weakThresholdEl.addEventListener('change', () => {
+      saveWeakListPref({
+        hideHighRate: !!weakHideHighRateEl?.checked,
+        threshold: Number(weakThresholdEl.value || 80)
+      });
+      renderStats();
+    });
+  }
 
   // 学習ページ
   document.getElementById('btn-start').addEventListener('click', startSession);
