@@ -239,12 +239,9 @@ async function handleLogout() {
       return;
     }
 
-    // ログアウト時は「前回の続きから」を残さない。
+    // 通常ユーザーはログアウト後も「前回の続きから」を使えるように残す。
     if (typeof endSession === 'function') {
-      endSession({ keepSnapshot: false });
-    }
-    if (typeof clearStudySessionSnapshot === 'function') {
-      clearStudySessionSnapshot();
+      endSession();
     }
 
     await auth.signOut();
@@ -475,7 +472,16 @@ function setupAuthStateListener() {
           await pullQuestionsFromCloudIfNeeded();
         }
 
-        if (!session && typeof readSavedStudySession === 'function' && readSavedStudySession(window.currentUser.uid)) {
+        const savedSnapshot = typeof readSavedStudySession === 'function'
+          ? readSavedStudySession(window.currentUser.uid)
+          : null;
+        if (savedSnapshot) {
+          console.log('✓ 前回の学習セッションを検出:', savedSnapshot.queueIds?.length || 0, '件');
+        } else {
+          console.log('ℹ 前回の学習セッションは見つかりませんでした');
+        }
+
+        if (!session && savedSnapshot) {
           if (typeof restoreLastStudySession === 'function' && await restoreLastStudySession()) {
             if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
             if (btnLogout) btnLogout.textContent = 'ログアウト';
