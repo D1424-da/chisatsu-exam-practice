@@ -422,20 +422,41 @@ function aggregateLegacyRecordDocs(docs) {
 
     if (d.records && typeof d.records === 'object') {
       for (const [limbId, stat] of Object.entries(d.records)) {
-        if (!out[limbId]) out[limbId] = { correct: 0, wrong: 0 };
+        if (!out[limbId]) out[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [] };
         out[limbId].correct += Number(stat?.correct || 0);
         out[limbId].wrong += Number(stat?.wrong || 0);
+        out[limbId].wrongDateKeys = normalizeWrongDateKeys([
+          ...(out[limbId].wrongDateKeys || []),
+          ...(Array.isArray(stat?.wrongDateKeys) ? stat.wrongDateKeys : [])
+        ]);
       }
       continue;
     }
 
     if (typeof d.limbId === 'string' && d.limbId) {
-      if (!out[d.limbId]) out[d.limbId] = { correct: 0, wrong: 0 };
+      if (!out[d.limbId]) out[d.limbId] = { correct: 0, wrong: 0, wrongDateKeys: [] };
       if (d.correct === true) out[d.limbId].correct += 1;
-      else out[d.limbId].wrong += 1;
+      else {
+        out[d.limbId].wrong += 1;
+        out[d.limbId].wrongDateKeys = normalizeWrongDateKeys([
+          ...(out[d.limbId].wrongDateKeys || []),
+          toDateKey()
+        ]);
+      }
     }
   }
   return out;
+}
+
+function normalizeWrongDateKeys(values) {
+  const src = Array.isArray(values) ? values : [];
+  const keys = [];
+  for (const v of src) {
+    const key = String(v || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+    if (!keys.includes(key)) keys.push(key);
+  }
+  return keys.sort();
 }
 
 function normalizeRecordMap(map) {
@@ -446,7 +467,8 @@ function normalizeRecordMap(map) {
     if (!key) continue;
     out[key] = {
       correct: Math.max(0, Number(stat?.correct || 0)),
-      wrong: Math.max(0, Number(stat?.wrong || 0))
+      wrong: Math.max(0, Number(stat?.wrong || 0)),
+      wrongDateKeys: normalizeWrongDateKeys(stat?.wrongDateKeys)
     };
   }
   return out;
@@ -465,7 +487,11 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
     merged[id] = {
       // カウンタは減らさない方針で統合し、空データ上書きによる履歴消失を防ぐ。
       correct: Math.max(0, Number(local[id]?.correct || 0), Number(remote[id]?.correct || 0)),
-      wrong: Math.max(0, Number(local[id]?.wrong || 0), Number(remote[id]?.wrong || 0))
+      wrong: Math.max(0, Number(local[id]?.wrong || 0), Number(remote[id]?.wrong || 0)),
+      wrongDateKeys: normalizeWrongDateKeys([
+        ...(local[id]?.wrongDateKeys || []),
+        ...(remote[id]?.wrongDateKeys || [])
+      ])
     };
   }
   return merged;
@@ -1797,13 +1823,19 @@ function showChangePwForm() {
 }
 
 function getRecord(limbId) {
-  return records[limbId] || { correct: 0, wrong: 0 };
+  return records[limbId] || { correct: 0, wrong: 0, wrongDateKeys: [] };
 }
 
 function addRecord(limbId, isCorrect) {
-  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0 };
+  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [] };
   if (isCorrect) records[limbId].correct++;
-  else           records[limbId].wrong++;
+  else {
+    records[limbId].wrong++;
+    records[limbId].wrongDateKeys = normalizeWrongDateKeys([
+      ...(records[limbId].wrongDateKeys || []),
+      toDateKey()
+    ]);
+  }
 
   // 回答が発生した時点で当日を学習済みにする（タイマー更新の取りこぼし対策）。
   markTodayAsStudied();
@@ -1815,6 +1847,11 @@ function addRecord(limbId, isCorrect) {
   saveRecords({ skipCloudSnapshot: true });
   addPendingRecordDelta(limbId, isCorrect);
   flushRecordDeltasToCloudIfNeeded();
+
+  if (!isCorrect) {
+    recordsPendingSync = true;
+    pushRecordsToCloud();
+  }
 }
 
 function makeInlineRecordId(limbId, key) {
@@ -2816,11 +2853,15 @@ function renderStats() {
     const r = getRecord(limb.id);
     const t = r.correct + r.wrong;
     const rt = Math.round(r.correct / t * 100);
+    const wrongDates = Array.isArray(r.wrongDateKeys)
+      ? r.wrongDateKeys.slice(-5).reverse().join(', ')
+      : '';
+    const wrongDateInfo = wrongDates ? ` / 誤答日 ${wrongDates}` : '';
     return `<div class="weak-limb-row" data-limb-id="${esc(limb.id)}" role="button" tabindex="0" aria-label="この問題を再挑戦">
       <span class="weak-rank">${i + 1}</span>
       <div class="weak-limb-info">
         <div class="weak-limb-text">${esc(limb.text.slice(0, 80))}${limb.text.length > 80 ? '…' : ''}</div>
-        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(limb.category) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)</div>
+        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(limb.category) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${esc(wrongDateInfo)}</div>
       </div>
     </div>`;
   }).join('');
