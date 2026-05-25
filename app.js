@@ -13,6 +13,7 @@ const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
 const KEY_WEAK_LIST_PREF = 'limb_weak_list_pref';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ── 状態 ────────────────────────────────────────────
 let questions   = [];   // 全問題
@@ -480,6 +481,64 @@ function normalizeWrongDateKeys(values) {
   return keys.sort();
 }
 
+function normalizeReviewState(review) {
+  const src = (review && typeof review === 'object') ? review : {};
+  const intervalDays = Math.max(1, Math.floor(Number(src.intervalDays || 1)));
+  const streak = Math.max(0, Math.floor(Number(src.streak || 0)));
+  const ease = Math.min(2.5, Math.max(1.3, Number(src.ease || 2.0)));
+  const lastAnsweredAtMs = Math.max(0, Number(src.lastAnsweredAtMs || 0));
+  const dueAtMs = Math.max(0, Number(src.dueAtMs || 0));
+  return { intervalDays, streak, ease, lastAnsweredAtMs, dueAtMs };
+}
+
+function nextReviewState(current, isCorrect, nowMs = Date.now()) {
+  const prev = normalizeReviewState(current);
+  if (!isCorrect) {
+    return {
+      intervalDays: 1,
+      streak: 0,
+      ease: Math.max(1.3, prev.ease - 0.2),
+      lastAnsweredAtMs: nowMs,
+      dueAtMs: nowMs
+    };
+  }
+
+  const streak = prev.streak + 1;
+  const intervalDays = streak === 1
+    ? 1
+    : streak === 2
+    ? 3
+    : Math.max(1, Math.round(prev.intervalDays * prev.ease));
+
+  return {
+    intervalDays,
+    streak,
+    ease: Math.min(2.5, prev.ease + 0.05),
+    lastAnsweredAtMs: nowMs,
+    dueAtMs: nowMs + intervalDays * DAY_MS
+  };
+}
+
+function reviewPriorityScore(limbId, nowMs = Date.now()) {
+  const r = getRecord(limbId);
+  const total = r.correct + r.wrong;
+  if (total === 0) return 1000000 + weakScore(limbId);
+
+  const review = normalizeReviewState(r.review);
+  const dueAt = review.dueAtMs || review.lastAnsweredAtMs;
+  const overdueDays = Math.max(0, (nowMs - dueAt) / DAY_MS);
+  return overdueDays * 2 + weakScore(limbId) * 3;
+}
+
+function isDueForReview(limbId, nowMs = Date.now()) {
+  const r = getRecord(limbId);
+  const total = r.correct + r.wrong;
+  if (total === 0) return true;
+  const review = normalizeReviewState(r.review);
+  const dueAt = review.dueAtMs || review.lastAnsweredAtMs;
+  return dueAt <= 0 || dueAt <= nowMs;
+}
+
 function normalizeRecordMap(map) {
   const src = (map && typeof map === 'object') ? map : {};
   const out = {};
@@ -489,7 +548,8 @@ function normalizeRecordMap(map) {
     out[key] = {
       correct: Math.max(0, Number(stat?.correct || 0)),
       wrong: Math.max(0, Number(stat?.wrong || 0)),
-      wrongDateKeys: normalizeWrongDateKeys(stat?.wrongDateKeys)
+      wrongDateKeys: normalizeWrongDateKeys(stat?.wrongDateKeys),
+      review: normalizeReviewState(stat?.review)
     };
   }
   return out;
@@ -505,6 +565,9 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
   const merged = {};
   const ids = new Set([...Object.keys(local), ...Object.keys(remote)]);
   for (const id of ids) {
+    const left = normalizeReviewState(local[id]?.review);
+    const right = normalizeReviewState(remote[id]?.review);
+    const review = right.lastAnsweredAtMs > left.lastAnsweredAtMs ? right : left;
     merged[id] = {
       // カウンタは減らさない方針で統合し、空データ上書きによる履歴消失を防ぐ。
       correct: Math.max(0, Number(local[id]?.correct || 0), Number(remote[id]?.correct || 0)),
@@ -512,7 +575,8 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
       wrongDateKeys: normalizeWrongDateKeys([
         ...(local[id]?.wrongDateKeys || []),
         ...(remote[id]?.wrongDateKeys || [])
-      ])
+      ]),
+      review
     };
   }
   return merged;
@@ -1844,11 +1908,11 @@ function showChangePwForm() {
 }
 
 function getRecord(limbId) {
-  return records[limbId] || { correct: 0, wrong: 0, wrongDateKeys: [] };
+  return records[limbId] || { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null) };
 }
 
 function addRecord(limbId, isCorrect) {
-  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [] };
+  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null) };
   if (isCorrect) records[limbId].correct++;
   else {
     records[limbId].wrong++;
@@ -1857,6 +1921,7 @@ function addRecord(limbId, isCorrect) {
       toDateKey()
     ]);
   }
+  records[limbId].review = nextReviewState(records[limbId].review, isCorrect);
 
   // 回答が発生した時点で当日を学習済みにする（タイマー更新の取りこぼし対策）。
   markTodayAsStudied();
@@ -2107,6 +2172,10 @@ function startSession() {
   if (mode === 'weak') {
     limbs = limbs.filter(l => getRecord(l.id).wrong > 0 || getRecord(l.id).correct === 0);
     limbs.sort((a, b) => weakScore(b.id) - weakScore(a.id));
+  } else if (mode === 'due') {
+    const nowMs = Date.now();
+    limbs = limbs.filter(l => isDueForReview(l.id, nowMs));
+    limbs.sort((a, b) => reviewPriorityScore(b.id, nowMs) - reviewPriorityScore(a.id, nowMs));
   } else if (mode === 'unanswered') {
     limbs = limbs.filter(l => {
       const r = getRecord(l.id);
