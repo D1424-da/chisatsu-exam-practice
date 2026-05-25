@@ -30,7 +30,8 @@ if (!window.firebaseInitialized) {
     if (firebase.firestore) {
       firebase.firestore().settings({
         experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false
+        useFetchStreams: false,
+        merge: true
       });
     }
 
