@@ -48,6 +48,8 @@ function setLocalAdminAuthenticated(enabled) {
 
 function startLocalAdminSession() {
   setLocalAdminAuthenticated(true);
+  const loginOverlay = document.getElementById('login-overlay');
+  if (loginOverlay) loginOverlay.classList.add('hidden');
   closeAdminLoginOverlay();
   updateAdminNavAvailability(true);
   updateManageNavAvailability(true);

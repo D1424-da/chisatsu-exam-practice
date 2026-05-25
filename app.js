@@ -48,7 +48,7 @@ let studySessionSnapshotCache = {};
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-const useLocalStorage = false;
+const useLocalStorage = true;
 const volatileStorage = new Map();
 
 function storageGetItem(key) {
@@ -1420,8 +1420,33 @@ function saveQuestions() {
     localDirty: true,
     localEditedAt: Date.now()
   });
+  refreshSessionQueueAfterQuestionUpdate();
   pushQuestionsToCloud();
   writeToFile();
+}
+
+function refreshSessionQueueAfterQuestionUpdate() {
+  if (!session || !Array.isArray(session.queue)) return;
+
+  const queueIds = session.queue.map(limb => limb?.id).filter(Boolean);
+  if (queueIds.length === 0) return;
+
+  const rebuilt = rebuildSessionQueue(queueIds);
+  if (rebuilt.length === 0) {
+    endSession({ keepSnapshot: false });
+    return;
+  }
+
+  session.queue = rebuilt;
+  if (session.index >= rebuilt.length) {
+    session.index = rebuilt.length - 1;
+  }
+  saveStudySessionSnapshot();
+
+  const studyPage = document.getElementById('page-study');
+  if (studyPage && studyPage.classList.contains('active')) {
+    renderCurrentLimb();
+  }
 }
 
 function saveRecords(options = {}) {
