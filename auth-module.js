@@ -466,6 +466,15 @@ function setupAuthStateListener() {
       const canManage = typeof isAdminUser === 'function' ? isAdminUser(window.currentUser) : false;
       updateAdminNavAvailability(canManage);
       updateManageNavAvailability(canManage);
+
+      if (!session && typeof readSavedStudySession === 'function' && readSavedStudySession(window.currentUser.uid)) {
+        if (typeof restoreLastStudySession === 'function' && await restoreLastStudySession()) {
+          if (userNameEl) userNameEl.textContent = window.currentUser.displayName;
+          if (btnLogout) btnLogout.textContent = 'ログアウト';
+          return;
+        }
+      }
+
       if (!canManage && typeof showPage === 'function') showPage('study');
       if (canManage) closeAdminLoginOverlay();
 
