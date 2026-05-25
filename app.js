@@ -1338,16 +1338,26 @@ function applyStudyDuration(elapsedMs) {
   tryRenderStatsIfOpen();
 }
 
-function startStudyTimerIfNeeded() {
-  if (sessionStudyStartedAt > 0) return;
+function startStudyTimerIfNeeded(reset = false) {
+  if (!reset && sessionStudyStartedAt > 0) return;
   markTodayAsStudied();
   sessionStudyStartedAt = Date.now();
 }
 
-function stopStudyTimerAndAccumulate() {
+function stopStudyTimerAndAccumulate(accumulate = false) {
   if (sessionStudyStartedAt <= 0) return;
   const elapsed = Date.now() - sessionStudyStartedAt;
   sessionStudyStartedAt = 0;
+  if (accumulate) applyStudyDuration(elapsed);
+}
+
+function recordAnswerActionStudyDuration() {
+  if (sessionStudyStartedAt <= 0) {
+    startStudyTimerIfNeeded(true);
+    return;
+  }
+  const elapsed = Date.now() - sessionStudyStartedAt;
+  sessionStudyStartedAt = Date.now();
   applyStudyDuration(elapsed);
 }
 
@@ -2308,6 +2318,7 @@ function renderCurrentLimb() {
   `;
 
   if (isInlineOxQuestion) {
+    startStudyTimerIfNeeded(true);
     const groups = [...area.querySelectorAll('.inline-ox-group')];
     const statusEl = document.getElementById('inline-ox-status');
     const nextBtn = document.getElementById('btn-inline-next');
@@ -2339,6 +2350,7 @@ function renderCurrentLimb() {
       group.querySelectorAll('.inline-ox-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           if (group.dataset.locked === '1') return;
+          recordAnswerActionStudyDuration();
           group.querySelectorAll('.inline-ox-btn').forEach(b => b.classList.remove('selected'));
           btn.classList.add('selected');
           group.dataset.selected = btn.dataset.answer;
@@ -2376,8 +2388,11 @@ function renderCurrentLimb() {
     return;
   }
 
+  startStudyTimerIfNeeded(true);
+
   area.querySelectorAll('.btn-answer').forEach(btn => {
     btn.addEventListener('click', () => {
+      recordAnswerActionStudyDuration();
       const userAnswer = btn.dataset.answer;
       const isCorrect = isChoiceQuestion
         ? userAnswer === limb.correctText
