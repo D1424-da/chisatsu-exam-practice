@@ -166,7 +166,7 @@ async function handleEmailLogin() {
     if (error.code === 'auth/wrong-password') msg = 'パスワードが正しくありません';
     if (error.code === 'auth/invalid-credential') msg = 'メールアドレスまたはパスワードが正しくありません';
     if (error.code === 'auth/invalid-email') msg = 'メールアドレスが無効です';
-    if (error.code === 'auth/too-many-requests') msg = '試行回数が多すぎます。しばらく待ってから再試行してください';
+    if (error.code === 'auth/too-many-requests') msg = '試行回数が多すぎます。10〜30分ほど待ってから再試行してください。急ぐ場合はパスワード再設定をご利用ください。';
     if (error.code === 'auth/network-request-failed') msg = 'ネットワークエラーです。接続を確認して再試行してください';
 
     // Google アカウントのみで作成されたメールを、メール/パスワードでログインしようとした場合の案内
@@ -517,7 +517,7 @@ async function handleAdminLogin() {
     if (error.code === 'auth/user-not-found') msg = 'ユーザーが見つかりません';
     if (error.code === 'auth/wrong-password') msg = 'パスワードが正しくありません';
     if (error.code === 'auth/invalid-email') msg = 'メールアドレスが無効です';
-    if (error.code === 'auth/too-many-requests') msg = '試行回数が多すぎます。しばらく待ってから再試行してください';
+    if (error.code === 'auth/too-many-requests') msg = '試行回数が多すぎます。10〜30分ほど待ってから再試行してください。急ぐ場合はパスワード再設定をご利用ください。';
     showError('admin-login-error', msg);
   } finally {
     if (btn) btn.disabled = false;
