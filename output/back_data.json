@@ -1,1437 +1,6 @@
 {
   "users": [],
-  "records": {
-    "6Zr91QU5omMM9P7GArRdg4C8Fyu2": {
-      "H30-3-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-5-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-3-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-6-l4": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R6-15-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H19-16-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R2-14-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-20-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H18-18-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-1-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-19-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H24-20-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "R1-10-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H30-4-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-4-l2": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-19-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-20-l4": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R2-8-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H29-17-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-17-l4": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-8-l3": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-20-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-6-l2": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-16-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-12-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-19-l2": {
-        "correct": 0,
-        "wrong": 2,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H28-2-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "R2-12-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-8-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R6-6-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-19-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-12-l1": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R5-5-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-13-l1": {
-        "correct": 0,
-        "wrong": 2,
-        "wrongDateKeys": []
-      },
-      "H22-13-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R2-2-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-9-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-17-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-8-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-20-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H30-14-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-19-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R5-18-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H26-5-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H23-18-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-19-l4": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H24-18-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H17-5-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-16-l4": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-17-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H24-3-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-20-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H26-9-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-15-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R5-4-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H19-2-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-18-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-9-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-7-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-2-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-11-l3": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H25-5-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-4-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H28-18-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-16-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R1-19-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-11-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H26-8-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-12-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H23-16-l1": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H26-3-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H28-19-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-4-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-9-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H23-1-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H17-19-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H27-3-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H25-9-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-12-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-14-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R2-10-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-9-l1": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-7-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R6-5-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H20-18-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H17-19-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-11-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-14-l4": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-9-l0::ウ": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-3-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-13-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-7-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-12-l4": {
-        "correct": 0,
-        "wrong": 2,
-        "wrongDateKeys": []
-      },
-      "H28-11-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H29-14-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H30-4-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-6-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H25-12-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H29-15-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H24-13-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H19-19-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-13-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-10-l3": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-11-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-3-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H18-17-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-4-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H29-5-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-13-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-18-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-8-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-7-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-20-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-19-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H28-2-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H28-4-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R2-18-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-5-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-6-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R4-10-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R4-9-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H22-2-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-13-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-9-l0::オ": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-13-l4": {
-        "correct": 1,
-        "wrong": 2,
-        "wrongDateKeys": []
-      },
-      "R7-15-l3": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H24-15-l4": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-20-l0": {
-        "correct": 0,
-        "wrong": 2,
-        "wrongDateKeys": []
-      },
-      "R7-3-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-4-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R2-4-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R3-18-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R3-19-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H25-10-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-1-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-19-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-16-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-10-l4": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H27-3-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-20-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R2-3-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-18-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-9-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H23-1-l0": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R6-20-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H17-11-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H24-2-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H26-16-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H30-11-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-6-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-5-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-7-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R1-12-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-8-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-5-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-20-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-11-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-7-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-12-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H29-12-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H21-4-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-16-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R2-8-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-1-l1": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H24-15-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-13-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-18-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-19-l7": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-17-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H22-17-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-6-l1": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R3-16-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-10-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-9-l2": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-16-l0": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H22-2-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-17-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-5-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-2-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-9-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-14-l3": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-13-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-7-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R2-9-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-8-l0": {
-        "correct": 0,
-        "wrong": 2,
-        "wrongDateKeys": []
-      },
-      "H19-5-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H23-2-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H29-12-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R5-9-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H27-17-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-6-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H20-1-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-12-l3": {
-        "correct": 0,
-        "wrong": 2,
-        "wrongDateKeys": []
-      },
-      "R4-16-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-5-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-13-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H20-1-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-18-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H23-13-l1": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-14-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-9-l0::ア": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H20-17-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-17-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R4-1-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R1-18-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-14-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-4-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-10-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-6-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-3-l4": {
-        "correct": 1,
-        "wrong": 3,
-        "wrongDateKeys": []
-      },
-      "R5-13-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H28-6-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H21-20-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H26-7-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H29-16-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H30-8-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-4-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-17-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-16-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-12-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R5-3-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H29-7-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H28-20-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-19-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H23-11-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-18-l2": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-18-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H30-12-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-19-l5": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-12-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-11-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H28-20-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-7-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H18-9-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H25-10-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-5-l1": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-11-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H17-1-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-19-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-16-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H25-17-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-15-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H27-13-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H19-11-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H27-4-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H23-5-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-15-l1": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-10-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-5-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H17-13-l3": {
-        "correct": 0,
-        "wrong": 2,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H19-6-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H18-16-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-17-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-9-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H25-1-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-9-l0::イ": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-8-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H19-2-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H17-2-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-9-l0::エ": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H23-5-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-2-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H21-15-l3": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-16-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-12-l0": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H23-11-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-8-l1": {
-        "correct": 1,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "R7-10-l2": {
-        "correct": 2,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-13-l2": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R7-18-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H27-18-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      },
-      "H25-14-l0": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H19-3-l4": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "R1-15-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H28-9-l1": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H25-2-l4": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": []
-      },
-      "H20-15-l3": {
-        "correct": 1,
-        "wrong": 0,
-        "wrongDateKeys": []
-      },
-      "H17-4-l3": {
-        "correct": 0,
-        "wrong": 1,
-        "wrongDateKeys": [
-          "2026-05-25"
-        ]
-      }
-    }
-  },
+  "records": {},
   "questions": [
     {
       "id": "H17-1",
@@ -2531,79 +1100,6 @@
         }
       ],
       "correctCombo": "アイ"
-    },
-    {
-      "id": "H18-7",
-      "subject": "土地家屋調査士",
-      "category": "不動産登記法",
-      "source": "H18-7",
-      "questionText": "次のアからコまでの土地のうち、宅地と認定すべきものと雑種地と認定すべきものの個数の組合せとして正しいものは、後記１から５までのうちどれか。",
-      "limbs": [
-        {
-          "id": "H18-7-l0",
-          "text": "競馬場内にある一筆の土地が永久的設備と認められる建物の敷地として利用されている場合における当該土地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l1",
-          "text": "宗教法人である寺院の境内にある庫裏の敷地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l2",
-          "text": "水力発電のためのダム貯水池用地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l3",
-          "text": "住居として使用されている建物の敷地内に設けられた屋外プールの敷地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l4",
-          "text": "鉄道のガード下を利用して築造された店舗の敷地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l5",
-          "text": "海産物加工場と道を隔てた向かいに側にあり、日干場として利用されている土地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l6",
-          "text": "中学校の校舎の敷地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l7",
-          "text": "高圧線下にある建物の敷地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        },
-        {
-          "id": "H18-7-l8",
-          "text": "木場の区域内にある一筆の土地が材木問屋の建物の敷地として利用されている場合における当該土地",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        }
-      ],
-      "correctCombo": ""
     },
     {
       "id": "H18-8",
@@ -6767,40 +5263,49 @@
         {
           "id": "H23-6-l0",
           "text": "所有権が敷地権である旨の登記がされている土地の分筆は、その敷地権の登記がされた区分建物における所有権の登記名義人の３分の２以上の者の申請により、することができる。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-6-l1",
           "text": "区分建物が所在する土地を２筆に分筆する場合において、その土地の一方が当該区分建物が所在する土地以外の土地となるときは、当該分筆の登記の申請情報と併せて、当該土地を当該区分建物の敷地とする旨の規約を定めたことを証する情報の提供をしなければならない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-6-l2",
           "text": "土地の一部が別の地目となった場合には、登記官が職権で分筆することができるので、所有権の登記名義人は、分筆の登記を申請することを要しない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-6-l3",
           "text": "分筆の登記の申請において、分筆前の地積と分筆後の地積が異なる場合であっても、その地積の差が分筆前の地積を基準にして不動産登記規則に定められている誤差の限度内であるときは、地積に関する更正の登記を申請することを要しない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-6-l4",
           "text": "所有権の登記がない土地について、表題部所有者ではない当該土地の実体上の所有者は、表題部所有者の承諾を証する情報を提供して、当該土地の分筆の登記を申請することができる。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H23-7",
@@ -7082,40 +5587,49 @@
         {
           "id": "H23-13-l0",
           "text": "表題登記がある建物を全て取り壊し、その材料を用いて建物を再度建築したときは、表題登記がある既存建物について、建物の滅失の登記を申請しなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-13-l1",
           "text": "所有権の登記以外の権利に関する登記がある建物が滅失したときは、当該権利の登記名義人の承諾書を添付して、建物の滅失の登記を申請しなければならない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-13-l2",
           "text": "所有者が異なる区分建物が属する一棟の建物が滅失した場合において、区分建物の滅失の登記を申請するときは、区分建物の所有権の一人が一棟の建物の滅失の登記を申請することができる。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-13-l3",
           "text": "区分した建物として登記されているが、初めから区分した状態になかったことが明らかな建物については、錯誤を原因として建物の滅失の登記を申請しなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H23-13-l4",
           "text": "鉄筋コンクリート造の建物について、火災により建物の内部の一部が焼失したが、主要構造部が残存し、使用目的に従った使用が可能であるときは、建物の滅失の登記を申請することはできない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H23-14",
@@ -8484,40 +6998,49 @@
         {
           "id": "H25-4-l0",
           "text": "所有権の登記名義人がAである甲土地の分筆の登記と表題部所有者がAである乙土地の分筆の登記",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-4-l1",
           "text": "表題部所有者がAである甲土地の分筆の登記と表題部所有者Aの住所についての更正の登記",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-4-l2",
           "text": "いずれも所有権の登記名義人がA及びBである甲土地（A及びBの持分は、各２分の１）と乙土地（Aの持分は３分の２、Bの持分は３分の１）が隣接する場合において、地目が山林であった甲土地及び乙土地が同時に宅地に造成されたときにする甲土地の地目の変更の登記と乙土地の地目の変更の登記",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-4-l3",
           "text": "所有権の登記名義人がAである甲建物の登記記録からその附属建物を分割する建物の分割の登記と当該附属建物を所有権の登記名義人がAである乙建物の附属建物とする建物の合併の登記",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-4-l4",
           "text": "Aが婚姻により配偶者の氏を称することとなった場合にする甲建物の表題部所有者Aの氏名についての変更の登記と乙土地の表題部所有者Aの氏名についての変更の登記",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H25-5",
@@ -8844,40 +7367,49 @@
         {
           "id": "H25-13-l0",
           "text": "建物の一部が上階まで吹抜になっている場合には、その吹抜の部分も、上階の床面積に算入する。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-13-l1",
           "text": "地下街の建物のゆかめんせきは、常時一般に開放されている通路及び階段の部分を除き、壁又は柱等により区画された部分の面積により、定める。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-13-l2",
           "text": "建物の内部と外部にまたがってダストシュートがある場合には、その外部にある部分は、各階の床面積に算入しない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-13-l3",
           "text": "柱又は壁が傾斜している場合の床面積は、各階の床面の接着する壁その他の区画の中心線で囲まれた部分による。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-13-l4",
           "text": "出窓は、その高さが１．５メートル以上のもので、その下部が床面と同一の高さにあるものに限り、床面積に算入する。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H25-14",
@@ -8889,40 +7421,49 @@
         {
           "id": "H25-14-l0",
           "text": "団地共用部分である旨の登記を申請する場合には、その旨を定めた規約を設定したことを証する情報を提供しなければならない。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-14-l1",
           "text": "法定代理人によって建物の表題登記の申請をする場合において、当該法定代理人の権限を証する情報として戸籍の全部事項証明書を提供するときは、当該戸籍の全部事項証明書は、作成後３月以内のものであることを要しない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-14-l2",
           "text": "登記名義人が同一である所有権の登記がある２個の建物の合体による登記の申請においては、当該合体に係る建物のうちいずれか１個の建物の所有権の登記名義人の登記識別情報を提供すれば足りる。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-14-l3",
           "text": "甲区分建物及び乙区分建物が属する一棟の建物が新築された場合において、甲区分建物の所有者Aが乙区分建物の所有者Bに代わって乙区分建物についての表題登記を申請するときは、代位原因を証する情報として、甲区分建物の表題登記の申請情報に添付したAが甲区分建物の所有権を有することを証する情報を援用することができる。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-14-l4",
           "text": "建物の表題登記を申請する場合に添付する表題部所有者となる者の住所を証する情報として、当該者に係る印鑑に関する証明書を提供することができる。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H25-15",
@@ -9135,40 +7676,49 @@
         {
           "id": "H25-20-l0",
           "text": "土地家屋調査士は、筆界特定の手続きについての代理の依頼を拒むことはできるが、正当な事由がある場合でなければ、当該代理についての相談の依頼を拒むことはできない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-20-l1",
           "text": "土地家屋調査士がその業務に関して虚偽の調査又は測量をしたときは、当該土地家屋調査士は、１年以下の懲役又は１００万円以下の罰金に処せられる。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-20-l2",
           "text": "土地家屋調査士は、その業務を行う地域における土地の筆界を明らかにするための方法に関する慣習その他の土地家屋調査士の業務についての知識を深めるよう、努めなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-20-l3",
           "text": "土地家屋調査士は、２以上の事務所を設けることができない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H25-20-l4",
           "text": "土地家屋調査士は、会則の定めるところにより、業務上使用する職印を定めなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H26-1",
@@ -9720,40 +8270,49 @@
         {
           "id": "H26-14-l0",
           "text": "附属建物の新築による建物の表題部の変更の登記を申請する場合には、添付書類として、表題部所有者又は所有権の登記名義人の住所を証する市町村長、登記官その他の公務員が職務上作成した情報を提供しなければならない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-14-l1",
           "text": "附属建物がある建物の表題登記を申請する場合において、附属建物の新築の日が主である建物の新築の日と同一であるときは、附属建物の新築の日付を申請情報の内容とすることを要しない。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-14-l2",
           "text": "甲建物を乙建物の附属建物とする建物の合併の登記を申請する場合には、添付情報として、合併後の建物図面及び各階平面図を提供しなければならない。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-14-l3",
           "text": "附属建物がある区分建物の表題登記を申請する場合において、附属建物が主である建物と同一の一棟の建物に属する区分建物であるときは、当該附属建物の所在地番並びに構造及び床面積を申請情報の内容とすることを要しない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-14-l4",
           "text": "甲建物の敷地に乙建物の敷地を合筆する合筆の登記がされた後、甲建物を乙建物の附属建物とする建物の合併の登記を申請する場合において、合筆による乙建物の所在の変更の登記を申請するときは、当該合併の登記と当該所在の変更の登記を一の申請情報によって申請することはできない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H26-15",
@@ -9810,40 +8369,49 @@
         {
           "id": "H26-16-l0",
           "text": "区分建物が新築された後、当該区分建物の所有者がその敷地について登記された所有権を取得して、その取得の登記がされた場合において、当該所有権を敷地権とする区分建物の表題登記を申請するときは、敷地権の表示の登記原因の日付として、当該所有権の取得の登記の日を申請情報の内容とする。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-16-l1",
           "text": "附属建物のある敷地権付き区分建物の表題登記を申請する場合において、当該附属建物が同一の一棟の建物に属する区分建物であるときは、敷地権の表示として、主である建物に係る敷地権と附属建物に係る敷地権とを区別して、申請情報の内容としなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-16-l2",
           "text": "区分建物の種類について変更があった後に当該区分建物の所有権の登記名義人となった者は、その者に係る所有権の登記があった日から１か月以内に、当該区分建物の種類の変更の登記を申請しなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-16-l3",
           "text": "区分建物の属する一棟の建物の規約敷地とされている土地を、他の区分建物の属する一棟の建物の規約敷地とすることはできない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-16-l4",
           "text": "敷地権付き区分建物のうち抵当証券が発行されていない抵当権の登記があるものについて、専有部分とその専有部分に係る敷地利用権とを分離して処分することができるものとなったことによる敷地権の変更の登記を申請する場合には、当該抵当権の登記名義人が当該変更の登記後の当該区分建物について当該抵当権を消滅させたことを承諾したことを証する情報を提供しても、当該抵当権が消滅した旨の登記はされない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H26-17",
@@ -9990,40 +8558,49 @@
         {
           "id": "H26-20-l0",
           "text": "土地家屋調査士は、業務を廃止したときは、遅滞なく、日本土地家屋調査士会連合会に対し、直接、その旨を届けなければならない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-20-l1",
           "text": "民間紛争解決手続代理関係業務を行うことを目的とする土地家屋調査士法人が同業務を行う場合には、当該土地家屋調査士法人の社員のうち、土地家屋調査士法代３条第２項に規定する土地家屋調査士である社員のみが当該業務を執行する権利を有する。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-20-l2",
           "text": "土地家屋調査士は、正当な事由がある場合でなければ、業務上取り扱った事件について知ることのできた秘密を他に漏らしてはならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-20-l3",
           "text": "土地家屋調査士法人の社員でない者が自己を社員であると誤認させる行為をしたときは、当該社員でない者は、その誤認に基づいて土地家屋調査士法人と取引をした者に対し、社員と同一の責任を負う。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H26-20-l4",
           "text": "土地家屋調査士は、その所属する土地家屋調査士会及び日本土地家屋調査士会連合会が実施する研修を受け、その資質の向上を図るように努めなけらばならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H27-1",
@@ -10530,85 +9107,103 @@
         {
           "id": "H27-12-l0",
           "text": "新築された建物が甲登記所と乙登記所の管轄区域にまたがる場合において、法務大臣又は法務局若しくは地方法務局の長が当該建物に関する登記の事務をつかさどる登記所を指定するまでの間、当該建物の表題登記の申請は、甲登記所又は乙登記所のいずれかの登記所にすることができる。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-12-l1",
           "text": "甲登記所において登記されている建物について、増築により乙登記所の管轄区域にまたがることとまった場合であっても、当該建物の不動産所在事項の変更の登記の申請は、甲登記所にしなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-12-l2",
           "text": "甲登記所において登記されている建物について、乙登記所の管轄に属する建物を附属建物として合併する場合には、建物の合併の登記の申請は、乙登記所にしなければならない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-12-l3",
           "text": "甲登記所において登記されている建物について、市町村の合併により管轄登記所が甲登記所から乙登記所に転属した場合には、当該建物に係る不動産所在事項の変更の登記の申請は、乙登記所にしなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-12-l4",
           "text": "甲登記所において登記されている建物について、えい行移転により乙登記所の管轄区域に移動した場合には、当該建物の不動産所在事項の変更の登記の申請は、乙登記所にすることはできない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H27-13",
       "subject": "土地家屋調査士",
       "category": "不動産登記法",
       "source": "H27-13",
-      "questionText": "建物の認定に関する次のアからオまでの記述のうち、登記することのできる建物として取り扱うことのできないものは、幾つあるか。",
+      "questionText": "建物の認定に関する次記述のうち、登記することのできる建物として取り扱うことはできるか。",
       "limbs": [
         {
           "id": "H27-13-l0",
           "text": "内部に祭壇や参拝者が着席することができる設備があり、寺院の本堂として利用されている観音像",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-13-l1",
           "text": "屋根のある駅のホーム内にあり、コンクリートで基礎工事が施されている売店",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-13-l2",
           "text": "屋根及び外壁があって、内部に車を格納する回転式のパーキング機械が設置されているタワー状の立体式駐車場",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-13-l3",
           "text": "公衆用道路上に屋根覆いを施したアーケード付街路",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-13-l4",
           "text": "屋根及び周壁の部分がガラスで覆われている半永久的な建造物と認められる農耕用の温床施設",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H27-14",
@@ -10867,40 +9462,49 @@
         {
           "id": "H27-20-l0",
           "text": "業務の禁止を受けた土地家屋調査士は、当該処分の日から３年を経過するまでの間、土地家屋調査士となる資格を失う。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-20-l1",
           "text": "土地家屋調査士法人は、定款で定めるところにより、当事者その他関係人の依頼を受けて、鑑定人に就任し、土地の筆界に関する鑑定を行う業務をすることができる。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-20-l2",
           "text": "土地家屋調査士は、業務を受任しようとする場合には、あらかじめ、その依頼をしようとする者に対し、報酬の基準を示さなければならない。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-20-l3",
           "text": "土地家屋調査士は、土地の表示に関する登記について必要な測量の業務の依頼を受けた場合において、自ら当該業務を行うことができない正当な事由があるときは、補助者に当該業務を取り扱わせることができる。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H27-20-l4",
           "text": "土地家屋調査士は、補助者を置いたときは、遅滞無く、その旨を事務所の所在地を管轄する法務局又は地方法務局の長に届け出なければならない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H28-1",
@@ -11362,40 +9966,49 @@
         {
           "id": "H28-11-l0",
           "text": "地積測量図は、0.2ミリメートル以下の細線により、図形を鮮明に表示しなければならない。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-11-l1",
           "text": "地役権図面は、土地の状況その他の事情により適当でないときを除き、250分の1の縮尺により作成しなければならない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-11-l2",
           "text": "地積測量図の縮尺がその土地について作成すべき土地所在図の縮尺と同一であって、当該地積測量図によって土地の所在を明確に表示することができるときは、当該地積測量図をもって土地所在図を兼ねることができる。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-11-l3",
           "text": "地役権図面つづり込み帳につづり込まれた地役権図面は、閉鎖した日から３０年間保存される。",
-          "context": "",
-          "correct": false,
+          "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-11-l4",
           "text": "地積測量図に、基本三角点等に基ずく測量の成果による筆界点の座標値を記録した場合には、方位を記録することを要しない。",
-          "context": "",
           "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H28-12",
@@ -11722,40 +10335,49 @@
         {
           "id": "H28-19-l0",
           "text": "敷地権の登記がある土地について分筆の登記を申請するときは、登録免許税は課されない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-19-l1",
           "text": "いずれも所有権の登記がない甲土地と乙土地を合筆する合筆の登記を申請するときは、納付すべき登録免許税の額は1,000円となる。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-19-l2",
           "text": "表題登記がない建物と表題登記のみがある建物が合体して１個の建物となったことによる合体による登記等を申請するときは、納付すべき登録免許税の額は1,000円となる。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-19-l3",
           "text": "所有権の登記がある甲建物の登記記録から甲建物の附属建物を分割して、これを乙建物の附属建物としようとする場合において、建物の分割の登記と建物の合併の登記を一の申請情報によって申請するときは、納付すべき登録免許税の額は3,000円となる。",
-          "context": "",
           "correct": true,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         },
         {
           "id": "H28-19-l4",
           "text": "私人を所有権の登記名義人とする土地の一部を取得した地方公共団体が、代位による分筆の登記を嘱託するときは、登録免許税は課されない。",
-          "context": "",
-          "correct": true,
+          "correct": false,
+          "options": [],
+          "correctText": "",
+          "inlineOxWrong": [],
           "explanation": ""
         }
-      ],
-      "correctCombo": ""
+      ]
     },
     {
       "id": "H28-20",
@@ -14996,23 +13618,6 @@
         }
       ],
       "correctCombo": "アイ"
-    },
-    {
-      "id": "R2-15",
-      "subject": "土地家屋調査士",
-      "category": "不動産登記法",
-      "source": "R2-15",
-      "questionText": "次の「登記記録」の中の（　ア　）から（　オ　）までの空欄に後記の「語句群」の中から適切な語句を選んで入れると、敷地権付き区分建物の登記記録となる。（　ア　）から（　オ　）までの空欄に入れるべき語句が含まれないものは、後記１から５までのうち、どれか。ただし、同一の文字の付された空欄には同一の語句が入り、異なる文字の付された空欄に同一の語句は入らないものとする。\n敷地権、　１階部分、使用貸借権、１階、非敷地権、平家建、地上権、一部抹消、\n分割、変更、敷地権消滅、１階建、新築\n１　使用貸借権 敷地権 地上権\n２　分割 新築 １階",
-      "limbs": [
-        {
-          "id": "R2-15-l0",
-          "text": "敷地権消滅 １階建 １階部分",
-          "context": "",
-          "correct": false,
-          "explanation": ""
-        }
-      ],
-      "correctCombo": "2"
     },
     {
       "id": "R2-16",
