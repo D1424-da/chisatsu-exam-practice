@@ -27,6 +27,20 @@ function setGoogleLoginVisibility(visible) {
   if (divider) divider.classList.toggle('hidden', !visible);
 }
 
+function renderGooglePopupFallbackButton() {
+  const googleBtn = document.getElementById('google-login-btn');
+  if (!googleBtn) return;
+
+  googleBtn.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'btn-google-fallback-login';
+  btn.className = 'btn btn-ghost login-submit';
+  btn.textContent = 'Googleでログイン';
+  btn.addEventListener('click', handleGoogleSignIn);
+  googleBtn.appendChild(btn);
+}
+
 const LOCAL_ADMIN_AUTH_KEY = 'limb_local_admin_auth';
 
 function isLocalAdminAuthenticated() {
@@ -524,7 +538,7 @@ function setupAuthStateListener() {
 // ===== イベントリスナー登録 =====
 document.addEventListener('DOMContentLoaded', () => {
   const hasGoogleClientId = !!getGoogleClientId();
-  setGoogleLoginVisibility(hasGoogleClientId);
+  setGoogleLoginVisibility(true);
 
   // Firebase 初期化を待つ
   if (!window.firebaseInitialized) {
@@ -615,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Google ログインは Client ID 設定済みのときのみ初期化
+  // Google ログインは Client ID 設定済みなら GIS ボタン、未設定なら Firebase Popup ボタンを表示
   if (hasGoogleClientId) {
     if (window.google && window.google.accounts && window.google.accounts.id) {
       initGoogleSignIn();
@@ -628,6 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }, 100);
     }
+  } else {
+    renderGooglePopupFallbackButton();
   }
 });
 
@@ -637,7 +653,8 @@ function initGoogleSignIn() {
   const GOOGLE_CLIENT_ID = getGoogleClientId();
 
   if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('YOUR_')) {
-    setGoogleLoginVisibility(false);
+    renderGooglePopupFallbackButton();
+    setGoogleLoginVisibility(true);
     return;
   }
 
@@ -652,10 +669,13 @@ function initGoogleSignIn() {
 
     const googleBtn = document.getElementById('google-login-btn');
     if (googleBtn) {
+      googleBtn.innerHTML = '';
       google.accounts.id.renderButton(googleBtn, { theme: 'outline', size: 'large' });
     }
   } catch (error) {
     console.warn('Google Sign-In initialization skipped:', error);
+    renderGooglePopupFallbackButton();
+    setGoogleLoginVisibility(true);
   }
 }
 
