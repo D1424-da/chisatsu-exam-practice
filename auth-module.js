@@ -20,6 +20,30 @@ function getGoogleClientId() {
   return String(configured).trim();
 }
 
+async function ensureAuthPersistence() {
+  try {
+    const auth = firebase.auth();
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  } catch (error) {
+    console.warn('Auth persistence setup skipped:', error?.code || error);
+  }
+}
+
+async function resolveRedirectSignInResult() {
+  try {
+    const auth = firebase.auth();
+    const result = await auth.getRedirectResult();
+    if (result && result.user) {
+      console.log('✓ Redirect ログイン成功:', result.user.email || result.user.uid);
+    }
+  } catch (error) {
+    console.warn('Redirect ログイン結果の取得に失敗:', error?.code || error);
+    if (String(error?.code || '').startsWith('auth/')) {
+      showError('login-error', getGoogleAuthErrorMessage(error));
+    }
+  }
+}
+
 function setGoogleLoginVisibility(visible) {
   const googleBtn = document.getElementById('google-login-btn');
   const divider = document.querySelector('#login-form-area .divider');
@@ -125,6 +149,7 @@ async function handleEmailLogin() {
   try {
     hideError('login-error');
     document.getElementById('btn-login').disabled = true;
+    await ensureAuthPersistence();
 
     if (matchesConfiguredAdminId(email) && password === getAdminLoginPassword()) {
       startLocalAdminSession();
@@ -234,6 +259,7 @@ async function handlePasswordReset() {
 async function handleGoogleSignIn() {
   try {
     const auth = firebase.auth();
+    await ensureAuthPersistence();
     auth.useDeviceLanguage();
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -579,6 +605,9 @@ function setupAuthStateListener() {
 document.addEventListener('DOMContentLoaded', () => {
   const hasGoogleClientId = !!getGoogleClientId();
   setGoogleLoginVisibility(true);
+
+  // リダイレクト方式で戻ってきた認証結果を先に回収しておく。
+  resolveRedirectSignInResult();
 
   // Firebase 初期化を待つ
   if (!window.firebaseInitialized) {
