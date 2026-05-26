@@ -91,6 +91,20 @@ function getGoogleAuthErrorMessage(error) {
   return 'Googleログインに失敗しました。時間をおいて再試行してください。';
 }
 
+function shouldUseRedirectForGoogleSignIn() {
+  try {
+    const protocol = String(window.location?.protocol || '').toLowerCase();
+    if (protocol !== 'https:') return false;
+
+    const ua = String(navigator.userAgent || '');
+    const isMobileUa = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+    const isTouchOnly = navigator.maxTouchPoints > 0 && window.innerWidth <= 900;
+    return isMobileUa || isTouchOnly;
+  } catch {
+    return false;
+  }
+}
+
 const LOCAL_ADMIN_AUTH_KEY = 'limb_local_admin_auth';
 
 function isLocalAdminAuthenticated() {
@@ -280,6 +294,13 @@ async function handleGoogleSignIn() {
     auth.useDeviceLanguage();
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
+
+    if (shouldUseRedirectForGoogleSignIn()) {
+      showError('login-error', 'スマホ環境のため、Googleログイン画面へ移動します...');
+      await auth.signInWithRedirect(provider);
+      return;
+    }
+
     const result = await auth.signInWithPopup(provider);
     console.log('✓ Google ログイン成功:', result.user.email);
     
