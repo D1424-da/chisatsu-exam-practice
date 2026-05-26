@@ -139,7 +139,7 @@ function matchesConfiguredAdminId(input) {
 // ===== ログイン処理 =====
 async function handleEmailLogin() {
   const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value.trim();
+  const password = document.getElementById('login-password').value;
 
   if (!email || !password) {
     showError('login-error', 'メールアドレスとパスワードを入力してください');
@@ -164,7 +164,10 @@ async function handleEmailLogin() {
     let msg = 'ログインに失敗しました';
     if (error.code === 'auth/user-not-found') msg = 'ユーザーが見つかりません';
     if (error.code === 'auth/wrong-password') msg = 'パスワードが正しくありません';
+    if (error.code === 'auth/invalid-credential') msg = 'メールアドレスまたはパスワードが正しくありません';
     if (error.code === 'auth/invalid-email') msg = 'メールアドレスが無効です';
+    if (error.code === 'auth/too-many-requests') msg = '試行回数が多すぎます。しばらく待ってから再試行してください';
+    if (error.code === 'auth/network-request-failed') msg = 'ネットワークエラーです。接続を確認して再試行してください';
     showError('login-error', msg);
   } finally {
     document.getElementById('btn-login').disabled = false;
@@ -174,8 +177,8 @@ async function handleEmailLogin() {
 // ===== 新規登録処理 =====
 async function handleRegister() {
   const email = document.getElementById('reg-email').value.trim();
-  const password = document.getElementById('reg-password').value.trim();
-  const password2 = document.getElementById('reg-password2').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const password2 = document.getElementById('reg-password2').value;
 
   if (!email || !password || !password2) {
     showError('reg-error', 'すべてのフィールドを入力してください');
