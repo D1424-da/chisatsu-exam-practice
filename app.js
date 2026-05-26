@@ -34,7 +34,7 @@ let cloudStudyFlushInFlight = false;
 let studyTime = { totalMs: 0, pendingDeltaMs: 0 };
 let sessionStudyStartedAt = 0;
 let studyTimeBackend = 'auto'; // 'study_stats' | 'records' | 'auto'
-let studyCalendar = { checkedDates: {} };
+let studyCalendar = { checkedDates: {}, dailyCounts: {}, updatedAtMs: 0 };
 let studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let unsubscribeRecordsRealtime = null;
 let unsubscribeStudyStatsRealtime = null;
@@ -179,8 +179,22 @@ function normalizeStudyCalendarData(data) {
       checkedDates[dateKey] = true;
     }
   }
+
+  const countSrc = (data && typeof data === 'object' && data.dailyCounts && typeof data.dailyCounts === 'object')
+    ? data.dailyCounts
+    : {};
+  const dailyCounts = {};
+  for (const [dateKey, count] of Object.entries(countSrc)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey))) continue;
+    const safeCount = Math.max(0, Math.floor(Number(count || 0)));
+    if (safeCount > 0) {
+      dailyCounts[dateKey] = safeCount;
+      checkedDates[dateKey] = true;
+    }
+  }
+
   const updatedAtMs = Math.max(0, Number(data?.updatedAtMs || 0));
-  return { checkedDates, updatedAtMs };
+  return { checkedDates, dailyCounts, updatedAtMs };
 }
 
 function loadStudyCalendarLocal(uid = getAuthUid()) {
@@ -188,7 +202,7 @@ function loadStudyCalendarLocal(uid = getAuthUid()) {
   try {
     return normalizeStudyCalendarData(JSON.parse(storageGetItem(key)) || {});
   } catch {
-    return { checkedDates: {}, updatedAtMs: 0 };
+    return { checkedDates: {}, dailyCounts: {}, updatedAtMs: 0 };
   }
 }
 
@@ -203,7 +217,7 @@ function saveStudyCalendarLocal(data, uid = getAuthUid()) {
 }
 
 function clearStudyCalendar(uid = getAuthUid()) {
-  saveStudyCalendarLocal({ checkedDates: {}, updatedAtMs: Date.now() }, uid);
+  saveStudyCalendarLocal({ checkedDates: {}, dailyCounts: {}, updatedAtMs: Date.now() }, uid);
   calendarPendingSync = true;
   flushStudyCalendarToCloudIfNeeded();
 }
@@ -742,8 +756,17 @@ function startCloudRealtimeSubscriptions() {
     const remoteRecords = (data.records && typeof data.records === 'object')
       ? normalizeRecordMap(data.records)
       : null;
-    const remoteCalendar = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
-      ? data.studyCalendarCheckedDates
+    const hasRemoteCalendarField = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+      || (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object');
+    const remoteCalendar = hasRemoteCalendarField
+      ? {
+          checkedDates: (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+            ? data.studyCalendarCheckedDates
+            : {},
+          dailyCounts: (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object')
+            ? data.studyCalendarDailyCounts
+            : {}
+        }
       : null;
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
     const hasRemoteSessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
@@ -873,8 +896,17 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
 
     const data = snap.data() || {};
     const remoteRecords = (data.records && typeof data.records === 'object') ? normalizeRecordMap(data.records) : null;
-    const remoteCalendar = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
-      ? data.studyCalendarCheckedDates
+    const hasRemoteCalendarField = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+      || (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object');
+    const remoteCalendar = hasRemoteCalendarField
+      ? {
+          checkedDates: (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+            ? data.studyCalendarCheckedDates
+            : {},
+          dailyCounts: (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object')
+            ? data.studyCalendarDailyCounts
+            : {}
+        }
       : null;
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
     const hasRemoteSessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
@@ -1046,7 +1078,11 @@ function setStudyDayChecked(dateKey, checked = true) {
   const next = { ...studyCalendar.checkedDates };
   if (checked) next[key] = true;
   else delete next[key];
-  saveStudyCalendarLocal({ checkedDates: next, updatedAtMs: Date.now() });
+  saveStudyCalendarLocal({
+    checkedDates: next,
+    dailyCounts: { ...(studyCalendar.dailyCounts || {}) },
+    updatedAtMs: Date.now()
+  });
   renderStudyCalendar();
   calendarPendingSync = true;
   flushStudyCalendarToCloudIfNeeded();
@@ -1068,6 +1104,25 @@ function markTodayAsStudied() {
   renderStudyCalendar();
 }
 
+function incrementStudyDailyCount(dateKey, amount = 1) {
+  const key = String(dateKey || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+  const delta = Math.max(0, Math.floor(Number(amount || 0)));
+  if (delta <= 0) return;
+
+  const nextCounts = { ...(studyCalendar.dailyCounts || {}) };
+  nextCounts[key] = Math.max(0, Math.floor(Number(nextCounts[key] || 0))) + delta;
+
+  saveStudyCalendarLocal({
+    checkedDates: { ...(studyCalendar.checkedDates || {}), [key]: true },
+    dailyCounts: nextCounts,
+    updatedAtMs: Date.now()
+  });
+  renderStudyCalendar();
+  calendarPendingSync = true;
+  flushStudyCalendarToCloudIfNeeded();
+}
+
 function mergeStudyCalendarDates(localData, remoteData) {
   const local = normalizeStudyCalendarData(localData || {});
   const remote = normalizeStudyCalendarData(remoteData || {});
@@ -1079,18 +1134,28 @@ function mergeStudyCalendarDates(localData, remoteData) {
   for (const [key, checked] of Object.entries(remote.checkedDates)) {
     if (checked === true) mergedDates[key] = true;
   }
+
+  const mergedCounts = { ...local.dailyCounts };
+  for (const [key, count] of Object.entries(remote.dailyCounts)) {
+    const left = Math.max(0, Math.floor(Number(mergedCounts[key] || 0)));
+    const right = Math.max(0, Math.floor(Number(count || 0)));
+    if (right > left) mergedCounts[key] = right;
+  }
+
   return {
     checkedDates: mergedDates,
+    dailyCounts: mergedCounts,
     updatedAtMs: Math.max(local.updatedAtMs, remote.updatedAtMs)
   };
 }
 
-function applyRemoteStudyCalendar(remoteCheckedDates, remoteUpdatedAtMs = 0) {
+function applyRemoteStudyCalendar(remoteCalendar, remoteUpdatedAtMs = 0) {
   const uid = getAuthUid();
   if (!uid) return;
   const local = loadStudyCalendarLocal(uid);
   const merged = mergeStudyCalendarDates(local, {
-    checkedDates: remoteCheckedDates || {},
+    checkedDates: remoteCalendar?.checkedDates || {},
+    dailyCounts: remoteCalendar?.dailyCounts || {},
     updatedAtMs: Number(remoteUpdatedAtMs || 0)
   });
   saveStudyCalendarLocal(merged, uid);
@@ -1111,6 +1176,7 @@ async function pushStudyCalendarToCloud() {
       await firebase.firestore().collection('records').doc(uid).set({
         uid,
         studyCalendarCheckedDates: latest.checkedDates,
+        studyCalendarDailyCounts: latest.dailyCounts || {},
         studyCalendarUpdatedAtMs: Math.max(0, Number(latest.updatedAtMs || Date.now())),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
@@ -1223,7 +1289,8 @@ function renderStudyCalendar() {
     const dateKey = toDateKey(date);
     const isToday = dateKey === todayKey;
     const isChecked = !!studyCalendar.checkedDates[dateKey];
-    html += `<div class="study-calendar-day${isToday ? ' is-today' : ''}${isChecked ? ' is-checked' : ''}" aria-label="${year}年${month + 1}月${day}日${isChecked ? ' 学習済み' : ''}">${day}${isChecked ? ' ✓' : ''}</div>`;
+    const count = Math.max(0, Math.floor(Number(studyCalendar.dailyCounts?.[dateKey] || 0)));
+    html += `<div class="study-calendar-day${isToday ? ' is-today' : ''}${isChecked ? ' is-checked' : ''}" aria-label="${year}年${month + 1}月${day}日${isChecked ? ' 学習済み' : ''}${count > 0 ? ` 学習数${count}件` : ''}"><span class="study-calendar-day-number">${day}</span>${isChecked ? '<span class="study-calendar-day-check">✓</span>' : ''}${count > 0 ? `<span class="study-calendar-day-count">${count}件</span>` : ''}</div>`;
   }
 
   gridEl.innerHTML = html;
@@ -1935,6 +2002,7 @@ function addRecord(limbId, isCorrect) {
 
   // 回答が発生した時点で当日を学習済みにする（タイマー更新の取りこぼし対策）。
   markTodayAsStudied();
+  incrementStudyDailyCount(toDateKey(), 1);
 
   if (session && typeof session.answeredCount === 'number') {
     session.answeredCount += 1;
@@ -2936,6 +3004,14 @@ function renderStats() {
   if (studyEl) studyEl.textContent = formatStudyDuration(studyTime.totalMs);
   renderStudyCalendar();
 
+  const dailyStudyListEl = document.getElementById('daily-study-count-list');
+  if (dailyStudyListEl) {
+    const dailyRows = getRecentDailyStudyCounts(14);
+    dailyStudyListEl.innerHTML = dailyRows.length > 0
+      ? dailyRows.map((row) => `<div class="daily-study-row"><span class="daily-study-date">${esc(row.dateLabel)}</span><span class="daily-study-count">${row.count}件</span></div>`).join('')
+      : '<p>まだ学習データがありません</p>';
+  }
+
   // 科目別
   const subjectMap = {};
   for (const limb of allLimbs) {
@@ -2986,6 +3062,23 @@ function renderStats() {
     </div>`;
   }).join('');
   document.getElementById('weak-limbs-list').innerHTML = weakHtml || '<p>苦手肢なし</p>';
+}
+
+function getRecentDailyStudyCounts(days = 14) {
+  const limit = Math.max(1, Math.floor(Number(days || 14)));
+  const out = [];
+  const now = new Date();
+  for (let i = 0; i < limit; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const key = toDateKey(d);
+    const count = Math.max(0, Math.floor(Number(studyCalendar.dailyCounts?.[key] || 0)));
+    out.push({
+      key,
+      dateLabel: `${d.getMonth() + 1}/${d.getDate()}`,
+      count
+    });
+  }
+  return out;
 }
 
 // ── XSSエスケープ ────────────────────────────────────────────
