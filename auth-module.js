@@ -41,6 +41,29 @@ function renderGooglePopupFallbackButton() {
   googleBtn.appendChild(btn);
 }
 
+function getGoogleAuthErrorMessage(error) {
+  const code = String(error?.code || '');
+  if (code === 'auth/popup-blocked') {
+    return 'ポップアップがブロックされました。リダイレクト方式で再試行します。';
+  }
+  if (code === 'auth/popup-closed-by-user') {
+    return 'Googleログインがキャンセルされました。';
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return 'Firebase ConsoleでGoogle認証が有効化されていません。';
+  }
+  if (code === 'auth/unauthorized-domain') {
+    return 'このドメインは認証許可されていません。Firebaseの承認済みドメインに追加してください。';
+  }
+  if (code === 'auth/invalid-credential') {
+    return 'Google認証情報が無効です。設定を確認してください。';
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'ネットワークエラーが発生しました。接続を確認して再試行してください。';
+  }
+  return 'Googleログインに失敗しました。時間をおいて再試行してください。';
+}
+
 const LOCAL_ADMIN_AUTH_KEY = 'limb_local_admin_auth';
 
 function isLocalAdminAuthenticated() {
@@ -208,7 +231,9 @@ async function handlePasswordReset() {
 async function handleGoogleSignIn() {
   try {
     const auth = firebase.auth();
+    auth.useDeviceLanguage();
     const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     const result = await auth.signInWithPopup(provider);
     console.log('✓ Google ログイン成功:', result.user.email);
     
@@ -227,9 +252,21 @@ async function handleGoogleSignIn() {
     }
   } catch (error) {
     console.error('✗ Google ログイン失敗:', error.code);
-    if (error.code !== 'auth/popup-closed-by-user') {
-      showError('login-error', 'Google ログインに失敗しました');
+    if (error.code === 'auth/popup-blocked') {
+      try {
+        const auth = firebase.auth();
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        showError('login-error', getGoogleAuthErrorMessage(error));
+        await auth.signInWithRedirect(provider);
+        return;
+      } catch (redirectErr) {
+        console.error('✗ Google リダイレクト失敗:', redirectErr?.code || redirectErr);
+        showError('login-error', getGoogleAuthErrorMessage(redirectErr));
+        return;
+      }
     }
+    showError('login-error', getGoogleAuthErrorMessage(error));
   }
 }
 
@@ -689,7 +726,7 @@ async function handleGoogleSignInCallback(response) {
     console.log('✓ Google ログイン成功');
   } catch (error) {
     console.error('✗ Google ログイン失敗:', error);
-    showError('login-error', 'Google ログインに失敗しました');
+    showError('login-error', getGoogleAuthErrorMessage(error));
   }
 }
 
