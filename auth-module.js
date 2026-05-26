@@ -43,6 +43,9 @@ function renderGooglePopupFallbackButton() {
 
 function getGoogleAuthErrorMessage(error) {
   const code = String(error?.code || '');
+  if (code === 'auth/operation-not-supported-in-this-environment') {
+    return '現在の実行環境ではGoogleログインが使えません。http(s) で起動し、ブラウザのストレージ/Cookieを有効化してください（file:// では不可）。';
+  }
   if (code === 'auth/popup-blocked') {
     return 'ポップアップがブロックされました。リダイレクト方式で再試行します。';
   }
