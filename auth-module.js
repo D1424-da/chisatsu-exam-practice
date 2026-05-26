@@ -168,6 +168,20 @@ async function handleEmailLogin() {
     if (error.code === 'auth/invalid-email') msg = 'メールアドレスが無効です';
     if (error.code === 'auth/too-many-requests') msg = '試行回数が多すぎます。しばらく待ってから再試行してください';
     if (error.code === 'auth/network-request-failed') msg = 'ネットワークエラーです。接続を確認して再試行してください';
+
+    // Google アカウントのみで作成されたメールを、メール/パスワードでログインしようとした場合の案内
+    if (email && (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found')) {
+      try {
+        const auth = firebase.auth();
+        const methods = await auth.fetchSignInMethodsForEmail(email);
+        if (Array.isArray(methods) && methods.includes('google.com') && !methods.includes('password')) {
+          msg = 'このメールはGoogleログイン専用で登録されています。Googleでログインするか、パスワード再設定メールでパスワードを作成してください。';
+        }
+      } catch (methodErr) {
+        console.warn('サインイン方式の確認に失敗:', methodErr?.code || methodErr);
+      }
+    }
+
     showError('login-error', msg);
   } finally {
     document.getElementById('btn-login').disabled = false;
