@@ -1,4 +1,45 @@
-﻿/* =========================================================
+﻿// --- 完璧・あいまい・まちがえたものカウント表示 ---
+function updateMasteryCounts() {
+  let perfect = 0, ambiguous = 0, wrong = 0;
+  for (const q of questions) {
+    const rec = getRecord(q.id);
+    if (rec.mastery === 'perfect') perfect++;
+    if (rec.mastery === 'ambiguous') ambiguous++;
+    if (rec.wrong > 0) wrong++;
+  }
+  const elPerfect = document.getElementById('count-perfect');
+  const elAmbiguous = document.getElementById('count-ambiguous');
+  const elWrong = document.getElementById('count-wrong');
+  if (elPerfect) elPerfect.textContent = `完璧: ${perfect}`;
+  if (elAmbiguous) elAmbiguous.textContent = `あいまい: ${ambiguous}`;
+  if (elWrong) elWrong.textContent = `まちがえたもの: ${wrong}`;
+}
+
+// 各種データロード後や成績変更時にカウントを更新
+(function setupMasteryCountAutoUpdate() {
+  document.addEventListener('DOMContentLoaded', updateMasteryCounts);
+  // saveRecordsをラップ
+  const origSaveRecords = window.saveRecords || saveRecords;
+  window.saveRecords = function() {
+    const res = origSaveRecords.apply(this, arguments);
+    updateMasteryCounts();
+    return res;
+  };
+  // 問題データが変わる可能性のある箇所にもフック（startSession, setLimbMastery, addRecord, loadQuestionsFromStorageがあれば）
+  const origSetLimbMastery = window.setLimbMastery || setLimbMastery;
+  window.setLimbMastery = function() {
+    const res = origSetLimbMastery.apply(this, arguments);
+    updateMasteryCounts();
+    return res;
+  };
+  const origAddRecord = window.addRecord || addRecord;
+  window.addRecord = function() {
+    const res = origAddRecord.apply(this, arguments);
+    updateMasteryCounts();
+    return res;
+  };
+})();
+/* =========================================================
    肢別問題集 - app.js
    ========================================================= */
 
