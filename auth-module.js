@@ -759,6 +759,13 @@ function initGoogleSignIn() {
   if (window.googleSignInInitialized) return;
   const GOOGLE_CLIENT_ID = getGoogleClientId();
 
+  // モバイルは Firebase Redirect の方が安定するため、GIS ボタンを使わずフォールバックに統一
+  if (shouldUseRedirectForGoogleSignIn()) {
+    renderGooglePopupFallbackButton();
+    setGoogleLoginVisibility(true);
+    return;
+  }
+
   if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('YOUR_')) {
     renderGooglePopupFallbackButton();
     setGoogleLoginVisibility(true);
