@@ -591,6 +591,21 @@ body {
   white-space: pre-wrap;
 }
 
+.result-mastery-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.result-mastery-actions .btn {
+  width: 100%;
+}
+
+.result-mastery-actions .btn.is-selected {
+  box-shadow: 0 0 0 2px rgba(44, 148, 107, .25) inset;
+}
+
 /* ─── 成績ページ ─────────────────────────────────────────── */
 .stats-grid {
   display: grid;

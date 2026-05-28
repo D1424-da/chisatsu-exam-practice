@@ -563,10 +563,24 @@ function normalizeRecordMap(map) {
       correct: Math.max(0, Number(stat?.correct || 0)),
       wrong: Math.max(0, Number(stat?.wrong || 0)),
       wrongDateKeys: normalizeWrongDateKeys(stat?.wrongDateKeys),
-      review: normalizeReviewState(stat?.review)
+      review: normalizeReviewState(stat?.review),
+      mastery: stat?.mastery === 'perfect' ? 'perfect' : stat?.mastery === 'ambiguous' ? 'ambiguous' : '',
+      masteryUpdatedAtMs: Math.max(0, Number(stat?.masteryUpdatedAtMs || 0))
     };
   }
   return out;
+}
+
+function pickLatestMastery(left = {}, right = {}) {
+  const leftAt = Math.max(0, Number(left?.masteryUpdatedAtMs || 0));
+  const rightAt = Math.max(0, Number(right?.masteryUpdatedAtMs || 0));
+  if (rightAt > leftAt) return { mastery: right?.mastery || '', masteryUpdatedAtMs: rightAt };
+  if (leftAt > rightAt) return { mastery: left?.mastery || '', masteryUpdatedAtMs: leftAt };
+
+  const leftRank = left?.mastery === 'perfect' ? 2 : left?.mastery === 'ambiguous' ? 1 : 0;
+  const rightRank = right?.mastery === 'perfect' ? 2 : right?.mastery === 'ambiguous' ? 1 : 0;
+  if (rightRank > leftRank) return { mastery: right?.mastery || '', masteryUpdatedAtMs: rightAt };
+  return { mastery: left?.mastery || '', masteryUpdatedAtMs: leftAt };
 }
 
 function isRecordMapEmpty(map) {
@@ -582,6 +596,7 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
     const left = normalizeReviewState(local[id]?.review);
     const right = normalizeReviewState(remote[id]?.review);
     const review = right.lastAnsweredAtMs > left.lastAnsweredAtMs ? right : left;
+    const mastery = pickLatestMastery(local[id], remote[id]);
     merged[id] = {
       // カウンタは減らさない方針で統合し、空データ上書きによる履歴消失を防ぐ。
       correct: Math.max(0, Number(local[id]?.correct || 0), Number(remote[id]?.correct || 0)),
@@ -590,7 +605,9 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
         ...(local[id]?.wrongDateKeys || []),
         ...(remote[id]?.wrongDateKeys || [])
       ]),
-      review
+      review,
+      mastery: mastery.mastery,
+      masteryUpdatedAtMs: mastery.masteryUpdatedAtMs
     };
   }
   return merged;
@@ -1985,11 +2002,32 @@ function showChangePwForm() {
 }
 
 function getRecord(limbId) {
-  return records[limbId] || { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null) };
+  return records[limbId] || {
+    correct: 0,
+    wrong: 0,
+    wrongDateKeys: [],
+    review: normalizeReviewState(null),
+    mastery: '',
+    masteryUpdatedAtMs: 0
+  };
+}
+
+function isPerfectLimb(limbId) {
+  return getRecord(limbId).mastery === 'perfect';
+}
+
+function setLimbMastery(limbId, mastery) {
+  if (!records[limbId]) {
+    records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0 };
+  }
+  const nextMastery = mastery === 'perfect' ? 'perfect' : mastery === 'ambiguous' ? 'ambiguous' : '';
+  records[limbId].mastery = nextMastery;
+  records[limbId].masteryUpdatedAtMs = Date.now();
+  saveRecords();
 }
 
 function addRecord(limbId, isCorrect) {
-  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null) };
+  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0 };
   if (isCorrect) records[limbId].correct++;
   else {
     records[limbId].wrong++;
@@ -1997,6 +2035,9 @@ function addRecord(limbId, isCorrect) {
       ...(records[limbId].wrongDateKeys || []),
       toDateKey()
     ]);
+    // 不正解になった問題は「完璧」状態を解除する。
+    records[limbId].mastery = '';
+    records[limbId].masteryUpdatedAtMs = Date.now();
   }
   records[limbId].review = nextReviewState(records[limbId].review, isCorrect);
 
@@ -2247,6 +2288,13 @@ function startSession() {
     });
   }
 
+  if (mode === 'perfect') {
+    limbs = limbs.filter(l => isPerfectLimb(l.id));
+    limbs = shuffle(limbs);
+  } else {
+    limbs = limbs.filter(l => !isPerfectLimb(l.id));
+  }
+
   if (mode === 'weak') {
     limbs = limbs.filter(l => getRecord(l.id).wrong > 0 || getRecord(l.id).correct === 0);
     limbs.sort((a, b) => weakScore(b.id) - weakScore(a.id));
@@ -2263,6 +2311,8 @@ function startSession() {
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => getRecord(l.id).wrong > 0);
     limbs = shuffle(limbs);
+  } else if (mode === 'perfect') {
+    // already filtered above
   } else {
     limbs = shuffle(limbs);
   }
@@ -2474,9 +2524,16 @@ function renderCurrentLimb() {
 function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
   const overlay = document.getElementById('modal-result');
   const btnNext = document.getElementById('btn-result-next');
+  const masteryActions = document.getElementById('result-mastery-actions');
+  const btnPerfect = document.getElementById('btn-mark-perfect');
+  const btnAmbiguous = document.getElementById('btn-mark-ambiguous');
   const advanceSession = opts.advanceSession !== false;
   overlay.dataset.advanceSession = advanceSession ? '1' : '0';
+  overlay.dataset.requireMastery = '0';
+  overlay.dataset.masterySelected = '0';
+  overlay.dataset.currentLimbId = String(limb?.id || '');
   btnNext.textContent = advanceSession ? '次の肢へ' : '閉じる';
+  btnNext.disabled = false;
   document.getElementById('result-icon').textContent        = isCorrect ? '✅ 正解！' : '❌ 不正解';
   document.getElementById('result-icon').className          = 'result-icon ' + (isCorrect ? 'correct' : 'wrong');
   const isChoiceQuestion = Array.isArray(limb.options) && limb.options.length >= 2;
@@ -2491,6 +2548,21 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
   const explanation  = limb.explanation || '（解説なし）';
   document.getElementById('result-explanation').innerHTML   =
     `<strong>正解：${correctLabel}</strong>${detailHtml ? `<br><br>${detailHtml}` : ''}<br><br>${esc(explanation)}`;
+
+  if (isCorrect && masteryActions && btnPerfect && btnAmbiguous) {
+    masteryActions.classList.remove('hidden');
+    btnNext.disabled = true;
+    overlay.dataset.requireMastery = '1';
+
+    const currentMastery = getRecord(limb.id).mastery;
+    btnPerfect.classList.toggle('is-selected', currentMastery === 'perfect');
+    btnAmbiguous.classList.toggle('is-selected', currentMastery === 'ambiguous');
+  } else if (masteryActions && btnPerfect && btnAmbiguous) {
+    masteryActions.classList.add('hidden');
+    btnPerfect.classList.remove('is-selected');
+    btnAmbiguous.classList.remove('is-selected');
+  }
+
   overlay.classList.remove('hidden');
 }
 
@@ -3258,8 +3330,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // 結果モーダル
+  document.getElementById('btn-mark-perfect').addEventListener('click', () => {
+    const modal = document.getElementById('modal-result');
+    const limbId = String(modal.dataset.currentLimbId || '');
+    if (!limbId) return;
+    setLimbMastery(limbId, 'perfect');
+    modal.dataset.masterySelected = '1';
+    document.getElementById('btn-result-next').disabled = false;
+    document.getElementById('btn-mark-perfect').classList.add('is-selected');
+    document.getElementById('btn-mark-ambiguous').classList.remove('is-selected');
+  });
+
+  document.getElementById('btn-mark-ambiguous').addEventListener('click', () => {
+    const modal = document.getElementById('modal-result');
+    const limbId = String(modal.dataset.currentLimbId || '');
+    if (!limbId) return;
+    setLimbMastery(limbId, 'ambiguous');
+    modal.dataset.masterySelected = '1';
+    document.getElementById('btn-result-next').disabled = false;
+    document.getElementById('btn-mark-perfect').classList.remove('is-selected');
+    document.getElementById('btn-mark-ambiguous').classList.add('is-selected');
+  });
+
   document.getElementById('btn-result-next').addEventListener('click', () => {
     const modal = document.getElementById('modal-result');
+    if (modal.dataset.requireMastery === '1' && modal.dataset.masterySelected !== '1') {
+      return;
+    }
     const shouldAdvance = modal.dataset.advanceSession !== '0';
     modal.classList.add('hidden');
     if (shouldAdvance && session) {
@@ -3309,6 +3406,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('modal-result').addEventListener('click', (e) => {
     if (e.target === document.getElementById('modal-result')) {
       const modal = document.getElementById('modal-result');
+      if (modal.dataset.requireMastery === '1' && modal.dataset.masterySelected !== '1') {
+        return;
+      }
       const shouldAdvance = modal.dataset.advanceSession !== '0';
       modal.classList.add('hidden');
       if (shouldAdvance && session) { session.index++; renderCurrentLimb(); }

@@ -133,6 +133,7 @@
               <option value="due">復習優先（忘却曲線）</option>
               <option value="unanswered">未回答のみ</option>
               <option value="wrong">間違えたもの</option>
+              <option value="perfect">完璧なもの</option>
             </select>
           </div>
           <div class="study-actions">
@@ -421,6 +422,10 @@
     <div class="modal modal-sm">
       <div id="result-icon" class="result-icon"></div>
       <p id="result-explanation" class="result-explanation"></p>
+      <div id="result-mastery-actions" class="result-mastery-actions hidden">
+        <button id="btn-mark-perfect" class="btn btn-primary" type="button">完璧</button>
+        <button id="btn-mark-ambiguous" class="btn btn-ghost" type="button">あいまい</button>
+      </div>
       <button id="btn-result-next" class="btn btn-primary" style="width:100%">次の肢へ</button>
     </div>
   </div>
