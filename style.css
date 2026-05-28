@@ -40,6 +40,7 @@
   color: #fff !important;
   box-shadow: 0 8px 18px rgba(124, 58, 173, 0.18);
 }
+
 /* === モーダル背景色（完璧・あいまい） === */
 .modal.bg-perfect {
   background: #e6fbe6 !important;
@@ -49,6 +50,7 @@
   background: #f7e9ff !important;
   transition: background 0.2s;
 }
+
 /* =========================================================
    肢別問題集 - style.css
    ========================================================= */
@@ -57,19 +59,22 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --primary:    #3b6ff0;
+  --primary: #3b6ff0;
   --primary-dk: #2a54c0;
-  --danger:     #e84040;
-  --success:    #22b35c;
-  --warn:       #f5a623;
-  --bg:         #f4f6fb;
-  --surface:    #ffffff;
-  --border:     #dce2ef;
-  --text:       #1e2130;
+  --danger: #e84040;
+  --success: #22b35c;
+  --warn: #f5a623;
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --border: #dce2ef;
+  --text: #1e2130;
   --text-muted: #6b7394;
-  --radius:     10px;
-  --shadow:     0 2px 10px rgba(0,0,0,.08);
+  --radius: 10px;
+  --shadow: 0 2px 10px rgba(0, 0, 0, .08);
   --transition: .18s ease;
+  --motion-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --btn-shadow-soft: 0 8px 18px rgba(13, 78, 125, 0.18);
+  --btn-shadow-strong: 0 10px 24px rgba(13, 78, 125, 0.24);
   --mastery-perfect: #22b35c;
   --mastery-perfect-strong: #24946b;
   --mastery-ambiguous: #7c3aad;
@@ -94,7 +99,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, .06);
 }
 .header-inner {
   max-width: 900px;
@@ -159,7 +164,7 @@ body {
   font-size: .9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity var(--transition), background var(--transition);
+  transition: transform .18s var(--motion-smooth), box-shadow .2s var(--motion-smooth), opacity var(--transition), background var(--transition), border-color var(--transition), color var(--transition);
   white-space: nowrap;
 }
 .btn:hover { opacity: .88; }
@@ -174,26 +179,6 @@ body {
   outline-offset: 2px;
 }
 
-/* ─── フィルターバー ─────────────────────────────────────── */
-.filter-bar { margin-bottom: 16px; }
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: flex-end;
-}
-.filter-group { display: flex; flex-direction: column; gap: 4px; }
-.filter-group label { font-size: .8rem; color: var(--text-muted); font-weight: 600; }
-.filter-group select {
-  padding: 7px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  font-size: .9rem;
-  background: var(--bg);
-  color: var(--text);
-  min-width: 140px;
-}
-
 .study-actions {
   display: flex;
   gap: 10px;
@@ -201,17 +186,31 @@ body {
   align-items: flex-end;
 }
 
+#btn-start {
+  min-width: 150px;
+  padding: 11px 20px;
+  box-shadow: var(--btn-shadow-strong);
+}
+
+#btn-start:hover {
+  transform: translateY(-1px);
+}
+
 .mastery-count-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-bottom: 12px;
+  margin: 0 0 18px;
+  padding: 10px 12px;
 }
 
 .mastery-count-btn {
-  min-width: 150px;
+  min-width: 132px;
   justify-content: center;
+  font-size: .84rem;
+  padding: 7px 12px;
+  border-radius: 10px;
 }
 
 /* 進捗バー */
@@ -680,6 +679,15 @@ body {
   transform: translateY(-1px);
 }
 
+.result-mastery-actions .btn-ghost {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(165, 183, 205, 0.8);
+}
+
+.result-mastery-actions .btn.is-selected {
+  transform: translateY(-1px);
+}
+
 #btn-mark-perfect.btn-ghost:hover {
   background: rgba(34, 179, 92, 0.14);
   border-color: rgba(34, 179, 92, 0.4);
@@ -959,6 +967,11 @@ body {
   .mastery-count-btn {
     width: 100%;
     min-width: 0;
+    justify-content: flex-start;
+  }
+
+  #btn-start {
+    width: 100%;
   }
 }
 
@@ -1178,7 +1191,7 @@ body::before {
 }
 
 .page.active .card {
-  animation: cardFadeUp .45s ease both;
+  animation: cardFadeUp .45s var(--motion-smooth) both;
 }
 
 @keyframes cardFadeUp {
@@ -1194,12 +1207,23 @@ body::before {
 
 .btn-primary {
   background: linear-gradient(135deg, #1570ab 0%, #0d4e7d 100%);
-  box-shadow: 0 8px 18px rgba(13, 78, 125, 0.24);
+  box-shadow: var(--btn-shadow-soft);
 }
 
 .btn-primary:hover {
   background: linear-gradient(135deg, #1b79b8 0%, #11598d 100%);
   transform: translateY(-1px);
+  box-shadow: var(--btn-shadow-strong);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #da5555 0%, #bc3f3f 100%);
+  box-shadow: 0 8px 16px rgba(197, 72, 72, 0.2);
+}
+
+.btn-danger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(197, 72, 72, 0.24);
 }
 
 .btn-ghost {
