@@ -6,17 +6,11 @@ function setMasteryCountBarVisible(visible) {
 
 // --- 完璧・あいまい・まちがえたものカウント表示 ---
 function updateMasteryCounts() {
-  // デバッグ用: questionsとrecordsの中身を出力
-  // 詳細デバッグ: questions, recordsの要約とidマッチ状況を出力
-  // --- 肢単位でカウント・突合 ---
-  let limbCount = 0, perfect = 0, ambiguous = 0, wrong = 0;
-  const limbIds = [];
+  let perfect = 0, ambiguous = 0, wrong = 0;
   if (Array.isArray(questions)) {
     for (const q of questions) {
       if (Array.isArray(q.limbs)) {
         for (const limb of q.limbs) {
-          limbCount++;
-          limbIds.push(limb.id);
           const rec = getRecord(limb.id);
           if (rec.mastery === 'perfect') perfect++;
           if (rec.mastery === 'ambiguous') ambiguous++;
@@ -25,20 +19,6 @@ function updateMasteryCounts() {
       }
     }
   }
-  const recordKeys = records ? Object.keys(records) : [];
-  const missingIds = limbIds.filter(id => !(id in records));
-  const orphanRecordIds = recordKeys.filter(id => !limbIds.includes(id));
-  console.log('updateMasteryCounts debug:', {
-    limbCount,
-    records_keys_length: recordKeys.length,
-    limbIds_sample: limbIds.slice(0, 10),
-    records_keys_sample: recordKeys.slice(0, 10),
-    missingIds_sample: missingIds.slice(0, 10),
-    missingIds_count: missingIds.length,
-    orphanRecordIds_sample: orphanRecordIds.slice(0, 10),
-    orphanRecordIds_count: orphanRecordIds.length,
-    perfect, ambiguous, wrong
-  });
   const elPerfect = document.getElementById('count-perfect');
   const elAmbiguous = document.getElementById('count-ambiguous');
   const elWrong = document.getElementById('count-wrong');
@@ -81,7 +61,7 @@ const origShowPage = window.showPage || showPage;
 window.showPage = function(name) {
   const res = origShowPage.apply(this, arguments);
   const loggedIn = !!(getAuthUid() || window.currentUser?.uid);
-  if (loggedIn && (name === 'study' || name === 'stats' || name === 'manage' || name === 'admin')) {
+  if (loggedIn && name === 'study') {
     setMasteryCountBarVisible(true);
   } else {
     setMasteryCountBarVisible(false);
@@ -2705,31 +2685,6 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
       modalBox.classList.add('bg-ambiguous');
     }
 
-    // --- 完璧・あいまいボタンのhover挙動ログ ---
-    btnPerfect.onmouseenter = () => {
-      console.log('[hover] 完璧ボタン mouseenter', {
-        classList: [...btnPerfect.classList],
-        mastery: getRecord(limb.id).mastery
-      });
-    };
-    btnPerfect.onmouseleave = () => {
-      console.log('[hover] 完璧ボタン mouseleave', {
-        classList: [...btnPerfect.classList],
-        mastery: getRecord(limb.id).mastery
-      });
-    };
-    btnAmbiguous.onmouseenter = () => {
-      console.log('[hover] あいまいボタン mouseenter', {
-        classList: [...btnAmbiguous.classList],
-        mastery: getRecord(limb.id).mastery
-      });
-    };
-    btnAmbiguous.onmouseleave = () => {
-      console.log('[hover] あいまいボタン mouseleave', {
-        classList: [...btnAmbiguous.classList],
-        mastery: getRecord(limb.id).mastery
-      });
-    };
   } else if (masteryActions && btnPerfect && btnAmbiguous) {
     masteryActions.classList.add('hidden');
     btnPerfect.classList.remove('is-selected');

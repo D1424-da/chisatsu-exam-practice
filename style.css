@@ -169,6 +169,7 @@ body {
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-sm { padding: 5px 11px; font-size: .82rem; border-radius: 5px; }
 .btn:focus-visible {
+  outline: 2px solid #4f88ad;
   outline: 2px solid color-mix(in oklab, var(--primary) 75%, white);
   outline-offset: 2px;
 }
@@ -680,12 +681,16 @@ body {
 }
 
 #btn-mark-perfect.btn-ghost:hover {
+  background: rgba(34, 179, 92, 0.14);
+  border-color: rgba(34, 179, 92, 0.4);
   background: color-mix(in oklab, var(--mastery-perfect) 14%, white);
   border-color: color-mix(in oklab, var(--mastery-perfect) 40%, white);
   color: var(--mastery-perfect-strong);
 }
 
 #btn-mark-ambiguous.btn-ghost:hover {
+  background: rgba(124, 58, 173, 0.14);
+  border-color: rgba(124, 58, 173, 0.4);
   background: color-mix(in oklab, var(--mastery-ambiguous) 14%, white);
   border-color: color-mix(in oklab, var(--mastery-ambiguous) 40%, white);
   color: var(--mastery-ambiguous-strong);
