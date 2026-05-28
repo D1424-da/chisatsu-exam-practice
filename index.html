@@ -98,12 +98,6 @@
           <button id="btn-logout" class="btn btn-ghost btn-sm">ログアウト</button>
         </div>
       </div>
-      <!-- カウント表示バー -->
-        <div id="mastery-count-bar" style="display:none; margin-bottom: 12px; display: flex; gap: 8px;">
-          <button id="count-perfect" class="btn btn-primary btn-mark-perfect mastery-count-btn" type="button">完璧: 0</button>
-          <button id="count-ambiguous" class="btn btn-primary btn-mark-ambiguous mastery-count-btn" type="button">あいまい: 0</button>
-          <button id="count-wrong" class="btn btn-danger mastery-count-btn" type="button">まちがえたもの: 0</button>
-        </div>
     </header>
 
     <!-- 学習ページ -->
@@ -156,6 +150,13 @@
           <button id="btn-end-session" class="btn btn-ghost btn-sm">終了</button>
         </div>
       </section>
+
+      <!-- カウント表示バー -->
+      <div id="mastery-count-bar" class="card mastery-count-bar" style="display:none;">
+        <button id="count-perfect" class="btn btn-primary btn-mark-perfect mastery-count-btn" type="button">完璧: 0</button>
+        <button id="count-ambiguous" class="btn btn-primary btn-mark-ambiguous mastery-count-btn" type="button">あいまい: 0</button>
+        <button id="count-wrong" class="btn btn-danger mastery-count-btn" type="button">まちがえたもの: 0</button>
+      </div>
 
       <!-- 肢カード -->
       <section id="limb-area" class="limb-area">
