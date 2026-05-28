@@ -67,6 +67,8 @@ function renderGooglePopupFallbackButton() {
 
 function getGoogleAuthErrorMessage(error) {
   const code = String(error?.code || '');
+  const ua = String(navigator.userAgent || '');
+  const isSafari = /Safari/i.test(ua) && !/Chrome|CriOS|Edg|EdgiOS|FxiOS|Firefox/i.test(ua);
   if (code === 'auth/operation-not-supported-in-this-environment') {
     return '現在の実行環境ではGoogleログインが使えません。http(s) で起動し、ブラウザのストレージ/Cookieを有効化してください（file:// では不可）。';
   }
@@ -88,13 +90,22 @@ function getGoogleAuthErrorMessage(error) {
   if (code === 'auth/network-request-failed') {
     return 'ネットワークエラーが発生しました。接続を確認して再試行してください。';
   }
+  if (code === 'auth/web-storage-unsupported') {
+    return 'ブラウザのストレージが無効なためログインできません。SafariのプライベートブラウズをOFFにして再試行してください。';
+  }
+  if (isSafari) {
+    return 'SafariでGoogleログインに失敗しました。プライベートブラウズをOFFにし、Safari設定の「サイト越えトラッキングを防ぐ」を一時的にOFFにして再試行してください。';
+  }
   return 'Googleログインに失敗しました。時間をおいて再試行してください。';
 }
 
 function shouldUseRedirectForGoogleSignIn() {
   try {
     const protocol = String(window.location?.protocol || '').toLowerCase();
-    if (protocol !== 'https:') return false;
+    const host = String(window.location?.hostname || '').toLowerCase();
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local');
+    const isSecureOrigin = protocol === 'https:' || isLocalHost;
+    if (!isSecureOrigin) return false;
 
     const ua = String(navigator.userAgent || '');
     const isMobileUa = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
