@@ -1,3 +1,8 @@
+.btn-mark-ambiguous.btn-primary {
+  background: linear-gradient(135deg, #7c3aad 0%, #4e267d 100%);
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(124, 58, 173, 0.18);
+}
 /* === モーダル背景色（完璧・あいまい） === */
 .modal.bg-perfect {
   background: #e6fbe6 !important;

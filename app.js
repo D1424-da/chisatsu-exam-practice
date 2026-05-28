@@ -3462,8 +3462,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     modal.dataset.masterySelected = '1';
     document.getElementById('btn-result-next').disabled = false;
     // 色とボタン状態のみ即時反映
-    document.getElementById('btn-mark-perfect').classList.add('is-selected');
-    document.getElementById('btn-mark-ambiguous').classList.remove('is-selected');
+    const btnPerfect = document.getElementById('btn-mark-perfect');
+    const btnAmbiguous = document.getElementById('btn-mark-ambiguous');
+    btnPerfect.classList.add('is-selected', 'btn-primary');
+    btnAmbiguous.classList.remove('is-selected', 'btn-primary');
     const modalBox = modal.querySelector('.modal');
     modalBox.classList.add('bg-perfect');
     modalBox.classList.remove('bg-ambiguous');
@@ -3477,8 +3479,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     modal.dataset.masterySelected = '1';
     document.getElementById('btn-result-next').disabled = false;
     // 色とボタン状態のみ即時反映
-    document.getElementById('btn-mark-perfect').classList.remove('is-selected');
-    document.getElementById('btn-mark-ambiguous').classList.add('is-selected');
+    const btnPerfect = document.getElementById('btn-mark-perfect');
+    const btnAmbiguous = document.getElementById('btn-mark-ambiguous');
+    btnPerfect.classList.remove('is-selected', 'btn-primary');
+    btnAmbiguous.classList.add('is-selected', 'btn-primary');
     const modalBox = modal.querySelector('.modal');
     modalBox.classList.add('bg-ambiguous');
     modalBox.classList.remove('bg-perfect');
