@@ -99,11 +99,11 @@
         </div>
       </div>
       <!-- カウント表示バー -->
-      <div id="mastery-count-bar" class="card mastery-count-bar" style="max-width:900px;margin:0 auto 8px;display:flex;gap:16px;justify-content:flex-end;font-size:0.98rem;padding:8px 16px 8px 0;">
-        <span id="count-perfect" style="color:#24946b;">完璧: --</span>
-        <span id="count-ambiguous" style="color:#7c3aad;">あいまい: --</span>
-        <span id="count-wrong" style="color:#e84040;">まちがえたもの: --</span>
-      </div>
+        <div id="mastery-count-bar" style="display:none; margin-bottom: 12px; display: flex; gap: 8px;">
+          <button id="count-perfect" class="btn btn-primary btn-mark-perfect mastery-count-btn" type="button">完璧: 0</button>
+          <button id="count-ambiguous" class="btn btn-primary btn-mark-ambiguous mastery-count-btn" type="button">あいまい: 0</button>
+          <button id="count-wrong" class="btn btn-danger mastery-count-btn" type="button">まちがえたもの: 0</button>
+        </div>
     </header>
 
     <!-- 学習ページ -->
