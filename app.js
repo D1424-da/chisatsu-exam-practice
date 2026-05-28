@@ -414,6 +414,7 @@ function saveStudySessionSnapshot() {
   sessionSnapshotPendingSync = true;
   flushStudySessionSnapshotToCloudIfNeeded();
   updateResumeSessionButton();
+  updateMasteryCounts();
 }
 
 function clearStudySessionSnapshot() {
