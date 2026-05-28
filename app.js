@@ -348,6 +348,13 @@ function setStudyFilters(filters = {}) {
   if (modeEl) modeEl.value = filters.mode || 'all';
 }
 
+function jumpToStudyMode(mode) {
+  const current = getStudyFilters();
+  setStudyFilters({ ...current, mode: mode || 'all' });
+  showPage('study');
+  startSession();
+}
+
 function readSavedStudySession(uid = getAuthUid()) {
   if (uid && studySessionSnapshotCache[uid]) {
     const cached = normalizeStudySessionSnapshot(studySessionSnapshotCache[uid]);
@@ -3499,6 +3506,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-start').addEventListener('click', startSession);
   document.getElementById('btn-resume-session').addEventListener('click', restoreLastStudySession);
   document.getElementById('btn-end-session').addEventListener('click', endSession);
+
+  const countPerfectBtn = document.getElementById('count-perfect');
+  const countAmbiguousBtn = document.getElementById('count-ambiguous');
+  const countWrongBtn = document.getElementById('count-wrong');
+  if (countPerfectBtn) {
+    countPerfectBtn.addEventListener('click', () => jumpToStudyMode('perfect'));
+  }
+  if (countAmbiguousBtn) {
+    countAmbiguousBtn.addEventListener('click', () => jumpToStudyMode('ambiguous'));
+  }
+  if (countWrongBtn) {
+    countWrongBtn.addEventListener('click', () => jumpToStudyMode('wrong'));
+  }
 
   document.getElementById('filter-subject').addEventListener('change', (e) => {
     const cats = getCategories(e.target.value);
