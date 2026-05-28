@@ -7,9 +7,12 @@ function setMasteryCountBarVisible(visible) {
 // --- 完璧・あいまい・まちがえたものカウント表示 ---
 function updateMasteryCounts() {
   // デバッグ用: questionsとrecordsの中身を出力
+  // 詳細デバッグ: questions, recordsの要約を出力
   console.log('updateMasteryCounts debug:', {
-    questions,
-    records
+    questions_length: Array.isArray(questions) ? questions.length : 'not array',
+    questions_sample: Array.isArray(questions) ? questions.slice(0, 3) : questions,
+    records_keys: records ? Object.keys(records).slice(0, 10) : [],
+    records_sample: records ? Object.entries(records).slice(0, 3) : []
   });
   let perfect = 0, ambiguous = 0, wrong = 0;
   for (const q of questions) {
