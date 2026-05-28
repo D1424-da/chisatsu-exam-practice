@@ -1697,6 +1697,7 @@ function saveQuestions() {
     localDirty: true,
     localEditedAt: Date.now()
   });
+  updateMasteryCounts();
   refreshSessionQueueAfterQuestionUpdate();
   pushQuestionsToCloud();
   writeToFile();
