@@ -26,11 +26,11 @@ const GOOGLE_REDIRECT_PENDING_AT_KEY = 'limb_google_redirect_pending_at';
 function setGoogleRedirectPending(enabled) {
   try {
     if (enabled) {
-      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1');
-      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_AT_KEY, String(Date.now()));
+      localStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1');
+      localStorage.setItem(GOOGLE_REDIRECT_PENDING_AT_KEY, String(Date.now()));
     } else {
-      sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
-      sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_AT_KEY);
+      localStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
+      localStorage.removeItem(GOOGLE_REDIRECT_PENDING_AT_KEY);
     }
   } catch {
     // ignore
@@ -39,8 +39,8 @@ function setGoogleRedirectPending(enabled) {
 
 function hasRecentGoogleRedirectPending(maxAgeMs = 10 * 60 * 1000) {
   try {
-    if (sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) !== '1') return false;
-    const at = Number(sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_AT_KEY) || 0);
+    if (localStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) !== '1') return false;
+    const at = Number(localStorage.getItem(GOOGLE_REDIRECT_PENDING_AT_KEY) || 0);
     return at > 0 && (Date.now() - at) <= maxAgeMs;
   } catch {
     return false;
@@ -48,11 +48,37 @@ function hasRecentGoogleRedirectPending(maxAgeMs = 10 * 60 * 1000) {
 }
 
 async function ensureAuthPersistence() {
+  const auth = firebase.auth();
+  const modes = [
+    firebase.auth.Auth.Persistence.LOCAL,
+    firebase.auth.Auth.Persistence.SESSION,
+    firebase.auth.Auth.Persistence.NONE,
+  ];
+  for (const mode of modes) {
+    try {
+      await auth.setPersistence(mode);
+      return mode;
+    } catch (error) {
+      console.warn('Auth persistence setup failed:', mode, error?.code || error);
+    }
+  }
+  return null;
+}
+
+async function tryRecoverGoogleRedirectSignIn() {
   try {
     const auth = firebase.auth();
-    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    if (auth.currentUser) return auth.currentUser;
+    await ensureAuthPersistence();
+    await auth.getRedirectResult();
+    if (auth.currentUser) return auth.currentUser;
+    await new Promise(resolve => setTimeout(resolve, 800));
+    if (auth.currentUser) return auth.currentUser;
+    await auth.getRedirectResult();
+    return auth.currentUser || null;
   } catch (error) {
-    console.warn('Auth persistence setup skipped:', error?.code || error);
+    console.warn('Redirect recovery failed:', error?.code || error);
+    return null;
   }
 }
 
@@ -671,6 +697,15 @@ function setupAuthStateListener() {
     } else {
       console.log('✗ ユーザーはログインしていません');
       const pendingGoogleRedirect = hasRecentGoogleRedirectPending();
+
+      if (pendingGoogleRedirect) {
+        const recovered = await tryRecoverGoogleRedirectSignIn();
+        if (recovered) {
+          // onAuthStateChanged が再発火してログイン分岐に入るため、ここでは終了
+          return;
+        }
+      }
+
       if (typeof stopCloudRealtimeSubscriptions === 'function') {
         stopCloudRealtimeSubscriptions();
       }
