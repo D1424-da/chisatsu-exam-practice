@@ -80,7 +80,8 @@ function updateMasteryCounts() {
 const origShowPage = window.showPage || showPage;
 window.showPage = function(name) {
   const res = origShowPage.apply(this, arguments);
-  if (name === 'study' || name === 'stats' || name === 'manage' || name === 'admin') {
+  const loggedIn = !!(getAuthUid() || window.currentUser?.uid);
+  if (loggedIn && (name === 'study' || name === 'stats' || name === 'manage' || name === 'admin')) {
     setMasteryCountBarVisible(true);
   } else {
     setMasteryCountBarVisible(false);
