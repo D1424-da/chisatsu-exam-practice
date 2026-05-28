@@ -2581,6 +2581,19 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
   }
 
   overlay.classList.remove('hidden');
+
+  // --- 未回答モード時、回答した肢を即座にキューから除外 ---
+  try {
+    const filters = session?.filters || getStudyFilters();
+    if (filters?.mode === 'unanswered' && session?.queue) {
+      // 現在の肢をキューから除外
+      session.queue = session.queue.filter(l => l.id !== limb.id);
+      // セッションが空になったら完了メッセージ
+      if (session.queue.length === 0) {
+        setTimeout(() => showCompletionMessage(), 300);
+      }
+    }
+  } catch (e) { /* ignore */ }
 }
 
 function showCompletionMessage() {
