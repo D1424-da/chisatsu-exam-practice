@@ -604,8 +604,14 @@ body {
 
 .result-mastery-actions .btn.is-selected {
   box-shadow: 0 0 0 2px rgba(44, 148, 107, .25) inset;
-  background: #f7e9ff;
-  color: #7c3aad;
+}
+.result-mastery-actions #btn-mark-perfect.is-selected {
+  background: #e6fbe6 !important;
+  color: #24946b !important;
+}
+.result-mastery-actions #btn-mark-ambiguous.is-selected {
+  background: #f7e9ff !important;
+  color: #7c3aad !important;
 }
 
 /* ─── 成績ページ ─────────────────────────────────────────── */
