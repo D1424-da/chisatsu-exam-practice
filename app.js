@@ -747,6 +747,7 @@ async function pullQuestionsFromCloudIfNeeded() {
       });
       cloudQuestionsLoadedUid = uid;
       markSyncSuccess('questions', now);
+      if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
       return;
     }
 
@@ -763,6 +764,7 @@ async function pullQuestionsFromCloudIfNeeded() {
       });
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+      if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
     }
     markSyncSuccess('questions', remoteEditedAt || Date.now());
     cloudQuestionsLoadedUid = uid;
@@ -958,6 +960,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
         }, { merge: true });
         markSyncSuccess('records', migratedAt);
         tryRenderStatsIfOpen();
+        if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
         cloudRecordsLoadedUid = uid;
         return;
       }
@@ -979,6 +982,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
         lastAccessAt: now,
         lastCloudPullAt: now
       }, uid);
+      if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
       cloudRecordsLoadedUid = uid;
       return;
     }
@@ -1019,6 +1023,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
         lastAccessAt: now,
         lastCloudPullAt: now
       }, uid);
+      if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
     }
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
     if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
