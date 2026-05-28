@@ -2291,6 +2291,9 @@ function startSession() {
   if (mode === 'perfect') {
     limbs = limbs.filter(l => isPerfectLimb(l.id));
     limbs = shuffle(limbs);
+  } else if (mode === 'ambiguous') {
+    limbs = limbs.filter(l => getRecord(l.id).mastery === 'ambiguous');
+    limbs = shuffle(limbs);
   } else {
     limbs = limbs.filter(l => !isPerfectLimb(l.id));
   }
@@ -2311,6 +2314,8 @@ function startSession() {
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => getRecord(l.id).wrong > 0);
     limbs = shuffle(limbs);
+  } else if (mode === 'ambiguous') {
+    // already filtered above
   } else if (mode === 'perfect') {
     // already filtered above
   } else {
