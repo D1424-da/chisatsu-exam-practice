@@ -2664,6 +2664,9 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
     const currentMastery = getRecord(limb.id).mastery;
     btnPerfect.classList.toggle('is-selected', currentMastery === 'perfect');
     btnAmbiguous.classList.toggle('is-selected', currentMastery === 'ambiguous');
+    const hasMastery = currentMastery === 'perfect' || currentMastery === 'ambiguous';
+    overlay.dataset.masterySelected = hasMastery ? '1' : '0';
+    btnNext.disabled = !hasMastery;
     if (currentMastery === 'perfect') {
       btnPerfect.classList.add('btn-primary');
       btnPerfect.classList.remove('btn-ghost');
