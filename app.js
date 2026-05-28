@@ -3380,12 +3380,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     setLimbMastery(limbId, 'perfect');
     modal.dataset.masterySelected = '1';
     document.getElementById('btn-result-next').disabled = false;
-    document.getElementById('btn-mark-perfect').classList.add('is-selected');
-    document.getElementById('btn-mark-ambiguous').classList.remove('is-selected');
-    // モーダル背景色切り替え
-    const modalBox = modal.querySelector('.modal');
-    modalBox.classList.add('bg-perfect');
-    modalBox.classList.remove('bg-ambiguous');
+    // 最新状態で再描画
+    const limb = (session?.queue || []).find(l => String(l.id) === limbId) || {};
+    showResult(limb, true, '', { advanceSession: false });
   });
 
   document.getElementById('btn-mark-ambiguous').addEventListener('click', () => {
@@ -3395,12 +3392,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     setLimbMastery(limbId, 'ambiguous');
     modal.dataset.masterySelected = '1';
     document.getElementById('btn-result-next').disabled = false;
-    document.getElementById('btn-mark-perfect').classList.remove('is-selected');
-    document.getElementById('btn-mark-ambiguous').classList.add('is-selected');
-    // モーダル背景色切り替え
-    const modalBox = modal.querySelector('.modal');
-    modalBox.classList.add('bg-ambiguous');
-    modalBox.classList.remove('bg-perfect');
+    // 最新状態で再描画
+    const limb = (session?.queue || []).find(l => String(l.id) === limbId) || {};
+    showResult(limb, true, '', { advanceSession: false });
   });
 
   document.getElementById('btn-result-next').addEventListener('click', () => {
