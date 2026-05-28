@@ -657,10 +657,10 @@ body {
   box-shadow: 0 0 0 2px rgba(44, 148, 107, .25) inset;
 }
 .result-mastery-actions #btn-mark-perfect.is-selected {
-  color: #24946b !important;
+  color: #fff !important;
 }
 .result-mastery-actions #btn-mark-ambiguous.is-selected {
-  color: #7c3aad !important;
+  color: #fff !important;
 }
 
 /* ─── 成績ページ ─────────────────────────────────────────── */
