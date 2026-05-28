@@ -2666,6 +2666,32 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
     } else if (currentMastery === 'ambiguous') {
       modalBox.classList.add('bg-ambiguous');
     }
+
+    // --- 完璧・あいまいボタンのhover挙動ログ ---
+    btnPerfect.addEventListener('mouseenter', () => {
+      console.log('[hover] 完璧ボタン mouseenter', {
+        classList: [...btnPerfect.classList],
+        mastery: getRecord(limb.id).mastery
+      });
+    });
+    btnPerfect.addEventListener('mouseleave', () => {
+      console.log('[hover] 完璧ボタン mouseleave', {
+        classList: [...btnPerfect.classList],
+        mastery: getRecord(limb.id).mastery
+      });
+    });
+    btnAmbiguous.addEventListener('mouseenter', () => {
+      console.log('[hover] あいまいボタン mouseenter', {
+        classList: [...btnAmbiguous.classList],
+        mastery: getRecord(limb.id).mastery
+      });
+    });
+    btnAmbiguous.addEventListener('mouseleave', () => {
+      console.log('[hover] あいまいボタン mouseleave', {
+        classList: [...btnAmbiguous.classList],
+        mastery: getRecord(limb.id).mastery
+      });
+    });
   } else if (masteryActions && btnPerfect && btnAmbiguous) {
     masteryActions.classList.add('hidden');
     btnPerfect.classList.remove('is-selected');
