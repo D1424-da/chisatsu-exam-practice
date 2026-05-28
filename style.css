@@ -1,3 +1,14 @@
+/* --- 完璧ボタンのグラデーションとホバー色 --- */
+.btn-mark-perfect.btn-primary {
+  background: linear-gradient(135deg, #22b35c 0%, #24946b 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(34, 179, 92, 0.18) !important;
+}
+.btn-mark-perfect.btn-primary:hover {
+  background: linear-gradient(135deg, #24946b 0%, #22b35c 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(34, 179, 92, 0.18) !important;
+}
 .btn-mark-ambiguous.btn-primary:hover {
   background: linear-gradient(135deg, #7c3aad 0%, #4e267d 100%) !important;
   color: #fff !important;
