@@ -7,12 +7,17 @@ function setMasteryCountBarVisible(visible) {
 // --- 完璧・あいまい・まちがえたものカウント表示 ---
 function updateMasteryCounts() {
   // デバッグ用: questionsとrecordsの中身を出力
-  // 詳細デバッグ: questions, recordsの要約を出力
+  // 詳細デバッグ: questions, recordsの要約とidマッチ状況を出力
+  const qIds = Array.isArray(questions) ? questions.map(q => q.id) : [];
+  const recordKeys = records ? Object.keys(records) : [];
+  const missingIds = qIds.filter(id => !(id in records));
   console.log('updateMasteryCounts debug:', {
-    questions_length: Array.isArray(questions) ? questions.length : 'not array',
-    questions_sample: Array.isArray(questions) ? questions.slice(0, 3) : questions,
-    records_keys: records ? Object.keys(records).slice(0, 10) : [],
-    records_sample: records ? Object.entries(records).slice(0, 3) : []
+    questions_length: qIds.length,
+    records_keys_length: recordKeys.length,
+    questions_sample: questions.slice(0, 3),
+    records_keys_sample: recordKeys.slice(0, 10),
+    missingIds_sample: missingIds.slice(0, 10),
+    missingIds_count: missingIds.length
   });
   let perfect = 0, ambiguous = 0, wrong = 0;
   for (const q of questions) {
