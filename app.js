@@ -2582,15 +2582,28 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
 
   overlay.classList.remove('hidden');
 
-  // --- 未回答モード時、回答した肢を即座にキューから除外 ---
+  // --- モードごとに、条件を満たさなくなった肢をキューから除外 ---
   try {
     const filters = session?.filters || getStudyFilters();
-    if (filters?.mode === 'unanswered' && session?.queue) {
-      // 現在の肢をキューから除外
-      session.queue = session.queue.filter(l => l.id !== limb.id);
-      // セッションが空になったら完了メッセージ
-      if (session.queue.length === 0) {
-        setTimeout(() => showCompletionMessage(), 300);
+    if (filters?.mode && session?.queue) {
+      let shouldRemove = false;
+      if (filters.mode === 'unanswered') {
+        // 未回答: 1回でも答えたら除外
+        shouldRemove = true;
+      } else if (filters.mode === 'wrong') {
+        // まちがえたもの: 不正解数が0になったら除外
+        const rec = getRecord(limb.id);
+        shouldRemove = rec.wrong === 0;
+      } else if (filters.mode === 'ambiguous') {
+        // あいまいなもの: masteryがambiguousでなくなったら除外
+        const rec = getRecord(limb.id);
+        shouldRemove = rec.mastery !== 'ambiguous';
+      }
+      if (shouldRemove) {
+        session.queue = session.queue.filter(l => l.id !== limb.id);
+        if (session.queue.length === 0) {
+          setTimeout(() => showCompletionMessage(), 300);
+        }
       }
     }
   } catch (e) { /* ignore */ }
