@@ -1,4 +1,10 @@
-﻿// --- 完璧・あいまい・まちがえたものカウント表示 ---
+﻿// ログイン・ログアウト時にカウントバー表示切替
+function setMasteryCountBarVisible(visible) {
+  const bar = document.getElementById('mastery-count-bar');
+  if (bar) bar.style.display = visible ? '' : 'none';
+}
+
+// --- 完璧・あいまい・まちがえたものカウント表示 ---
 function updateMasteryCounts() {
   let perfect = 0, ambiguous = 0, wrong = 0;
   for (const q of questions) {
@@ -17,7 +23,11 @@ function updateMasteryCounts() {
 
 // 各種データロード後や成績変更時にカウントを更新
 (function setupMasteryCountAutoUpdate() {
-  document.addEventListener('DOMContentLoaded', updateMasteryCounts);
+  document.addEventListener('DOMContentLoaded', function() {
+    // 初期状態: 非表示
+    setMasteryCountBarVisible(false);
+    updateMasteryCounts();
+  });
   // saveRecordsをラップ
   const origSaveRecords = window.saveRecords || saveRecords;
   window.saveRecords = function() {
@@ -25,7 +35,7 @@ function updateMasteryCounts() {
     updateMasteryCounts();
     return res;
   };
-  // 問題データが変わる可能性のある箇所にもフック（startSession, setLimbMastery, addRecord, loadQuestionsFromStorageがあれば）
+  // 問題データが変わる可能性のある箇所にもフック
   const origSetLimbMastery = window.setLimbMastery || setLimbMastery;
   window.setLimbMastery = function() {
     const res = origSetLimbMastery.apply(this, arguments);
@@ -39,6 +49,27 @@ function updateMasteryCounts() {
     return res;
   };
 })();
+
+// ログイン・ログアウト時のUI切替にフック
+const origShowPage = window.showPage || showPage;
+window.showPage = function(name) {
+  const res = origShowPage.apply(this, arguments);
+  if (name === 'study' || name === 'stats' || name === 'manage' || name === 'admin') {
+    setMasteryCountBarVisible(true);
+  } else {
+    setMasteryCountBarVisible(false);
+  }
+  return res;
+};
+
+// ログアウト時にも明示的に非表示
+const origLogout = window.logout || logout;
+if (typeof origLogout === 'function') {
+  window.logout = function() {
+    setMasteryCountBarVisible(false);
+    return origLogout.apply(this, arguments);
+  };
+}
 /* =========================================================
    肢別問題集 - app.js
    ========================================================= */
