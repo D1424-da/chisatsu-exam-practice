@@ -20,6 +20,33 @@ function getGoogleClientId() {
   return String(configured).trim();
 }
 
+const GOOGLE_REDIRECT_PENDING_KEY = 'limb_google_redirect_pending';
+const GOOGLE_REDIRECT_PENDING_AT_KEY = 'limb_google_redirect_pending_at';
+
+function setGoogleRedirectPending(enabled) {
+  try {
+    if (enabled) {
+      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1');
+      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_AT_KEY, String(Date.now()));
+    } else {
+      sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
+      sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_AT_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function hasRecentGoogleRedirectPending(maxAgeMs = 10 * 60 * 1000) {
+  try {
+    if (sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) !== '1') return false;
+    const at = Number(sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_AT_KEY) || 0);
+    return at > 0 && (Date.now() - at) <= maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
 async function ensureAuthPersistence() {
   try {
     const auth = firebase.auth();
@@ -30,16 +57,33 @@ async function ensureAuthPersistence() {
 }
 
 async function resolveRedirectSignInResult() {
+  const pending = hasRecentGoogleRedirectPending();
   try {
     const auth = firebase.auth();
+    await ensureAuthPersistence();
     const result = await auth.getRedirectResult();
     if (result && result.user) {
       console.log('✓ Redirect ログイン成功:', result.user.email || result.user.uid);
+      if (!auth.currentUser) {
+        try {
+          await auth.updateCurrentUser(result.user);
+        } catch (restoreErr) {
+          console.warn('Redirect ユーザーの復元に失敗:', restoreErr?.code || restoreErr);
+        }
+      }
+      setGoogleRedirectPending(false);
+      hideError('login-error');
+    } else if (pending) {
+      showError('login-error', 'Google認証後のセッション復元に失敗しました。SafariのプライベートブラウズをOFFにして再試行してください。');
     }
   } catch (error) {
     console.warn('Redirect ログイン結果の取得に失敗:', error?.code || error);
     if (String(error?.code || '').startsWith('auth/')) {
       showError('login-error', getGoogleAuthErrorMessage(error));
+    }
+  } finally {
+    if (!hasRecentGoogleRedirectPending()) {
+      setGoogleRedirectPending(false);
     }
   }
 }
@@ -308,12 +352,14 @@ async function handleGoogleSignIn() {
 
     if (shouldUseRedirectForGoogleSignIn()) {
       showError('login-error', 'スマホ環境のため、Googleログイン画面へ移動します...');
+      setGoogleRedirectPending(true);
       await auth.signInWithRedirect(provider);
       return;
     }
 
     const result = await auth.signInWithPopup(provider);
     console.log('✓ Google ログイン成功:', result.user.email);
+    setGoogleRedirectPending(false);
     
     // 新規ユーザーの場合、Firestore に情報を保存
     const db = firebase.firestore();
@@ -336,6 +382,7 @@ async function handleGoogleSignIn() {
         const provider = new firebase.auth.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
         showError('login-error', getGoogleAuthErrorMessage(error));
+        setGoogleRedirectPending(true);
         await auth.signInWithRedirect(provider);
         return;
       } catch (redirectErr) {
@@ -573,6 +620,7 @@ function setupAuthStateListener() {
 
     if (user) {
       console.log('✓ ユーザーはログイン中:', user.email);
+      setGoogleRedirectPending(false);
 
       setLocalAdminAuthenticated(false);
       
@@ -622,6 +670,7 @@ function setupAuthStateListener() {
       if (btnLogout) btnLogout.textContent = 'ログアウト';
     } else {
       console.log('✗ ユーザーはログインしていません');
+      const pendingGoogleRedirect = hasRecentGoogleRedirectPending();
       if (typeof stopCloudRealtimeSubscriptions === 'function') {
         stopCloudRealtimeSubscriptions();
       }
@@ -644,6 +693,12 @@ function setupAuthStateListener() {
 
       if (userNameEl) userNameEl.textContent = canManage ? '管理者' : 'ゲスト';
       if (btnLogout) btnLogout.textContent = 'ログイン';
+
+      if (pendingGoogleRedirect) {
+        if (overlayEl) overlayEl.classList.remove('hidden');
+        showError('login-error', 'Google認証後にログイン状態を保持できませんでした。SafariのプライベートブラウズをOFFにして再試行してください。');
+      }
+
       if (canManage && typeof showPage === 'function') showPage('admin');
       if (!canManage && typeof showPage === 'function') showPage('study');
     }
