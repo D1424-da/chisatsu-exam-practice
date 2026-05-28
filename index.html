@@ -129,12 +129,14 @@
             <label for="filter-mode">出題モード</label>
             <select id="filter-mode">
               <option value="all">全問ランダム</option>
+              <option value="priority">優先復習</option>
               <option value="weak">苦手優先</option>
               <option value="due">復習優先（忘却曲線）</option>
               <option value="unanswered">未回答のみ</option>
               <option value="wrong">間違えたもの</option>
               <option value="ambiguous">あいまいなもの</option>
               <option value="perfect">完璧なもの</option>
+              <option value="bookmarked">ブックマーク</option>
             </select>
           </div>
           <div class="study-actions">
@@ -148,6 +150,18 @@
             <div id="progress-bar" class="progress-bar-inner" style="width:0%"></div>
           </div>
           <button id="btn-end-session" class="btn btn-ghost btn-sm">終了</button>
+        </div>
+      </section>
+
+      <section id="study-goal-panel" class="card study-goal-panel">
+        <div class="study-goal-left">
+          <strong>今日の目標</strong>
+          <div id="today-goal-progress" class="study-goal-progress">0 / 0 肢</div>
+          <div id="study-streak" class="study-streak">連続学習: 0日</div>
+        </div>
+        <div class="study-goal-right">
+          <input id="study-goal-value" type="number" min="1" max="500" class="search-input" placeholder="例: 30" />
+          <button id="btn-save-goal" class="btn btn-ghost btn-sm" type="button">目標保存</button>
         </div>
       </section>
 

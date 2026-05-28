@@ -33,12 +33,14 @@ function updateMasteryCounts() {
     // 初期状態: 非表示
     setMasteryCountBarVisible(false);
     updateMasteryCounts();
+    renderStudyGoalPanel();
   });
   // saveRecordsをラップ
   const origSaveRecords = window.saveRecords || saveRecords;
   window.saveRecords = function() {
     const res = origSaveRecords.apply(this, arguments);
     updateMasteryCounts();
+    renderStudyGoalPanel();
     return res;
   };
   // 問題データが変わる可能性のある箇所にもフック
@@ -46,12 +48,14 @@ function updateMasteryCounts() {
   window.setLimbMastery = function() {
     const res = origSetLimbMastery.apply(this, arguments);
     updateMasteryCounts();
+    renderStudyGoalPanel();
     return res;
   };
   const origAddRecord = window.addRecord || addRecord;
   window.addRecord = function() {
     const res = origAddRecord.apply(this, arguments);
     updateMasteryCounts();
+    renderStudyGoalPanel();
     return res;
   };
 })();
@@ -85,6 +89,7 @@ if (typeof origLogout === 'function') {
  const KEY_QUESTIONS   = 'limb_questions';
 const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<uid>
 const KEY_RECORDS_META = 'limb_records_meta'; // パーユーザーキー: limb_records_meta_<uid>
+const KEY_STUDY_GOAL = 'limb_study_goal';
 const KEY_STUDY_TIME  = 'limb_study_time'; // パーユーザーキー: limb_study_time_<uid>
 const KEY_STUDY_CALENDAR = 'limb_study_calendar'; // パーユーザーキー: limb_study_calendar_<uid>
 const KEY_STUDY_SESSION = 'limb_study_session'; // パーユーザーキー: limb_study_session_<uid>
@@ -652,7 +657,9 @@ function normalizeRecordMap(map) {
       wrongDateKeys: normalizeWrongDateKeys(stat?.wrongDateKeys),
       review: normalizeReviewState(stat?.review),
       mastery: stat?.mastery === 'perfect' ? 'perfect' : stat?.mastery === 'ambiguous' ? 'ambiguous' : '',
-      masteryUpdatedAtMs: Math.max(0, Number(stat?.masteryUpdatedAtMs || 0))
+      masteryUpdatedAtMs: Math.max(0, Number(stat?.masteryUpdatedAtMs || 0)),
+      note: String(stat?.note || '').slice(0, 1000),
+      bookmarked: !!stat?.bookmarked
     };
   }
   return out;
@@ -694,10 +701,63 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
       ]),
       review,
       mastery: mastery.mastery,
-      masteryUpdatedAtMs: mastery.masteryUpdatedAtMs
+      masteryUpdatedAtMs: mastery.masteryUpdatedAtMs,
+      note: String(remote[id]?.note || local[id]?.note || '').slice(0, 1000),
+      bookmarked: !!(local[id]?.bookmarked || remote[id]?.bookmarked)
     };
   }
   return merged;
+}
+
+function getStudyGoalStorageKey(uid = getAuthUid()) {
+  return uid ? `${KEY_STUDY_GOAL}_${uid}` : KEY_STUDY_GOAL;
+}
+
+function loadStudyGoal(uid = getAuthUid()) {
+  try {
+    const v = Number(storageGetItem(getStudyGoalStorageKey(uid)) || 30);
+    return Math.min(500, Math.max(1, Math.floor(v || 30)));
+  } catch {
+    return 30;
+  }
+}
+
+function saveStudyGoal(value, uid = getAuthUid()) {
+  const v = Math.min(500, Math.max(1, Math.floor(Number(value) || 30)));
+  storageSetItem(getStudyGoalStorageKey(uid), String(v));
+  return v;
+}
+
+function calcStudyStreak() {
+  let streak = 0;
+  const daily = studyCalendar?.dailyCounts || {};
+  const today = new Date();
+  for (let i = 0; i < 3650; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const key = toDateKey(d);
+    const count = Math.max(0, Number(daily[key] || 0));
+    if (count > 0) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function renderStudyGoalPanel() {
+  const panel = document.getElementById('study-goal-panel');
+  const progressEl = document.getElementById('today-goal-progress');
+  const streakEl = document.getElementById('study-streak');
+  const goalInput = document.getElementById('study-goal-value');
+  if (!panel || !progressEl || !streakEl || !goalInput) return;
+
+  const goal = loadStudyGoal();
+  goalInput.value = String(goal);
+  const todayKey = toDateKey();
+  const todayCount = Math.max(0, Math.floor(Number(studyCalendar?.dailyCounts?.[todayKey] || 0)));
+  progressEl.textContent = `${todayCount} / ${goal} 肢`;
+  streakEl.textContent = `連続学習: ${calcStudyStreak()}日`;
 }
 
 async function pullQuestionsFromCloudIfNeeded() {
@@ -2103,7 +2163,9 @@ function getRecord(limbId) {
     wrongDateKeys: [],
     review: normalizeReviewState(null),
     mastery: '',
-    masteryUpdatedAtMs: 0
+    masteryUpdatedAtMs: 0,
+    note: '',
+    bookmarked: false
   };
 }
 
@@ -2113,7 +2175,7 @@ function isPerfectLimb(limbId) {
 
 function setLimbMastery(limbId, mastery) {
   if (!records[limbId]) {
-    records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0 };
+    records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0, note: '', bookmarked: false };
   }
   const nextMastery = mastery === 'perfect' ? 'perfect' : mastery === 'ambiguous' ? 'ambiguous' : '';
   records[limbId].mastery = nextMastery;
@@ -2122,7 +2184,7 @@ function setLimbMastery(limbId, mastery) {
 }
 
 function addRecord(limbId, isCorrect) {
-  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0 };
+  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0, note: '', bookmarked: false };
   if (isCorrect) records[limbId].correct++;
   else {
     records[limbId].wrong++;
@@ -2152,6 +2214,32 @@ function addRecord(limbId, isCorrect) {
     recordsPendingSync = true;
     pushRecordsToCloud();
   }
+}
+
+function setLimbNote(limbId, note) {
+  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0, note: '', bookmarked: false };
+  records[limbId].note = String(note || '').slice(0, 1000);
+  saveRecords();
+}
+
+function toggleLimbBookmark(limbId) {
+  if (!records[limbId]) records[limbId] = { correct: 0, wrong: 0, wrongDateKeys: [], review: normalizeReviewState(null), mastery: '', masteryUpdatedAtMs: 0, note: '', bookmarked: false };
+  records[limbId].bookmarked = !records[limbId].bookmarked;
+  saveRecords();
+  return records[limbId].bookmarked;
+}
+
+function priorityReviewScore(limbId, nowMs = Date.now()) {
+  const r = getRecord(limbId);
+  const total = r.correct + r.wrong;
+  let s = 0;
+  s += r.wrong * 3;
+  if (r.mastery === 'ambiguous') s += 2;
+  if (r.bookmarked) s += 2;
+  if (total === 0) s += 1;
+  if (isDueForReview(limbId, nowMs)) s += 2;
+  s += weakScore(limbId) * 5;
+  return s;
 }
 
 function makeInlineRecordId(limbId, key) {
@@ -2318,6 +2406,7 @@ async function showPage(name) {
   if (name === 'study') {
     if (getAuthUid()) pullRecordsFromCloudIfNeeded(true);
     renderStudyCalendar();
+    renderStudyGoalPanel();
   }
   if (name === 'manage') { renderManage(); renderUsers(); updateFileStatus(); }
 }
@@ -2389,6 +2478,10 @@ function startSession() {
   } else if (mode === 'ambiguous') {
     limbs = limbs.filter(l => getRecord(l.id).mastery === 'ambiguous');
     limbs = shuffle(limbs);
+  } else if (mode === 'bookmarked') {
+    limbs = limbs.filter(l => !!getRecord(l.id).bookmarked);
+  } else if (mode === 'priority') {
+    // 下の分岐でスコア順に整列する
   } else {
     limbs = limbs.filter(l => !isPerfectLimb(l.id));
   }
@@ -2408,6 +2501,13 @@ function startSession() {
     limbs = shuffle(limbs);
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => getRecord(l.id).wrong > 0);
+    limbs = shuffle(limbs);
+  } else if (mode === 'priority') {
+    const nowMs = Date.now();
+    limbs = limbs
+      .filter(l => !isPerfectLimb(l.id) || getRecord(l.id).bookmarked)
+      .sort((a, b) => priorityReviewScore(b.id, nowMs) - priorityReviewScore(a.id, nowMs));
+  } else if (mode === 'bookmarked') {
     limbs = shuffle(limbs);
   } else if (mode === 'ambiguous') {
     // already filtered above
@@ -2525,6 +2625,15 @@ function renderCurrentLimb() {
       </div>
     `;
 
+  const bookmarkLabel = rec.bookmarked ? '★ ブックマーク済み' : '☆ ブックマーク';
+  const noteSectionHtml = `
+    <div class="limb-tools">
+      <button id="btn-bookmark-limb" class="btn btn-ghost btn-sm" type="button">${bookmarkLabel}</button>
+      <textarea id="limb-note-input" class="limb-note-input" rows="2" placeholder="この肢のメモ（任意）">${esc(rec.note || '')}</textarea>
+      <button id="btn-save-limb-note" class="btn btn-ghost btn-sm" type="button">メモ保存</button>
+    </div>
+  `;
+
   const area = document.getElementById('limb-area');
   area.innerHTML = `
     <div class="limb-card card">
@@ -2532,9 +2641,27 @@ function renderCurrentLimb() {
       ${limb.questionText ? `<div class="question-shared"><span class="question-label">問題文</span><span class="question-body">${esc(limb.questionText)}</span></div>` : ''}
       <div class="limb-text">${inlineTextHtml}</div>
       <div class="limb-record">${rate !== null ? `正答率 ${rate}% (${rec.correct}○ ${rec.wrong}×)` : '未回答'}</div>
+      ${noteSectionHtml}
       ${answerSectionHtml}
     </div>
   `;
+
+  const btnBookmark = document.getElementById('btn-bookmark-limb');
+  const btnSaveNote = document.getElementById('btn-save-limb-note');
+  const noteInput = document.getElementById('limb-note-input');
+  if (btnBookmark) {
+    btnBookmark.addEventListener('click', () => {
+      const flagged = toggleLimbBookmark(limb.id);
+      btnBookmark.textContent = flagged ? '★ ブックマーク済み' : '☆ ブックマーク';
+    });
+  }
+  if (btnSaveNote && noteInput) {
+    btnSaveNote.addEventListener('click', () => {
+      setLimbNote(limb.id, noteInput.value);
+      btnSaveNote.textContent = '保存済み';
+      setTimeout(() => { btnSaveNote.textContent = 'メモ保存'; }, 1000);
+    });
+  }
 
   if (isInlineOxQuestion) {
     startStudyTimerIfNeeded(true);
@@ -3289,11 +3416,13 @@ function renderStats() {
       <span class="weak-rank">${i + 1}</span>
       <div class="weak-limb-info">
         <div class="weak-limb-text">${esc(limb.text.slice(0, 80))}${limb.text.length > 80 ? '…' : ''}</div>
-        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(limb.category) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${esc(wrongDateInfo)}</div>
+        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(limb.category) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${r.bookmarked ? ' / ★' : ''}${esc(wrongDateInfo)}</div>
       </div>
     </div>`;
   }).join('');
   document.getElementById('weak-limbs-list').innerHTML = weakHtml || '<p>苦手肢なし</p>';
+
+  renderStudyGoalPanel();
 }
 
 function getRecentDailyStudyCounts(days = 14) {
@@ -3482,6 +3611,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-start').addEventListener('click', startSession);
   document.getElementById('btn-resume-session').addEventListener('click', restoreLastStudySession);
   document.getElementById('btn-end-session').addEventListener('click', endSession);
+
+  const goalInput = document.getElementById('study-goal-value');
+  const saveGoalBtn = document.getElementById('btn-save-goal');
+  if (goalInput) {
+    goalInput.value = String(loadStudyGoal());
+  }
+  if (saveGoalBtn && goalInput) {
+    saveGoalBtn.addEventListener('click', () => {
+      const v = saveStudyGoal(goalInput.value);
+      goalInput.value = String(v);
+      renderStudyGoalPanel();
+    });
+  }
 
   const countPerfectBtn = document.getElementById('count-perfect');
   const countAmbiguousBtn = document.getElementById('count-ambiguous');
