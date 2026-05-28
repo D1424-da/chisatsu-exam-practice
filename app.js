@@ -773,6 +773,7 @@ async function pullQuestionsFromCloudIfNeeded() {
     console.warn('クラウド問題データ同期(取得)エラー:', e);
   } finally {
     cloudPullInFlight = false;
+    if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
   }
 }
 
@@ -1037,6 +1038,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     console.warn('クラウド成績データ同期(取得)エラー:', e);
   } finally {
     cloudRecordsPullInFlight = false;
+    if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
   }
 }
 
