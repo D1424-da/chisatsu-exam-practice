@@ -2460,8 +2460,9 @@ function renderCurrentLimb() {
   if (!session) return;
   const { queue, index } = session;
 
-  // 進捗更新
-  document.getElementById('progress-text').textContent = `${index + 1} / ${queue.length}`;
+  // 進捗更新（残り問題数のみ表示）
+  const remaining = queue.length - index;
+  document.getElementById('progress-text').textContent = `${remaining}`;
   const pct = ((index + 1) / queue.length * 100).toFixed(1);
   document.getElementById('progress-bar').style.width = pct + '%';
   saveStudySessionSnapshot();
