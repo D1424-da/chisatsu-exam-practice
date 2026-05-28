@@ -6,6 +6,11 @@ function setMasteryCountBarVisible(visible) {
 
 // --- 完璧・あいまい・まちがえたものカウント表示 ---
 function updateMasteryCounts() {
+  // デバッグ用: questionsとrecordsの中身を出力
+  console.log('updateMasteryCounts debug:', {
+    questions,
+    records
+  });
   let perfect = 0, ambiguous = 0, wrong = 0;
   for (const q of questions) {
     const rec = getRecord(q.id);
