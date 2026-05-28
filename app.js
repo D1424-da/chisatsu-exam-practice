@@ -8,27 +8,37 @@ function setMasteryCountBarVisible(visible) {
 function updateMasteryCounts() {
   // デバッグ用: questionsとrecordsの中身を出力
   // 詳細デバッグ: questions, recordsの要約とidマッチ状況を出力
-  const qIds = Array.isArray(questions) ? questions.map(q => q.id) : [];
+  // --- 肢単位でカウント・突合 ---
+  let limbCount = 0, perfect = 0, ambiguous = 0, wrong = 0;
+  const limbIds = [];
+  if (Array.isArray(questions)) {
+    for (const q of questions) {
+      if (Array.isArray(q.limbs)) {
+        for (const limb of q.limbs) {
+          limbCount++;
+          limbIds.push(limb.id);
+          const rec = getRecord(limb.id);
+          if (rec.mastery === 'perfect') perfect++;
+          if (rec.mastery === 'ambiguous') ambiguous++;
+          if (rec.wrong > 0) wrong++;
+        }
+      }
+    }
+  }
   const recordKeys = records ? Object.keys(records) : [];
-  const missingIds = qIds.filter(id => !(id in records));
-  const orphanRecordIds = recordKeys.filter(id => !qIds.includes(id));
+  const missingIds = limbIds.filter(id => !(id in records));
+  const orphanRecordIds = recordKeys.filter(id => !limbIds.includes(id));
   console.log('updateMasteryCounts debug:', {
-    questions_length: qIds.length,
+    limbCount,
     records_keys_length: recordKeys.length,
-    questions_sample: questions.slice(0, 3),
+    limbIds_sample: limbIds.slice(0, 10),
     records_keys_sample: recordKeys.slice(0, 10),
     missingIds_sample: missingIds.slice(0, 10),
     missingIds_count: missingIds.length,
     orphanRecordIds_sample: orphanRecordIds.slice(0, 10),
-    orphanRecordIds_count: orphanRecordIds.length
+    orphanRecordIds_count: orphanRecordIds.length,
+    perfect, ambiguous, wrong
   });
-  let perfect = 0, ambiguous = 0, wrong = 0;
-  for (const q of questions) {
-    const rec = getRecord(q.id);
-    if (rec.mastery === 'perfect') perfect++;
-    if (rec.mastery === 'ambiguous') ambiguous++;
-    if (rec.wrong > 0) wrong++;
-  }
   const elPerfect = document.getElementById('count-perfect');
   const elAmbiguous = document.getElementById('count-ambiguous');
   const elWrong = document.getElementById('count-wrong');
