@@ -11,13 +11,16 @@ function updateMasteryCounts() {
   const qIds = Array.isArray(questions) ? questions.map(q => q.id) : [];
   const recordKeys = records ? Object.keys(records) : [];
   const missingIds = qIds.filter(id => !(id in records));
+  const orphanRecordIds = recordKeys.filter(id => !qIds.includes(id));
   console.log('updateMasteryCounts debug:', {
     questions_length: qIds.length,
     records_keys_length: recordKeys.length,
     questions_sample: questions.slice(0, 3),
     records_keys_sample: recordKeys.slice(0, 10),
     missingIds_sample: missingIds.slice(0, 10),
-    missingIds_count: missingIds.length
+    missingIds_count: missingIds.length,
+    orphanRecordIds_sample: orphanRecordIds.slice(0, 10),
+    orphanRecordIds_count: orphanRecordIds.length
   });
   let perfect = 0, ambiguous = 0, wrong = 0;
   for (const q of questions) {
