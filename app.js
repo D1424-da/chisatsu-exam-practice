@@ -2674,9 +2674,26 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
     btnNext.disabled = true;
     overlay.dataset.requireMastery = '1';
 
+    // 毎回ベース状態を初期化（前回の選択状態を引きずらない）
+    btnPerfect.classList.add('btn-primary');
+    btnPerfect.classList.remove('btn-ghost');
+    btnAmbiguous.classList.add('btn-ghost');
+    btnAmbiguous.classList.remove('btn-primary');
+
     const currentMastery = getRecord(limb.id).mastery;
     btnPerfect.classList.toggle('is-selected', currentMastery === 'perfect');
     btnAmbiguous.classList.toggle('is-selected', currentMastery === 'ambiguous');
+    if (currentMastery === 'perfect') {
+      btnPerfect.classList.add('btn-primary');
+      btnPerfect.classList.remove('btn-ghost');
+      btnAmbiguous.classList.add('btn-ghost');
+      btnAmbiguous.classList.remove('btn-primary');
+    } else if (currentMastery === 'ambiguous') {
+      btnPerfect.classList.add('btn-ghost');
+      btnPerfect.classList.remove('btn-primary');
+      btnAmbiguous.classList.add('btn-primary');
+      btnAmbiguous.classList.remove('btn-ghost');
+    }
 
     // モーダル背景色切り替え
     const modalBox = overlay.querySelector('.modal');
@@ -2688,30 +2705,30 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
     }
 
     // --- 完璧・あいまいボタンのhover挙動ログ ---
-    btnPerfect.addEventListener('mouseenter', () => {
+    btnPerfect.onmouseenter = () => {
       console.log('[hover] 完璧ボタン mouseenter', {
         classList: [...btnPerfect.classList],
         mastery: getRecord(limb.id).mastery
       });
-    });
-    btnPerfect.addEventListener('mouseleave', () => {
+    };
+    btnPerfect.onmouseleave = () => {
       console.log('[hover] 完璧ボタン mouseleave', {
         classList: [...btnPerfect.classList],
         mastery: getRecord(limb.id).mastery
       });
-    });
-    btnAmbiguous.addEventListener('mouseenter', () => {
+    };
+    btnAmbiguous.onmouseenter = () => {
       console.log('[hover] あいまいボタン mouseenter', {
         classList: [...btnAmbiguous.classList],
         mastery: getRecord(limb.id).mastery
       });
-    });
-    btnAmbiguous.addEventListener('mouseleave', () => {
+    };
+    btnAmbiguous.onmouseleave = () => {
       console.log('[hover] あいまいボタン mouseleave', {
         classList: [...btnAmbiguous.classList],
         mastery: getRecord(limb.id).mastery
       });
-    });
+    };
   } else if (masteryActions && btnPerfect && btnAmbiguous) {
     masteryActions.classList.add('hidden');
     btnPerfect.classList.remove('is-selected');
