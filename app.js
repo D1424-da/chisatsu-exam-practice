@@ -2562,10 +2562,22 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
     const currentMastery = getRecord(limb.id).mastery;
     btnPerfect.classList.toggle('is-selected', currentMastery === 'perfect');
     btnAmbiguous.classList.toggle('is-selected', currentMastery === 'ambiguous');
+
+    // モーダル背景色切り替え
+    const modalBox = overlay.querySelector('.modal');
+    modalBox.classList.remove('bg-perfect', 'bg-ambiguous');
+    if (currentMastery === 'perfect') {
+      modalBox.classList.add('bg-perfect');
+    } else if (currentMastery === 'ambiguous') {
+      modalBox.classList.add('bg-ambiguous');
+    }
   } else if (masteryActions && btnPerfect && btnAmbiguous) {
     masteryActions.classList.add('hidden');
     btnPerfect.classList.remove('is-selected');
     btnAmbiguous.classList.remove('is-selected');
+    // モーダル背景色リセット
+    const modalBox = overlay.querySelector('.modal');
+    modalBox.classList.remove('bg-perfect', 'bg-ambiguous');
   }
 
   overlay.classList.remove('hidden');
@@ -3344,6 +3356,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-result-next').disabled = false;
     document.getElementById('btn-mark-perfect').classList.add('is-selected');
     document.getElementById('btn-mark-ambiguous').classList.remove('is-selected');
+    // モーダル背景色切り替え
+    const modalBox = modal.querySelector('.modal');
+    modalBox.classList.add('bg-perfect');
+    modalBox.classList.remove('bg-ambiguous');
   });
 
   document.getElementById('btn-mark-ambiguous').addEventListener('click', () => {
@@ -3355,6 +3371,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-result-next').disabled = false;
     document.getElementById('btn-mark-perfect').classList.remove('is-selected');
     document.getElementById('btn-mark-ambiguous').classList.add('is-selected');
+    // モーダル背景色切り替え
+    const modalBox = modal.querySelector('.modal');
+    modalBox.classList.add('bg-ambiguous');
+    modalBox.classList.remove('bg-perfect');
   });
 
   document.getElementById('btn-result-next').addEventListener('click', () => {
