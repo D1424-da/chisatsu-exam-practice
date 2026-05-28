@@ -604,6 +604,8 @@ body {
 
 .result-mastery-actions .btn.is-selected {
   box-shadow: 0 0 0 2px rgba(44, 148, 107, .25) inset;
+  background: #f7e9ff;
+  color: #7c3aad;
 }
 
 /* ─── 成績ページ ─────────────────────────────────────────── */
