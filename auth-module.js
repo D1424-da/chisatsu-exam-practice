@@ -186,51 +186,6 @@ function shouldUseRedirectForGoogleSignIn() {
   }
 }
 
-const LOCAL_ADMIN_AUTH_KEY = 'limb_local_admin_auth';
-
-function isLocalAdminAuthenticated() {
-  try {
-    return sessionStorage.getItem(LOCAL_ADMIN_AUTH_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function setLocalAdminAuthenticated(enabled) {
-  try {
-    if (enabled) sessionStorage.setItem(LOCAL_ADMIN_AUTH_KEY, '1');
-    else sessionStorage.removeItem(LOCAL_ADMIN_AUTH_KEY);
-  } catch {
-    // ignore
-  }
-}
-
-function startLocalAdminSession() {
-  setLocalAdminAuthenticated(true);
-  if (typeof loadData === 'function') loadData();
-  if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
-  const loginOverlay = document.getElementById('login-overlay');
-  if (loginOverlay) loginOverlay.classList.add('hidden');
-  closeAdminLoginOverlay();
-  updateAdminNavAvailability(true);
-  updateManageNavAvailability(true);
-
-  const userNameEl = document.getElementById('current-user-name');
-  const btnLogout = document.getElementById('btn-logout');
-  if (userNameEl) userNameEl.textContent = '管理者';
-  if (btnLogout) btnLogout.textContent = 'ログアウト';
-  if (typeof showPage === 'function') showPage('admin');
-}
-
-function matchesConfiguredAdminId(input) {
-  const normalized = String(input || '').trim().toLowerCase();
-  if (!normalized) return false;
-
-  const adminId = String(window.APP_CONFIG?.adminLoginId || 'admin').trim().toLowerCase();
-  const adminEmail = String(window.APP_CONFIG?.adminLoginEmail || '').trim().toLowerCase();
-  return normalized === adminId || (!!adminEmail && normalized === adminEmail);
-}
-
 // ===== ログイン処理 =====
 async function handleEmailLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -246,11 +201,6 @@ async function handleEmailLogin() {
     document.getElementById('btn-login').disabled = true;
     await ensureAuthPersistence();
 
-    if (matchesConfiguredAdminId(email) && password === getAdminLoginPassword()) {
-      startLocalAdminSession();
-      return;
-    }
-    
     const auth = firebase.auth();
     const result = await auth.signInWithEmailAndPassword(email, password);
     console.log('✓ ログイン成功:', result.user.email);
@@ -426,17 +376,6 @@ async function handleLogout() {
   try {
     const auth = firebase.auth();
     if (!auth.currentUser) {
-      if (isLocalAdminAuthenticated()) {
-        setLocalAdminAuthenticated(false);
-        updateAdminNavAvailability(false);
-        updateManageNavAvailability(false);
-        const userNameEl = document.getElementById('current-user-name');
-        const btnLogout = document.getElementById('btn-logout');
-        if (userNameEl) userNameEl.textContent = 'ゲスト';
-        if (btnLogout) btnLogout.textContent = 'ログイン';
-        if (typeof showPage === 'function') showPage('study');
-        return;
-      }
       switchAuthForm('login');
       const overlay = document.getElementById('login-overlay');
       if (overlay) overlay.classList.remove('hidden');
@@ -515,11 +454,6 @@ function openAdminLoginOverlay() {
   const overlay = document.getElementById('admin-login-overlay');
   if (!overlay) return;
 
-  if (isLocalAdminAuthenticated()) {
-    if (typeof showPage === 'function') showPage('admin');
-    return;
-  }
-
   const auth = firebase.auth();
   const current = auth.currentUser;
   if (current && typeof isAdminUser === 'function') {
@@ -547,23 +481,8 @@ function closeAdminLoginOverlay() {
   hideError('admin-login-error');
 }
 
-function getAdminLoginId() {
-  return String(window.APP_CONFIG?.adminLoginId || 'admin').trim();
-}
-
-function getAdminLoginPassword() {
-  return String(window.APP_CONFIG?.adminLoginPassword || '123456');
-}
-
 function resolveAdminLoginEmail(inputId) {
   const raw = String(inputId || '').trim();
-  const adminId = getAdminLoginId();
-  if (raw.toLowerCase() === adminId.toLowerCase()) {
-    const configuredEmail = String(window.APP_CONFIG?.adminLoginEmail || '').trim();
-    if (configuredEmail) return configuredEmail;
-    const configured = Array.isArray(window.APP_CONFIG?.adminEmails) ? window.APP_CONFIG.adminEmails : [];
-    return String(configured[0] || '').trim();
-  }
   return raw;
 }
 
@@ -581,25 +500,11 @@ async function handleAdminLogin() {
     hideError('admin-login-error');
     if (btn) btn.disabled = true;
 
-    const adminId = getAdminLoginId();
-    const usingAdminId = username.toLowerCase() === adminId.toLowerCase();
-    if (usingAdminId && password !== getAdminLoginPassword()) {
-      showError('admin-login-error', 'パスワードが正しくありません');
-      return;
-    }
-
-    if (usingAdminId) {
-      startLocalAdminSession();
-      return;
-    }
-
     const loginEmail = resolveAdminLoginEmail(username);
     if (!loginEmail || !loginEmail.includes('@')) {
-      showError('admin-login-error', '管理者IDが正しく設定されていません');
+      showError('admin-login-error', '管理者メールアドレスを入力してください');
       return;
     }
-
-    setLocalAdminAuthenticated(false);
 
     const auth = firebase.auth();
     const result = await auth.signInWithEmailAndPassword(loginEmail, password);
@@ -631,7 +536,6 @@ async function handleAdminLogin() {
 
 window.openAdminLoginOverlay = openAdminLoginOverlay;
 window.closeAdminLoginOverlay = closeAdminLoginOverlay;
-window.isLocalAdminAuthenticated = isLocalAdminAuthenticated;
 window.updateAdminNavAvailability = updateAdminNavAvailability;
 
 // ===== 認証状態の監視 =====
@@ -648,8 +552,6 @@ function setupAuthStateListener() {
       console.log('✓ ユーザーはログイン中:', user.email);
       setGoogleRedirectPending(false);
 
-      setLocalAdminAuthenticated(false);
-      
       // ログインオーバーレイを隠す
       if (overlayEl) overlayEl.classList.add('hidden');
       if (appEl) appEl.classList.remove('hidden');
@@ -722,7 +624,7 @@ function setupAuthStateListener() {
       if (typeof syncBundledQuestions === 'function') await syncBundledQuestions();
       if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
       updateStatsNavAvailability(false);
-      const canManage = isLocalAdminAuthenticated();
+      const canManage = false;
       updateAdminNavAvailability(canManage);
       updateManageNavAvailability(canManage);
 

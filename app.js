@@ -533,10 +533,6 @@ function getAuthUid() {
 }
 
 function isAdminUser(user = getActiveUser()) {
-  if (typeof window.isLocalAdminAuthenticated === 'function' && window.isLocalAdminAuthenticated()) {
-    return true;
-  }
-
   const email = String(user?.email || '').trim().toLowerCase();
   if (!email) return false;
   const configured = Array.isArray(window.APP_CONFIG?.adminEmails) ? window.APP_CONFIG.adminEmails : [];
@@ -2109,27 +2105,21 @@ function hideLoginOverlay() {
 }
 
 function renderUsers() {
-  const users = getUsers();
-  const activeId = getActiveUserId();
-  const html = users.map(u => `
-    <div class="user-row">
-      <span class="user-row-name">${esc(u.name)}${u.id === activeId ? ' <span class="badge-you">あなた</span>' : ''}</span>
-      ${u.id === activeId
-        ? `<button class="btn btn-ghost btn-sm" onclick="showChangePwForm()">パスワード変更</button>`
-        : `<button class="btn btn-danger btn-sm" onclick="deleteUserById('${esc(u.id)}')">\u524a\u9664</button>`}
-    </div>
-  `).join('');
-  document.getElementById('user-list').innerHTML = html || '<p class="users-empty">ユーザーなし</p>';
+  const box = document.getElementById('user-list');
+  if (!box) return;
+  box.innerHTML = '<p class="users-empty">ユーザー管理は Firebase Authentication 管理へ移行しました。ユーザー追加・削除は Firebase Console で実施してください。</p>';
+
+  const addUserBtn = document.getElementById('btn-show-add-user');
+  if (addUserBtn) addUserBtn.classList.add('hidden');
+  const addUserForm = document.getElementById('add-user-form');
+  if (addUserForm) addUserForm.classList.add('hidden');
+  const changePwForm = document.getElementById('change-pw-form');
+  if (changePwForm) changePwForm.classList.add('hidden');
 }
 
 function deleteUserById(id) {
-  const users = getUsers();
-  const user = users.find(u => u.id === id);
-  if (!user) return;
-  if (!confirm(`「${user.name}」を削除しますか？学習記録も削除されます。`)) return;
-  saveUsers(users.filter(u => u.id !== id));
-  storageRemoveItem(`${KEY_RECORDS}_${id}`);
-  renderUsers();
+  void id;
+  alert('ユーザー削除は Firebase Console から実施してください。');
 }
 
 // ── パスワードリセット・変更 ─────────────────────────────────────
@@ -3317,6 +3307,10 @@ function buildInlineOxResultHtml(items, expected, userAnswers) {
 
 // ── インポート / エクスポート ──────────────────────────────────
 function exportJSON() {
+  if (!isAdminUser()) {
+    alert('JSONエクスポートは管理者のみ実行できます。');
+    return;
+  }
   const blob = new Blob([JSON.stringify(questions, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -3327,10 +3321,19 @@ function exportJSON() {
 }
 
 function importJSON(file) {
+  if (!isAdminUser()) {
+    alert('JSONインポートは管理者のみ実行できます。');
+    return;
+  }
   return importJSONFiles([file]);
 }
 
 function importJSONFiles(files) {
+  if (!isAdminUser()) {
+    alert('JSONインポートは管理者のみ実行できます。');
+    return;
+  }
+
   const readFile = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -3522,54 +3525,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // パスワードリセットは Firebase 版 UI/auth-module.js 側で処理
 
-  // ユーザー追加フォーム
-  document.getElementById('btn-show-add-user').addEventListener('click', () => {
-    document.getElementById('new-user-name').value = '';
-    document.getElementById('new-user-pw').value = '';
-    document.getElementById('new-user-pw2').value = '';
-    document.getElementById('add-user-error').classList.add('hidden');
-    document.getElementById('add-user-form').classList.remove('hidden');
-    document.getElementById('new-user-name').focus();
-  });
-  document.getElementById('btn-cancel-add-user').addEventListener('click', () => {
-    document.getElementById('add-user-form').classList.add('hidden');
-  });
-  document.getElementById('btn-add-user').addEventListener('click', async () => {
-    const name  = document.getElementById('new-user-name').value.trim();
-    const pw    = document.getElementById('new-user-pw').value;
-    const pw2   = document.getElementById('new-user-pw2').value;
-    const errEl = document.getElementById('add-user-error');
-    errEl.classList.add('hidden');
-    if (!name)         { errEl.textContent = 'ユーザー名を入力してください'; errEl.classList.remove('hidden'); return; }
-    if (pw.length < 4) { errEl.textContent = 'パスワードは4文字以上'; errEl.classList.remove('hidden'); return; }
-    if (pw !== pw2)    { errEl.textContent = 'パスワードが一致しません'; errEl.classList.remove('hidden'); return; }
-    const users = getUsers();
-    if (users.find(u => u.name === name)) { errEl.textContent = 'そのユーザー名は既に使用中です'; errEl.classList.remove('hidden'); return; }
-    users.push({ id: uid(), name, pwHash: await hashPassword(pw) });
-    saveUsers(users);
-    document.getElementById('add-user-form').classList.add('hidden');
-    renderUsers();
-  });
+  // ローカルユーザー管理は段階廃止（Firebase Auth 管理へ移行）
+  const addUserBtn = document.getElementById('btn-show-add-user');
+  if (addUserBtn) {
+    addUserBtn.addEventListener('click', () => {
+      alert('ユーザー追加は Firebase Console から実施してください。');
+    });
+    addUserBtn.classList.add('hidden');
+  }
 
-  // パスワード変更
-  document.getElementById('btn-change-pw-cancel').addEventListener('click', () => {
-    document.getElementById('change-pw-form').classList.add('hidden');
-  });
-  document.getElementById('btn-change-pw-do').addEventListener('click', async () => {
-    const oldPw  = document.getElementById('change-pw-old').value;
-    const newPw  = document.getElementById('change-pw-new').value;
-    const newPw2 = document.getElementById('change-pw-new2').value;
-    const errEl  = document.getElementById('change-pw-error');
-    errEl.classList.add('hidden');
-    const err = await changePassword(oldPw, newPw, newPw2);
-    if (err) {
-      errEl.textContent = err;
-      errEl.classList.remove('hidden');
-    } else {
-      document.getElementById('change-pw-form').classList.add('hidden');
-      alert('パスワードを変更しました。');
-    }
-  });
+  const cancelAddUserBtn = document.getElementById('btn-cancel-add-user');
+  if (cancelAddUserBtn) {
+    cancelAddUserBtn.addEventListener('click', () => {
+      const form = document.getElementById('add-user-form');
+      if (form) form.classList.add('hidden');
+    });
+  }
+
+  const doAddUserBtn = document.getElementById('btn-add-user');
+  if (doAddUserBtn) {
+    doAddUserBtn.addEventListener('click', () => {
+      alert('ユーザー追加は Firebase Console から実施してください。');
+    });
+  }
+
+  const changePwCancelBtn = document.getElementById('btn-change-pw-cancel');
+  if (changePwCancelBtn) {
+    changePwCancelBtn.addEventListener('click', () => {
+      const form = document.getElementById('change-pw-form');
+      if (form) form.classList.add('hidden');
+    });
+  }
+
+  const changePwDoBtn = document.getElementById('btn-change-pw-do');
+  if (changePwDoBtn) {
+    changePwDoBtn.addEventListener('click', () => {
+      alert('パスワード変更は Firebase Auth の再認証フローへ移行予定です。現在はパスワード再設定をご利用ください。');
+    });
+  }
 
   // ── ファイルストレージ ──────────────────────────────────────
   document.getElementById('btn-new-data-file').addEventListener('click', async () => {
@@ -3767,6 +3760,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // インポート / エクスポート
   document.getElementById('btn-export').addEventListener('click', exportJSON);
   document.getElementById('btn-import').addEventListener('click', () => {
+    if (!isAdminUser()) {
+      alert('JSONインポートは管理者のみ実行できます。');
+      return;
+    }
     document.getElementById('import-file').value = '';
     document.getElementById('import-file').click();
   });
