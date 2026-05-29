@@ -97,6 +97,7 @@ const KEY_USERS       = 'limb_users';
 const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
 const KEY_WEAK_LIST_PREF = 'limb_weak_list_pref';
+const SHARED_QUESTION_SET_DOC_ID = 'shared';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ── 状態 ────────────────────────────────────────────
@@ -768,23 +769,58 @@ async function pullQuestionsFromCloudIfNeeded() {
 
   cloudPullInFlight = true;
   try {
-    const ref = firebase.firestore().collection('question_sets').doc(uid);
-    const snap = await ref.get();
+    const db = firebase.firestore();
+    const sharedRef = db.collection('question_sets').doc(SHARED_QUESTION_SET_DOC_ID);
+    const legacyRef = db.collection('question_sets').doc(uid);
+    const snap = await sharedRef.get();
     const meta = getQuestionsMeta();
     const localEditedAt = Number(meta.localEditedAt || 0);
+    const canManage = isAdminUser();
 
     if (!snap.exists) {
-      // First login on this account: seed cloud with current local questions if any.
-      if (Array.isArray(questions) && questions.length > 0) {
+      // 共有問題セットが未作成のときは、管理者のローカル/旧UIDデータから初期化する。
+      let seedQuestions = Array.isArray(questions) ? questions : [];
+      let seedUpdatedAt = Number(meta.localEditedAt || Date.now());
+
+      if (canManage) {
+        try {
+          const legacySnap = await legacyRef.get();
+          if (legacySnap.exists) {
+            const legacyData = legacySnap.data() || {};
+            const legacyQuestions = Array.isArray(legacyData.questions) ? legacyData.questions : [];
+            const legacyEditedAt = Number(legacyData.updatedAtMs || 0);
+            if (legacyQuestions.length > 0 && legacyEditedAt >= seedUpdatedAt) {
+              seedQuestions = legacyQuestions;
+              seedUpdatedAt = legacyEditedAt;
+            }
+          }
+        } catch (e) {
+          console.warn('旧UID問題データの取得に失敗:', e);
+        }
+      }
+
+      if (canManage && Array.isArray(seedQuestions) && seedQuestions.length > 0) {
         const now = Date.now();
-        await ref.set({
-          uid,
-          questions,
-          updatedAtMs: now,
+        await sharedRef.set({
+          questions: seedQuestions,
+          updatedAtMs: Math.max(now, seedUpdatedAt),
+          updatedByUid: uid,
+          updatedByEmail: String(getActiveUser()?.email || ''),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+
+        questions = seedQuestions;
+        storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
+        saveQuestionsMeta({
+          ...meta,
+          localEditedAt: Math.max(now, seedUpdatedAt),
+          localDirty: false,
+          lastCloudPullAt: now,
+          lastCloudSeedAt: now
+        });
         markSyncSuccess('questions', now);
       }
+
       cloudQuestionsLoadedUid = uid;
       return;
     }
@@ -809,10 +845,11 @@ async function pullQuestionsFromCloudIfNeeded() {
 
     if (suspiciousDownsync) {
       const now = Date.now();
-      await ref.set({
-        uid,
+      await sharedRef.set({
         questions,
         updatedAtMs: now,
+        updatedByUid: uid,
+        updatedByEmail: String(getActiveUser()?.email || ''),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
       saveQuestionsMeta({
@@ -856,14 +893,21 @@ async function pushQuestionsToCloud() {
   const uid = getAuthUid();
   if (!uid) return;
   if (!(window.firebase && firebase.firestore)) return;
+  if (!isAdminUser()) return;
   try {
     const now = Date.now();
-    await firebase.firestore().collection('question_sets').doc(uid).set({
-      uid,
+    await firebase.firestore().collection('question_sets').doc(SHARED_QUESTION_SET_DOC_ID).set({
       questions,
       updatedAtMs: now,
+      updatedByUid: uid,
+      updatedByEmail: String(getActiveUser()?.email || ''),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    saveQuestionsMeta({
+      ...getQuestionsMeta(),
+      localDirty: false,
+      lastCloudPushAt: now
+    });
     markSyncSuccess('questions', now);
   } catch (e) {
     markSyncError('questions', e);
