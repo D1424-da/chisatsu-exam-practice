@@ -821,7 +821,12 @@ async function pullQuestionsFromCloudIfNeeded() {
         markSyncSuccess('questions', now);
       }
 
-      cloudQuestionsLoadedUid = uid;
+      if (canManage) {
+        cloudQuestionsLoadedUid = uid;
+      } else {
+        // 管理者が共有セットを作成するまで、次回以降も再取得を試みる。
+        cloudQuestionsLoadedUid = null;
+      }
       return;
     }
 
@@ -843,7 +848,7 @@ async function pullQuestionsFromCloudIfNeeded() {
       remoteQuestionCount > 0 &&
       remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
 
-    if (suspiciousDownsync) {
+    if (suspiciousDownsync && canManage) {
       const now = Date.now();
       await sharedRef.set({
         questions,
