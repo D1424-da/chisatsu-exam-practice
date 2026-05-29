@@ -2899,6 +2899,12 @@ function showCompletionMessage() {
 
 // ── 問題管理ページ ────────────────────────────────────────────
 function renderManage() {
+  if (!isAdminUser()) {
+    const list = document.getElementById('question-list');
+    if (list) list.innerHTML = '<p class="empty-state">管理者ログインが必要です。</p>';
+    return;
+  }
+
   refreshFilterOptions();
   const keyword  = document.getElementById('search-manage').value.toLowerCase();
   const subject  = document.getElementById('manage-filter-subject').value;
@@ -2930,6 +2936,7 @@ function renderManage() {
   }
 
   list.innerHTML = filtered.map(q => {
+    const encodedQuestionId = encodeURIComponent(String(q.id || ''));
     const limbsHtml = q.limbs.map((l, i) => {
       const rec   = getRecord(l.id);
       const total = rec.correct + rec.wrong;
@@ -2953,7 +2960,7 @@ function renderManage() {
     return `<div class="manage-card card">
       <div class="manage-card-header">
         <div class="manage-card-left">
-          <input type="checkbox" class="manage-chk" data-id="${q.id}" />
+          <input type="checkbox" class="manage-chk" data-id="${esc(String(q.id || ''))}" />
           <div class="manage-card-meta">
             <span class="badge badge-subject">${esc(q.subject)}</span>
             ${q.category ? `<span class="badge badge-category">${esc(q.category)}</span>` : ''}
@@ -2961,8 +2968,8 @@ function renderManage() {
           </div>
         </div>
         <div class="manage-card-actions">
-          <button class="btn btn-ghost btn-sm" onclick="openEditModal('${q.id}')">✏️ 編集</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteQuestion('${q.id}')">🗑 削除</button>
+          <button class="btn btn-ghost btn-sm" onclick="openEditModalByEncodedId('${encodedQuestionId}')">✏️ 編集</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteQuestionByEncodedId('${encodedQuestionId}')">🗑 削除</button>
         </div>
       </div>
       ${q.questionText ? `<div class="manage-question-text">${esc(q.questionText)}</div>` : ''}
@@ -2974,6 +2981,10 @@ function renderManage() {
 }
 
 function deleteQuestion(id) {
+  if (!isAdminUser()) {
+    alert('この操作は管理者のみ実行できます。');
+    return;
+  }
   if (!confirm('この問題を削除しますか？')) return;
   questions = questions.filter(q => q.id !== id);
   saveQuestions();
@@ -2981,7 +2992,21 @@ function deleteQuestion(id) {
   refreshFilterOptions();
 }
 
+function openEditModalByEncodedId(encodedId) {
+  const id = decodeURIComponent(String(encodedId || ''));
+  openEditModal(id);
+}
+
+function deleteQuestionByEncodedId(encodedId) {
+  const id = decodeURIComponent(String(encodedId || ''));
+  deleteQuestion(id);
+}
+
 function bulkDeleteSelected() {
+  if (!isAdminUser()) {
+    alert('この操作は管理者のみ実行できます。');
+    return;
+  }
   const checked = document.querySelectorAll('.manage-chk:checked');
   if (checked.length === 0) return;
   if (!confirm(`選択した ${checked.length} 件の問題を削除しますか？`)) return;
@@ -3009,6 +3034,10 @@ function updateBulkDeleteBtn() {
 let editingQuestionId = null;
 
 function openAddModal() {
+  if (!isAdminUser()) {
+    alert('この操作は管理者のみ実行できます。');
+    return;
+  }
   editingQuestionId = null;
   document.getElementById('modal-title').textContent = '問題を追加';
   document.getElementById('form-question').reset();
@@ -3018,6 +3047,10 @@ function openAddModal() {
 }
 
 function openEditModal(id) {
+  if (!isAdminUser()) {
+    alert('この操作は管理者のみ実行できます。');
+    return;
+  }
   const q = questions.find(q => q.id === id);
   if (!q) return;
   editingQuestionId = id;
@@ -3050,6 +3083,9 @@ function addLimbRow(editor, limb = { text: '', correct: true, explanation: '', o
     : (limb.inlineOxWrong || '');
   const div = document.createElement('div');
   div.className = 'limb-row';
+  if (limb && typeof limb.id === 'string' && limb.id) {
+    div.dataset.limbId = limb.id;
+  }
   div.innerHTML = `
     <div class="limb-row-top">
       <select class="limb-answer-type-select">
@@ -3138,8 +3174,9 @@ function getLimbsFromEditor() {
       .filter(v => v);
     const correctText = row.querySelector('.limb-correct-choice-select').value.trim();
     const inlineOxWrong = parseInlineWrongKeys(row.querySelector('.limb-inline-wrong-input').value);
+    const existingId = String(row.dataset.limbId || '').trim();
     return {
-      id:          uid(),
+      id:          existingId || uid(),
       text:        row.querySelector('.limb-text-input').value.trim(),
       correct:     row.querySelector('.limb-correct-select').value === 'true',
       options:     answerType === 'choice' ? options : [],
@@ -3151,6 +3188,10 @@ function getLimbsFromEditor() {
 }
 
 function saveQuestion(e) {
+  if (!isAdminUser()) {
+    alert('この操作は管理者のみ実行できます。');
+    return;
+  }
   e.preventDefault();
   const subject      = document.getElementById('input-subject').value.trim();
   const category     = document.getElementById('input-category').value.trim();
@@ -3189,11 +3230,6 @@ function saveQuestion(e) {
   if (editingQuestionId) {
     const idx = questions.findIndex(q => q.id === editingQuestionId);
     if (idx >= 0) {
-      // 既存肢のIDを保持
-      const oldLimbs = questions[idx].limbs;
-      limbs.forEach((l, i) => {
-        if (oldLimbs[i]) l.id = oldLimbs[i].id;
-      });
       questions[idx] = { id: editingQuestionId, subject, category, source, questionText, limbs };
     }
   } else {
