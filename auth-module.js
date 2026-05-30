@@ -596,12 +596,13 @@ function setupAuthStateListener() {
       updateAdminNavAvailability(canManage);
       updateManageNavAvailability(canManage);
 
+      if (typeof pullQuestionsFromCloudIfNeeded === 'function') {
+        await pullQuestionsFromCloudIfNeeded(true);
+      }
+
       if (!canManage) {
         if (typeof pullRecordsFromCloudIfNeeded === 'function') {
           await pullRecordsFromCloudIfNeeded(true);
-        }
-        if (typeof pullQuestionsFromCloudIfNeeded === 'function') {
-          await pullQuestionsFromCloudIfNeeded();
         }
 
         const savedSnapshot = typeof readSavedStudySession === 'function'

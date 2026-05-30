@@ -757,10 +757,10 @@ function renderStudyGoalPanel() {
   streakEl.textContent = `連続学習: ${calcStudyStreak()}日`;
 }
 
-async function pullQuestionsFromCloudIfNeeded() {
+async function pullQuestionsFromCloudIfNeeded(force = false) {
   const uid = getAuthUid();
   if (!uid || cloudPullInFlight) return;
-  if (cloudQuestionsLoadedUid === uid) return;
+  if (!force && cloudQuestionsLoadedUid === uid) return;
   if (!(window.firebase && firebase.firestore)) return;
 
   cloudPullInFlight = true;
@@ -833,52 +833,18 @@ async function pullQuestionsFromCloudIfNeeded() {
       cloudQuestionsLoadedUid = uid;
       return;
     }
-
-    const localQuestionCount = Array.isArray(questions) ? questions.length : 0;
-    const remoteQuestionCount = remoteQuestions.length;
-    const hasBundledBase = Number(meta.lastBundledSyncAt || 0) > 0 && !meta.localDirty;
-    // 同梱データを持つ端末で、クラウド側だけ極端に少ない件数なら誤上書きを防止する。
-    const suspiciousDownsync =
-      hasBundledBase &&
-      localQuestionCount >= 50 &&
-      remoteQuestionCount > 0 &&
-      remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
-
-    if (suspiciousDownsync && canManage) {
-      const now = Date.now();
-      await sharedRef.set({
-        questions,
-        updatedAtMs: now,
-        updatedByUid: uid,
-        updatedByEmail: String(getActiveUser()?.email || ''),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-      saveQuestionsMeta({
-        ...meta,
-        lastCloudPullAt: Date.now(),
-        lastCloudHealAt: Date.now()
-      });
-      cloudQuestionsLoadedUid = uid;
-      markSyncSuccess('questions', now);
-      if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
-      return;
-    }
-
-    // Prefer remote when local is empty or remote is newer.
-    const shouldUseRemote = !Array.isArray(questions) || questions.length === 0 || remoteEditedAt >= localEditedAt;
-    if (shouldUseRemote) {
-      questions = remoteQuestions;
-      storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
-      saveQuestionsMeta({
-        ...meta,
-        localEditedAt: remoteEditedAt || Date.now(),
-        localDirty: false,
-        lastCloudPullAt: Date.now()
-      });
-      if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
-      if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
-      if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
-    }
+    // ログイン時はクラウドを問題データの正本として扱う。
+    questions = remoteQuestions;
+    storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
+    saveQuestionsMeta({
+      ...meta,
+      localEditedAt: remoteEditedAt || Date.now(),
+      localDirty: false,
+      lastCloudPullAt: Date.now()
+    });
+    if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+    if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+    if (typeof updateMasteryCounts === 'function') updateMasteryCounts();
     markSyncSuccess('questions', remoteEditedAt || Date.now());
     cloudQuestionsLoadedUid = uid;
   } catch (e) {
@@ -892,9 +858,9 @@ async function pullQuestionsFromCloudIfNeeded() {
 
 async function pushQuestionsToCloud() {
   const uid = getAuthUid();
-  if (!uid) return;
-  if (!(window.firebase && firebase.firestore)) return;
-  if (!isAdminUser()) return;
+  if (!uid) return false;
+  if (!(window.firebase && firebase.firestore)) return false;
+  if (!isAdminUser()) return false;
   try {
     const now = Date.now();
     await firebase.firestore().collection('question_sets').doc(SHARED_QUESTION_SET_DOC_ID).set({
@@ -909,10 +875,13 @@ async function pushQuestionsToCloud() {
       localDirty: false,
       lastCloudPushAt: now
     });
+    cloudQuestionsLoadedUid = uid;
     markSyncSuccess('questions', now);
+    return true;
   } catch (e) {
     markSyncError('questions', e);
     console.warn('クラウド問題データ同期(保存)エラー:', e);
+    return false;
   }
 }
 
@@ -1770,10 +1739,7 @@ function loadData() {
   sessionSnapshotPendingSync = false;
   studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   renderStudyCalendar();
-  // 管理者はローカル編集を正本とするため、読み込み時の自動pullで巻き戻さない。
-  if (!isAdminUser()) {
-    pullQuestionsFromCloudIfNeeded();
-  }
+  if (authUid) pullQuestionsFromCloudIfNeeded(true);
   pullRecordsFromCloudIfNeeded(true);
   pullStudyTimeFromCloudIfNeeded();
   startCloudRealtimeSubscriptions();
@@ -1820,7 +1786,7 @@ async function syncBundledQuestions() {
   }
 }
 
-function saveQuestions() {
+async function saveQuestions() {
   storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
   saveQuestionsMeta({
     ...getQuestionsMeta(),
@@ -1830,8 +1796,12 @@ function saveQuestions() {
   });
   updateMasteryCounts();
   refreshSessionQueueAfterQuestionUpdate();
-  pushQuestionsToCloud();
-  writeToFile();
+  let cloudSaved = true;
+  if (getAuthUid() && isAdminUser()) {
+    cloudSaved = await pushQuestionsToCloud();
+  }
+  await writeToFile();
+  return cloudSaved;
 }
 
 function refreshSessionQueueAfterQuestionUpdate() {
@@ -1992,7 +1962,7 @@ async function connectHandle(handle) {
   await IDB.set('dataFileHandle', handle);
 
   if (hasQuestions) {
-    saveQuestions();
+    await saveQuestions();
     // 読込直後に loadData() が呼ばれても、古いクラウドpullで上書きされないようにする。
     const uid = getAuthUid();
     if (uid) cloudQuestionsLoadedUid = uid;
@@ -3040,14 +3010,17 @@ function renderManage() {
   updateBulkDeleteBtn();
 }
 
-function deleteQuestion(id) {
+async function deleteQuestion(id) {
   if (!isAdminUser()) {
     alert('この操作は管理者のみ実行できます。');
     return;
   }
   if (!confirm('この問題を削除しますか？')) return;
   questions = questions.filter(q => q.id !== id);
-  saveQuestions();
+  const cloudSaved = await saveQuestions();
+  if (!cloudSaved && getAuthUid()) {
+    alert('クラウドへの保存に失敗しました。通信状態を確認して再試行してください。');
+  }
   renderManage();
   refreshFilterOptions();
 }
@@ -3062,7 +3035,7 @@ function deleteQuestionByEncodedId(encodedId) {
   deleteQuestion(id);
 }
 
-function bulkDeleteSelected() {
+async function bulkDeleteSelected() {
   if (!isAdminUser()) {
     alert('この操作は管理者のみ実行できます。');
     return;
@@ -3072,7 +3045,10 @@ function bulkDeleteSelected() {
   if (!confirm(`選択した ${checked.length} 件の問題を削除しますか？`)) return;
   const ids = new Set([...checked].map(c => c.dataset.id));
   questions = questions.filter(q => !ids.has(q.id));
-  saveQuestions();
+  const cloudSaved = await saveQuestions();
+  if (!cloudSaved && getAuthUid()) {
+    alert('クラウドへの保存に失敗しました。通信状態を確認して再試行してください。');
+  }
   renderManage();
   refreshFilterOptions();
 }
@@ -3247,7 +3223,7 @@ function getLimbsFromEditor() {
   });
 }
 
-function saveQuestion(e) {
+async function saveQuestion(e) {
   if (!isAdminUser()) {
     alert('この操作は管理者のみ実行できます。');
     return;
@@ -3296,7 +3272,10 @@ function saveQuestion(e) {
     questions.push({ id: uid(), subject, category, source, questionText, limbs });
   }
 
-  saveQuestions();
+  const cloudSaved = await saveQuestions();
+  if (!cloudSaved && getAuthUid()) {
+    alert('クラウドへの保存に失敗しました。通信状態を確認して再試行してください。');
+  }
   refreshFilterOptions();
   closeModal();
   renderManage();
@@ -3445,7 +3424,7 @@ function importJSONFiles(files) {
     reader.readAsText(file);
   });
 
-  Promise.all(files.map(readFile)).then((results) => {
+  Promise.all(files.map(readFile)).then(async (results) => {
     const merged = [...questions];
     let totalNew = 0;
     let totalUpdated = 0;
@@ -3462,7 +3441,10 @@ function importJSONFiles(files) {
       }
     }
     questions = merged;
-    saveQuestions();
+    const cloudSaved = await saveQuestions();
+    if (!cloudSaved && getAuthUid()) {
+      alert('クラウドへの保存に失敗しました。通信状態を確認して再試行してください。');
+    }
     refreshFilterOptions();
     renderManage();
     const fileNames = results.map(r => r.name).join('、');
