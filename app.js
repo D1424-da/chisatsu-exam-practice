@@ -1959,7 +1959,17 @@ async function applyFileData(data) {
   if (!data || typeof data !== 'object') throw new Error('不正なデータ形式');
   const hasQuestions = Array.isArray(data.questions);
   if (Array.isArray(data.users) && data.users.length > 0) storageSetItem(KEY_USERS, JSON.stringify(data.users));
-  if (hasQuestions) { questions = data.questions; storageSetItem(KEY_QUESTIONS, JSON.stringify(questions)); }
+  if (hasQuestions) {
+    questions = data.questions;
+    storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
+    // 明示的なファイル読込はローカル編集として扱う（同梱データ同期で巻き戻さない）
+    saveQuestionsMeta({
+      ...getQuestionsMeta(),
+      localDirty: true,
+      localEditedAt: Date.now(),
+      lastFileImportAt: Date.now()
+    });
+  }
   if (data.records && typeof data.records === 'object') {
     for (const [uid, recs] of Object.entries(data.records)) {
       storageSetItem(`${KEY_RECORDS}_${uid}`, JSON.stringify(recs));
@@ -1978,6 +1988,9 @@ async function connectHandle(handle) {
 
   if (hasQuestions) {
     saveQuestions();
+    // 読込直後に loadData() が呼ばれても、古いクラウドpullで上書きされないようにする。
+    const uid = getAuthUid();
+    if (uid) cloudQuestionsLoadedUid = uid;
   }
 }
 
