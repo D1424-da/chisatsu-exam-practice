@@ -112,6 +112,16 @@ async function tryRecoverGoogleRedirectSignIn() {
   }
 }
 
+async function tryRecoverGoogleRedirectWithGrace(auth, waitMs = 1200) {
+  const recovered = await tryRecoverGoogleRedirectSignIn();
+  if (recovered) return recovered;
+
+  await new Promise(resolve => setTimeout(resolve, waitMs));
+  if (auth.currentUser) return auth.currentUser;
+
+  return tryRecoverGoogleRedirectSignIn();
+}
+
 async function resolveRedirectSignInResult() {
   const pending = hasRecentGoogleRedirectPending();
   try {
@@ -631,7 +641,7 @@ function setupAuthStateListener() {
       const pendingGoogleRedirect = hasRecentGoogleRedirectPending();
 
       if (pendingGoogleRedirect) {
-        const recovered = await tryRecoverGoogleRedirectSignIn();
+        const recovered = await tryRecoverGoogleRedirectWithGrace(auth);
         if (recovered) {
           // onAuthStateChanged が再発火してログイン分岐に入るため、ここでは終了
           return;
@@ -662,8 +672,9 @@ function setupAuthStateListener() {
       if (btnLogout) btnLogout.textContent = 'ログイン';
 
       if (pendingGoogleRedirect) {
+        setGoogleRedirectPending(false);
         if (overlayEl) overlayEl.classList.remove('hidden');
-        showError('login-error', 'Google認証後にログイン状態を保持できませんでした。SafariのプライベートブラウズをOFFにして再試行してください。');
+        showError('login-error', 'Google認証後のセッション復元に失敗しました。Safari/Chromeで直接開き、プライベートブラウズをOFFにして再試行してください。');
       }
 
       if (canManage && typeof showPage === 'function') showPage('admin');
