@@ -2555,7 +2555,10 @@ function startSession() {
   }
 
   if (mode === 'weak') {
-    limbs = limbs.filter(l => getRecord(l.id).wrong > 0 || getRecord(l.id).correct === 0);
+    limbs = limbs.filter(l => {
+      const s = getLimbAnswerSummary(l);
+      return s.wrong > 0 || s.correct === 0;
+    });
     limbs.sort((a, b) => weakScore(b.id) - weakScore(a.id));
   } else if (mode === 'due') {
     const nowMs = Date.now();
@@ -2568,7 +2571,7 @@ function startSession() {
     });
     limbs = shuffle(limbs);
   } else if (mode === 'wrong') {
-    limbs = limbs.filter(l => getRecord(l.id).wrong > 0);
+    limbs = limbs.filter(l => getLimbAnswerSummary(l).wrong > 0);
     limbs = shuffle(limbs);
   } else if (mode === 'priority') {
     const nowMs = Date.now();

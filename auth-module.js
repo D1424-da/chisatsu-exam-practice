@@ -65,12 +65,24 @@ async function ensureAuthPersistence() {
   return null;
 }
 
+// getRedirectResult() はページロード後の最初の呼び出しのみ結果を返す。
+// 複数箇所から呼ぶと2回目以降は必ず null になるため、Promise をキャッシュして共有する。
+let _redirectResultPromise = null;
+
+function getRedirectResultOnce(auth) {
+  if (!_redirectResultPromise) {
+    _redirectResultPromise = auth.getRedirectResult();
+  }
+  return _redirectResultPromise;
+}
+
 async function tryRecoverGoogleRedirectSignIn() {
   try {
     const auth = firebase.auth();
     if (auth.currentUser) return auth.currentUser;
     await ensureAuthPersistence();
-    const firstResult = await auth.getRedirectResult();
+    // 共有Promiseから取得（二重呼び出しを防ぐ）
+    const firstResult = await getRedirectResultOnce(auth);
     if (firstResult?.user) {
       if (!auth.currentUser) {
         try {
@@ -91,20 +103,8 @@ async function tryRecoverGoogleRedirectSignIn() {
       return firstResult.user;
     }
     if (auth.currentUser) return auth.currentUser;
+    // onAuthStateChanged が遅れて発火するケースへの猶予
     await new Promise(resolve => setTimeout(resolve, 800));
-    if (auth.currentUser) return auth.currentUser;
-    const secondResult = await auth.getRedirectResult();
-    if (secondResult?.user) {
-      if (!auth.currentUser) {
-        try {
-          await auth.updateCurrentUser(secondResult.user);
-        } catch (restoreErr) {
-          console.warn('Redirect ユーザーの復元(再試行)に失敗:', restoreErr?.code || restoreErr);
-        }
-      }
-      if (auth.currentUser) return auth.currentUser;
-      return secondResult.user;
-    }
     return auth.currentUser || null;
   } catch (error) {
     console.warn('Redirect recovery failed:', error?.code || error);
@@ -127,7 +127,8 @@ async function resolveRedirectSignInResult() {
   try {
     const auth = firebase.auth();
     await ensureAuthPersistence();
-    const result = await auth.getRedirectResult();
+    // 共有Promiseから取得（tryRecoverGoogleRedirectSignIn との二重呼び出しを防ぐ）
+    const result = await getRedirectResultOnce(auth);
     if (result && result.user) {
       console.log('✓ Redirect ログイン成功:', result.user.email || result.user.uid);
       if (!auth.currentUser) {
