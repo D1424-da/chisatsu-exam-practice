@@ -2920,8 +2920,11 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
         session.queue = session.queue.filter(l => l.id !== limb.id);
         const removedCount = Math.max(0, beforeLen - session.queue.length);
         if (removedCount > 0) {
-          // このあと「次へ」で index++ されるため、先に戻して1問飛ばしを防ぐ。
-          session.index = Math.max(0, session.index - 1);
+          // このあと「次へ」で index++ されるため、先に1戻す。
+          // index=0 の場合 -1 になるが、次へで 0 に戻るため正常。
+          // Math.max(0, ...) にすると index=0 時に 0 のままとなり、
+          // 次へで 1 になって次の問題が丸ごとスキップされるバグが生じる。
+          session.index = session.index - 1;
         }
         if (session.queue.length === 0) {
           setTimeout(() => showCompletionMessage(), 300);
