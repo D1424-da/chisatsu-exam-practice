@@ -1770,7 +1770,10 @@ function loadData() {
   sessionSnapshotPendingSync = false;
   studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   renderStudyCalendar();
-  pullQuestionsFromCloudIfNeeded();
+  // 管理者はローカル編集を正本とするため、読み込み時の自動pullで巻き戻さない。
+  if (!isAdminUser()) {
+    pullQuestionsFromCloudIfNeeded();
+  }
   pullRecordsFromCloudIfNeeded(true);
   pullStudyTimeFromCloudIfNeeded();
   startCloudRealtimeSubscriptions();
@@ -1785,8 +1788,8 @@ async function syncBundledQuestions() {
 
     const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
     const meta = getQuestionsMeta();
-    // Preserve explicit local edits/imports on this device.
-    if (meta.localDirty) return;
+    // 明示的なローカル編集/インポートがある端末では同梱データで上書きしない。
+    if (meta.localDirty || meta.preventBundledOverride) return;
 
     const resp = await fetch(`output/all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
     if (!resp.ok) return;
@@ -1822,7 +1825,8 @@ function saveQuestions() {
   saveQuestionsMeta({
     ...getQuestionsMeta(),
     localDirty: true,
-    localEditedAt: Date.now()
+    localEditedAt: Date.now(),
+    preventBundledOverride: true
   });
   updateMasteryCounts();
   refreshSessionQueueAfterQuestionUpdate();
@@ -1967,7 +1971,8 @@ async function applyFileData(data) {
       ...getQuestionsMeta(),
       localDirty: true,
       localEditedAt: Date.now(),
-      lastFileImportAt: Date.now()
+      lastFileImportAt: Date.now(),
+      preventBundledOverride: true
     });
   }
   if (data.records && typeof data.records === 'object') {
