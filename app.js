@@ -2291,6 +2291,29 @@ function makeInlineRecordId(limbId, key) {
   return `${limbId}::${key}`;
 }
 
+function getLimbAnswerSummary(limb) {
+  const inlineItems = parseInlineOxItems(limb?.text || '');
+  const inlineExpected = getInlineOxExpectedAnswers(limb, inlineItems);
+  const isInlineOxQuestion = inlineItems.length > 0 && inlineExpected.length === inlineItems.length;
+
+  if (!isInlineOxQuestion) {
+    const rec = getRecord(limb.id);
+    const correct = Math.max(0, Number(rec.correct || 0));
+    const wrong = Math.max(0, Number(rec.wrong || 0));
+    return { correct, wrong, total: correct + wrong };
+  }
+
+  let correct = 0;
+  let wrong = 0;
+  for (const it of inlineItems) {
+    const rec = getRecord(makeInlineRecordId(limb.id, it.key));
+    correct += Math.max(0, Number(rec.correct || 0));
+    wrong += Math.max(0, Number(rec.wrong || 0));
+  }
+
+  return { correct, wrong, total: correct + wrong };
+}
+
 /** 全肢をフラット化して返す */
 function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStats = false) {
   const limbs = [];
@@ -2540,8 +2563,8 @@ function startSession() {
     limbs.sort((a, b) => reviewPriorityScore(b.id, nowMs) - reviewPriorityScore(a.id, nowMs));
   } else if (mode === 'unanswered') {
     limbs = limbs.filter(l => {
-      const r = getRecord(l.id);
-      return r.correct === 0 && r.wrong === 0;
+      const answered = getLimbAnswerSummary(l);
+      return answered.total === 0;
     });
     limbs = shuffle(limbs);
   } else if (mode === 'wrong') {
@@ -2643,8 +2666,9 @@ function renderCurrentLimb() {
 
   const limb = queue[index];
   const rec  = getRecord(limb.id);
-  const total = rec.correct + rec.wrong;
-  const rate  = total > 0 ? Math.round(rec.correct / total * 100) : null;
+  const answered = getLimbAnswerSummary(limb);
+  const total = answered.total;
+  const rate  = total > 0 ? Math.round(answered.correct / total * 100) : null;
   const inlineItems = parseInlineOxItems(limb.text || '');
   const inlineExpected = getInlineOxExpectedAnswers(limb, inlineItems);
   const isInlineOxQuestion = inlineItems.length > 0 && inlineExpected.length === inlineItems.length;
@@ -2878,7 +2902,7 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
       let shouldRemove = false;
       if (filters.mode === 'unanswered') {
         // 未回答: 1回でも答えたら除外
-        shouldRemove = true;
+        shouldRemove = getLimbAnswerSummary(limb).total > 0;
       } else if (filters.mode === 'wrong') {
         // まちがえたもの: 不正解数が0になったら除外
         const rec = getRecord(limb.id);
