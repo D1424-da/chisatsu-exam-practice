@@ -209,20 +209,11 @@ function getGoogleAuthErrorMessage(error) {
 }
 
 function shouldUseRedirectForGoogleSignIn() {
-  try {
-    const protocol = String(window.location?.protocol || '').toLowerCase();
-    const host = String(window.location?.hostname || '').toLowerCase();
-    const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local');
-    const isSecureOrigin = protocol === 'https:' || isLocalHost;
-    if (!isSecureOrigin) return false;
-
-    const ua = String(navigator.userAgent || '');
-    const isMobileUa = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
-    const isTouchOnly = navigator.maxTouchPoints > 0 && window.innerWidth <= 900;
-    return isMobileUa || isTouchOnly;
-  } catch {
-    return false;
-  }
+  // signInWithPopup をデフォルトとする。
+  // popup がブロックされた場合のみ signInWithRedirect にフォールバックする。
+  // redirect 方式は GitHub Pages 等のサードパーティホスティングでは
+  // getRedirectResult() の取得に失敗しやすいため、常に popup を優先する。
+  return false;
 }
 
 // ===== ログイン処理 =====
@@ -364,13 +355,6 @@ async function handleGoogleSignIn() {
     auth.useDeviceLanguage();
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-
-    if (shouldUseRedirectForGoogleSignIn()) {
-      showError('login-error', 'スマホ環境のため、Googleログイン画面へ移動します...');
-      setGoogleRedirectPending(true);
-      await auth.signInWithRedirect(provider);
-      return;
-    }
 
     const result = await auth.signInWithPopup(provider);
     console.log('✓ Google ログイン成功:', result.user.email);
@@ -803,13 +787,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function initGoogleSignIn() {
   if (window.googleSignInInitialized) return;
   const GOOGLE_CLIENT_ID = getGoogleClientId();
-
-  // モバイルは Firebase Redirect の方が安定するため、GIS ボタンを使わずフォールバックに統一
-  if (shouldUseRedirectForGoogleSignIn()) {
-    renderGooglePopupFallbackButton();
-    setGoogleLoginVisibility(true);
-    return;
-  }
 
   if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('YOUR_')) {
     renderGooglePopupFallbackButton();
