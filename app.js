@@ -2709,7 +2709,7 @@ function renderCurrentLimb() {
       ${limb.source ? `<div class="limb-meta"><span class="badge badge-source">${esc(limb.source)}</span> <span class="badge badge-subject">${esc(limb.subject)}</span>${limb.category ? ` <span class="badge badge-category">${esc(limb.category)}</span>` : ''}</div>` : `<div class="limb-meta"><span class="badge badge-subject">${esc(limb.subject)}</span>${limb.category ? ` <span class="badge badge-category">${esc(limb.category)}</span>` : ''}</div>`}
       ${limb.questionText ? `<div class="question-shared"><span class="question-label">問題文</span><span class="question-body">${esc(limb.questionText)}</span></div>` : ''}
       <div class="limb-text">${inlineTextHtml}</div>
-      <div class="limb-record">${rate !== null ? `正答率 ${rate}% (${rec.correct}○ ${rec.wrong}×)` : '未回答'}</div>
+      <div class="limb-record">${rate !== null ? `正答率 ${rate}% (${answered.correct}○ ${answered.wrong}×)` : '未回答'}</div>
       ${noteSectionHtml}
       ${answerSectionHtml}
     </div>
@@ -2902,18 +2902,24 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
       let shouldRemove = false;
       if (filters.mode === 'unanswered') {
         // 未回答: 1回でも答えたら除外
-        shouldRemove = getLimbAnswerSummary(limb).total > 0;
+        shouldRemove = advanceSession && getLimbAnswerSummary(limb).total > 0;
       } else if (filters.mode === 'wrong') {
         // まちがえたもの: 不正解数が0になったら除外
-        const rec = getRecord(limb.id);
-        shouldRemove = rec.wrong === 0;
+        const answered = getLimbAnswerSummary(limb);
+        shouldRemove = advanceSession && answered.wrong === 0;
       } else if (filters.mode === 'ambiguous') {
         // あいまいなもの: masteryがambiguousでなくなったら除外
         const rec = getRecord(limb.id);
-        shouldRemove = rec.mastery !== 'ambiguous';
+        shouldRemove = advanceSession && rec.mastery !== 'ambiguous';
       }
       if (shouldRemove) {
+        const beforeLen = session.queue.length;
         session.queue = session.queue.filter(l => l.id !== limb.id);
+        const removedCount = Math.max(0, beforeLen - session.queue.length);
+        if (removedCount > 0) {
+          // このあと「次へ」で index++ されるため、先に戻して1問飛ばしを防ぐ。
+          session.index = Math.max(0, session.index - 1);
+        }
         if (session.queue.length === 0) {
           setTimeout(() => showCompletionMessage(), 300);
         }

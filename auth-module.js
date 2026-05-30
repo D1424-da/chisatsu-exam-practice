@@ -139,8 +139,6 @@ async function resolveRedirectSignInResult() {
       }
       setGoogleRedirectPending(false);
       hideError('login-error');
-    } else if (pending) {
-      showError('login-error', 'Google認証後のセッション復元に失敗しました。SafariのプライベートブラウズをOFFにして再試行してください。');
     }
   } catch (error) {
     console.warn('Redirect ログイン結果の取得に失敗:', error?.code || error);
@@ -402,11 +400,13 @@ async function handleGoogleSignIn() {
         await auth.signInWithRedirect(provider);
         return;
       } catch (redirectErr) {
+        setGoogleRedirectPending(false);
         console.error('✗ Google リダイレクト失敗:', redirectErr?.code || redirectErr);
         showError('login-error', getGoogleAuthErrorMessage(redirectErr));
         return;
       }
     }
+    setGoogleRedirectPending(false);
     showError('login-error', getGoogleAuthErrorMessage(error));
   }
 }
