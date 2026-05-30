@@ -1957,22 +1957,28 @@ async function writeToFile() {
 
 async function applyFileData(data) {
   if (!data || typeof data !== 'object') throw new Error('不正なデータ形式');
+  const hasQuestions = Array.isArray(data.questions);
   if (Array.isArray(data.users) && data.users.length > 0) storageSetItem(KEY_USERS, JSON.stringify(data.users));
-  if (Array.isArray(data.questions)) { questions = data.questions; storageSetItem(KEY_QUESTIONS, JSON.stringify(questions)); }
+  if (hasQuestions) { questions = data.questions; storageSetItem(KEY_QUESTIONS, JSON.stringify(questions)); }
   if (data.records && typeof data.records === 'object') {
     for (const [uid, recs] of Object.entries(data.records)) {
       storageSetItem(`${KEY_RECORDS}_${uid}`, JSON.stringify(recs));
     }
   }
+  return { hasQuestions };
 }
 
 async function connectHandle(handle) {
   const file = await handle.getFile();
   const data = JSON.parse(await file.text());
-  await applyFileData(data);
+  const { hasQuestions } = await applyFileData(data);
   fileHandle    = handle;
   pendingHandle = null;
   await IDB.set('dataFileHandle', handle);
+
+  if (hasQuestions) {
+    saveQuestions();
+  }
 }
 
 async function initFileStorage() {
