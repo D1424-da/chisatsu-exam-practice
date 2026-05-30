@@ -98,6 +98,8 @@ const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
 const KEY_WEAK_LIST_PREF = 'limb_weak_list_pref';
 const SHARED_QUESTION_SET_DOC_ID = 'shared';
+const CLOUD_ONLY_QUESTIONS = true;
+const CLOUD_ONLY_USER_DATA = true;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ── 状態 ────────────────────────────────────────────
@@ -130,6 +132,8 @@ let cloudCalendarFlushInFlight = false;
 let sessionSnapshotPendingSync = false;
 let cloudSessionSnapshotFlushInFlight = false;
 let studySessionSnapshotCache = {};
+let studyTimeCacheByUid = {};
+let studyCalendarCacheByUid = {};
 
 
 // ── ユーティリティ ───────────────────────────────────────────
@@ -138,7 +142,27 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 const useLocalStorage = true;
 const volatileStorage = new Map();
 
+function isCloudOnlyStorageKey(key) {
+  const k = String(key || '');
+  if (!k) return false;
+
+  if (CLOUD_ONLY_QUESTIONS) {
+    if (k === KEY_QUESTIONS || k === KEY_QUESTIONS_META) return true;
+  }
+
+  if (CLOUD_ONLY_USER_DATA) {
+    if (k === KEY_RECORDS || k.startsWith(`${KEY_RECORDS}_`)) return true;
+    if (k.startsWith(`${KEY_RECORDS_META}_`)) return true;
+    if (k === KEY_STUDY_TIME || k.startsWith(`${KEY_STUDY_TIME}_`)) return true;
+    if (k === KEY_STUDY_CALENDAR || k.startsWith(`${KEY_STUDY_CALENDAR}_`)) return true;
+    if (k === KEY_STUDY_SESSION || k.startsWith(`${KEY_STUDY_SESSION}_`)) return true;
+  }
+
+  return false;
+}
+
 function storageGetItem(key) {
+  if (isCloudOnlyStorageKey(key)) return null;
   if (!useLocalStorage) {
     return volatileStorage.has(key) ? volatileStorage.get(key) : null;
   }
@@ -150,6 +174,7 @@ function storageGetItem(key) {
 }
 
 function storageSetItem(key, value) {
+  if (isCloudOnlyStorageKey(key)) return;
   if (!useLocalStorage) {
     volatileStorage.set(key, String(value));
     return;
@@ -162,6 +187,7 @@ function storageSetItem(key, value) {
 }
 
 function storageRemoveItem(key) {
+  if (isCloudOnlyStorageKey(key)) return;
   if (!useLocalStorage) {
     volatileStorage.delete(key);
     return;
@@ -239,6 +265,14 @@ function normalizeStudyTimeData(data) {
 }
 
 function loadStudyTimeLocal(uid = getAuthUid()) {
+  if (CLOUD_ONLY_USER_DATA) {
+    const key = uid || '__guest__';
+    const cached = studyTimeCacheByUid[key];
+    if (cached) return normalizeStudyTimeData(cached);
+    return uid === getAuthUid()
+      ? normalizeStudyTimeData(studyTime)
+      : { totalMs: 0, pendingDeltaMs: 0 };
+  }
   const key = getStudyTimeStorageKey(uid);
   try {
     return normalizeStudyTimeData(JSON.parse(storageGetItem(key)) || {});
@@ -248,9 +282,13 @@ function loadStudyTimeLocal(uid = getAuthUid()) {
 }
 
 function saveStudyTimeLocal(data, uid = getAuthUid()) {
-  const key = getStudyTimeStorageKey(uid);
   const normalized = normalizeStudyTimeData(data || {});
-  storageSetItem(key, JSON.stringify(normalized));
+  const cacheKey = uid || '__guest__';
+  studyTimeCacheByUid[cacheKey] = normalized;
+  if (!CLOUD_ONLY_USER_DATA) {
+    const key = getStudyTimeStorageKey(uid);
+    storageSetItem(key, JSON.stringify(normalized));
+  }
   studyTime = normalized;
 }
 
@@ -283,6 +321,14 @@ function normalizeStudyCalendarData(data) {
 }
 
 function loadStudyCalendarLocal(uid = getAuthUid()) {
+  if (CLOUD_ONLY_USER_DATA) {
+    const key = uid || '__guest__';
+    const cached = studyCalendarCacheByUid[key];
+    if (cached) return normalizeStudyCalendarData(cached);
+    return uid === getAuthUid()
+      ? normalizeStudyCalendarData(studyCalendar)
+      : { checkedDates: {}, dailyCounts: {}, updatedAtMs: 0 };
+  }
   const key = getStudyCalendarStorageKey(uid);
   try {
     return normalizeStudyCalendarData(JSON.parse(storageGetItem(key)) || {});
@@ -292,12 +338,16 @@ function loadStudyCalendarLocal(uid = getAuthUid()) {
 }
 
 function saveStudyCalendarLocal(data, uid = getAuthUid()) {
-  const key = getStudyCalendarStorageKey(uid);
   const normalized = normalizeStudyCalendarData({
     ...(data || {}),
     updatedAtMs: Number(data?.updatedAtMs || Date.now())
   });
-  storageSetItem(key, JSON.stringify(normalized));
+  const cacheKey = uid || '__guest__';
+  studyCalendarCacheByUid[cacheKey] = normalized;
+  if (!CLOUD_ONLY_USER_DATA) {
+    const key = getStudyCalendarStorageKey(uid);
+    storageSetItem(key, JSON.stringify(normalized));
+  }
   studyCalendar = normalized;
 }
 
@@ -346,6 +396,10 @@ function readSavedStudySession(uid = getAuthUid()) {
   if (uid && studySessionSnapshotCache[uid]) {
     const cached = normalizeStudySessionSnapshot(studySessionSnapshotCache[uid]);
     if (cached) return cached;
+  }
+
+  if (CLOUD_ONLY_USER_DATA) {
+    return null;
   }
 
   const key = getStudySessionStorageKey(uid);
@@ -422,7 +476,9 @@ function saveStudySessionSnapshot() {
     savedAt: Date.now()
   };
   studySessionSnapshotCache[uid] = snapshot;
-  storageSetItem(key, JSON.stringify(snapshot));
+  if (!CLOUD_ONLY_USER_DATA) {
+    storageSetItem(key, JSON.stringify(snapshot));
+  }
   sessionSnapshotPendingSync = true;
   flushStudySessionSnapshotToCloudIfNeeded();
   updateResumeSessionButton();
@@ -433,7 +489,9 @@ function clearStudySessionSnapshot() {
   const uid = getAuthUid();
   if (!uid) return;
   delete studySessionSnapshotCache[uid];
-  storageRemoveItem(getStudySessionStorageKey(uid));
+  if (!CLOUD_ONLY_USER_DATA) {
+    storageRemoveItem(getStudySessionStorageKey(uid));
+  }
   sessionSnapshotPendingSync = true;
   flushStudySessionSnapshotToCloudIfNeeded();
   updateResumeSessionButton();
@@ -806,7 +864,6 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
         }, { merge: true });
 
         questions = seedQuestions;
-        storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
         saveQuestionsMeta({
           ...meta,
           localEditedAt: Math.max(now, seedUpdatedAt),
@@ -835,7 +892,6 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     }
     // ログイン時はクラウドを問題データの正本として扱う。
     questions = remoteQuestions;
-    storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
     saveQuestionsMeta({
       ...meta,
       localEditedAt: remoteEditedAt || Date.now(),
@@ -1711,13 +1767,17 @@ async function resetStudyTime() {
 
 function loadData() {
   currentUser = getActiveUser();
-  try { questions = JSON.parse(storageGetItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
+  questions = [];
   const authUid = getAuthUid();
   const rk = getRecordStorageKey(authUid);
-  try { records = normalizeRecordMap(JSON.parse(storageGetItem(rk)) || {}); } catch { records = {}; }
+  if (CLOUD_ONLY_USER_DATA) {
+    records = {};
+  } else {
+    try { records = normalizeRecordMap(JSON.parse(storageGetItem(rk)) || {}); } catch { records = {}; }
+  }
 
   // 旧バージョン（単一キー保存）からの移行: uidキーが空なら legacy キーを引き継ぐ。
-  if (authUid && isRecordMapEmpty(records)) {
+  if (!CLOUD_ONLY_USER_DATA && authUid && isRecordMapEmpty(records)) {
     let legacy = {};
     try { legacy = normalizeRecordMap(JSON.parse(storageGetItem(KEY_RECORDS)) || {}); } catch { legacy = {}; }
     if (!isRecordMapEmpty(legacy)) {
@@ -1747,47 +1807,11 @@ function loadData() {
 }
 
 async function syncBundledQuestions() {
-  try {
-    if (window.location.protocol === 'file:') {
-      return;
-    }
-
-    const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
-    const meta = getQuestionsMeta();
-    // 明示的なローカル編集/インポートがある端末では同梱データで上書きしない。
-    if (meta.localDirty || meta.preventBundledOverride) return;
-
-    const resp = await fetch(`output/all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
-    if (!resp.ok) return;
-    const bundled = await resp.json();
-    if (!Array.isArray(bundled) || bundled.length === 0) return;
-
-    const localJson = JSON.stringify(Array.isArray(local) ? local : []);
-    const bundledJson = JSON.stringify(bundled);
-    if (localJson === bundledJson) {
-      saveQuestionsMeta({
-        ...meta,
-        localDirty: false,
-        lastBundledSyncAt: Date.now()
-      });
-      return;
-    }
-
-    storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
-    questions = bundled;
-    saveQuestionsMeta({
-      ...meta,
-      localDirty: false,
-      localEditedAt: Number(meta.localEditedAt || 0),
-      lastBundledSyncAt: Date.now()
-    });
-  } catch {
-    // Bundled JSON is optional; fall back to existing localStorage data.
-  }
+  // 問題データはクラウドのみを正本とするため、同梱JSON同期は無効化。
+  if (CLOUD_ONLY_QUESTIONS) return;
 }
 
 async function saveQuestions() {
-  storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
   saveQuestionsMeta({
     ...getQuestionsMeta(),
     localDirty: true,
@@ -1800,7 +1824,9 @@ async function saveQuestions() {
   if (getAuthUid() && isAdminUser()) {
     cloudSaved = await pushQuestionsToCloud();
   }
-  await writeToFile();
+  if (!CLOUD_ONLY_QUESTIONS) {
+    await writeToFile();
+  }
   return cloudSaved;
 }
 
@@ -1832,7 +1858,9 @@ function saveRecords(options = {}) {
   const uid = getAuthUid();
   const rk = getRecordStorageKey(uid);
   const now = Date.now();
-  storageSetItem(rk, JSON.stringify(records));
+  if (!CLOUD_ONLY_USER_DATA) {
+    storageSetItem(rk, JSON.stringify(records));
+  }
   if (uid) {
     saveRecordsMeta({
       ...getRecordsMeta(uid),
@@ -1931,11 +1959,10 @@ async function writeToFile() {
 
 async function applyFileData(data) {
   if (!data || typeof data !== 'object') throw new Error('不正なデータ形式');
-  const hasQuestions = Array.isArray(data.questions);
+  const hasQuestions = Array.isArray(data.questions) && !CLOUD_ONLY_QUESTIONS;
   if (Array.isArray(data.users) && data.users.length > 0) storageSetItem(KEY_USERS, JSON.stringify(data.users));
   if (hasQuestions) {
     questions = data.questions;
-    storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
     // 明示的なファイル読込はローカル編集として扱う（同梱データ同期で巻き戻さない）
     saveQuestionsMeta({
       ...getQuestionsMeta(),
