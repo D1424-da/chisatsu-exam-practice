@@ -70,11 +70,41 @@ async function tryRecoverGoogleRedirectSignIn() {
     const auth = firebase.auth();
     if (auth.currentUser) return auth.currentUser;
     await ensureAuthPersistence();
-    await auth.getRedirectResult();
+    const firstResult = await auth.getRedirectResult();
+    if (firstResult?.user) {
+      if (!auth.currentUser) {
+        try {
+          await auth.updateCurrentUser(firstResult.user);
+        } catch (restoreErr) {
+          console.warn('Redirect ユーザーの復元(updateCurrentUser)に失敗:', restoreErr?.code || restoreErr);
+        }
+      }
+      if (auth.currentUser) return auth.currentUser;
+      if (firstResult.credential) {
+        try {
+          const credResult = await auth.signInWithCredential(firstResult.credential);
+          if (credResult?.user) return credResult.user;
+        } catch (credErr) {
+          console.warn('Redirect 認証情報の再サインインに失敗:', credErr?.code || credErr);
+        }
+      }
+      return firstResult.user;
+    }
     if (auth.currentUser) return auth.currentUser;
     await new Promise(resolve => setTimeout(resolve, 800));
     if (auth.currentUser) return auth.currentUser;
-    await auth.getRedirectResult();
+    const secondResult = await auth.getRedirectResult();
+    if (secondResult?.user) {
+      if (!auth.currentUser) {
+        try {
+          await auth.updateCurrentUser(secondResult.user);
+        } catch (restoreErr) {
+          console.warn('Redirect ユーザーの復元(再試行)に失敗:', restoreErr?.code || restoreErr);
+        }
+      }
+      if (auth.currentUser) return auth.currentUser;
+      return secondResult.user;
+    }
     return auth.currentUser || null;
   } catch (error) {
     console.warn('Redirect recovery failed:', error?.code || error);
