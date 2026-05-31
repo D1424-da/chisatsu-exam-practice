@@ -209,11 +209,14 @@ function getGoogleAuthErrorMessage(error) {
 }
 
 function shouldUseRedirectForGoogleSignIn() {
-  // signInWithPopup をデフォルトとする。
-  // popup がブロックされた場合のみ signInWithRedirect にフォールバックする。
-  // redirect 方式は GitHub Pages 等のサードパーティホスティングでは
-  // getRedirectResult() の取得に失敗しやすいため、常に popup を優先する。
-  return false;
+  try {
+    const ua = String(navigator.userAgent || '');
+    const isSafari = /Safari/i.test(ua) && !/Chrome|CriOS|Edg|EdgiOS|FxiOS|Firefox/i.test(ua);
+    // Safari は popup が失敗しやすいため redirect を優先する。
+    return isSafari;
+  } catch {
+    return false;
+  }
 }
 
 // ===== ログイン処理 =====
@@ -355,6 +358,13 @@ async function handleGoogleSignIn() {
     auth.useDeviceLanguage();
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
+
+    if (shouldUseRedirectForGoogleSignIn()) {
+      showError('login-error', 'Safariのため、Googleログイン画面へ移動します...');
+      setGoogleRedirectPending(true);
+      await auth.signInWithRedirect(provider);
+      return;
+    }
 
     const result = await auth.signInWithPopup(provider);
     console.log('✓ Google ログイン成功:', result.user.email);
