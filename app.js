@@ -912,7 +912,13 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
             return true;
           }
         }
-      } catch { /* legacy collection unavailable, fall through */ }
+      } catch (migErr) {
+        // 接続エラー以外は外側catchへ伝播させる。接続エラーは移行読み取り失敗
+        // とみなし、空データをシードして上書きしないようここで中断（次回再試行）。
+        if (!isFirestoreConnectivityError(migErr)) throw migErr;
+        warnCloudError('クラウド問題データ移行(取得):', migErr);
+        return;
+      }
 
       // First login on this account: seed cloud with current local questions if any.
       if (canSyncQuestionsToCloud(questions)) {
@@ -1187,7 +1193,13 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
             return;
           }
         }
-      } catch { /* old collection unavailable, fall through */ }
+      } catch (migErr) {
+        // 接続エラー以外は外側catchへ伝播。接続エラーは移行読み取り失敗とみなし、
+        // 空シードによる既存データ上書きを避けるため中断（次回再試行）。
+        if (!isFirestoreConnectivityError(migErr)) throw migErr;
+        warnCloudError('クラウド成績データ移行(取得):', migErr);
+        return;
+      }
 
       // Backward compatibility: migrate legacy records collection format.
       const legacyQuery = await firebase.firestore().collection(FS_RECORDS).where('uid', '==', uid).get();

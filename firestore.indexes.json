@@ -5,21 +5,6 @@
       "collectionGroup": "chisatsu_records",
       "fieldPath": "records",
       "indexes": []
-    },
-    {
-      "collectionGroup": "chisatsu_records",
-      "fieldPath": "studyCalendarCheckedDates",
-      "indexes": []
-    },
-    {
-      "collectionGroup": "chisatsu_records",
-      "fieldPath": "studyCalendarDailyCounts",
-      "indexes": []
-    },
-    {
-      "collectionGroup": "chisatsu_records",
-      "fieldPath": "studyCalendar",
-      "indexes": []
     }
   ]
 }
