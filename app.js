@@ -883,44 +883,9 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     const localEditedAt = Number(meta.localEditedAt || 0);
 
     if (!snap.exists) {
-      // Migration: try legacy question_sets collection before seeding from local.
-      try {
-        const legacySnap = await firebase.firestore().collection('question_sets').doc(uid).get();
-        if (legacySnap.exists) {
-          const legacyData = legacySnap.data() || {};
-          const legacyQuestions = Array.isArray(legacyData.questions) ? legacyData.questions : null;
-          if (legacyQuestions && legacyQuestions.length > 0) {
-            const now = Date.now();
-            await ref.set({
-              uid,
-              questions: legacyQuestions,
-              updatedAtMs: Number(legacyData.updatedAtMs || now),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            questions = legacyQuestions;
-            storageSetItem(KEY_QUESTIONS, JSON.stringify(legacyQuestions));
-            saveQuestionsMeta({
-              ...getQuestionsMeta(),
-              localEditedAt: Number(legacyData.updatedAtMs || now),
-              localDirty: false,
-              lastCloudPullAt: now
-            });
-            if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
-            if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
-            markSyncSuccess('questions', Number(legacyData.updatedAtMs || now));
-            cloudQuestionsLoadedUid = uid;
-            return true;
-          }
-        }
-      } catch (migErr) {
-        // 接続エラー以外は外側catchへ伝播させる。接続エラーは移行読み取り失敗
-        // とみなし、空データをシードして上書きしないようここで中断（次回再試行）。
-        if (!isFirestoreConnectivityError(migErr)) throw migErr;
-        warnCloudError('クラウド問題データ移行(取得):', migErr);
-        return;
-      }
-
-      // First login on this account: seed cloud with current local questions if any.
+      // chisatsu_question_sets が未作成の場合、ローカル同梱データでシードする。
+      // 旧 question_sets コレクションは gyosei-quiz-app と共有されており汚染されている
+      // 可能性があるため、移行せずローカルデータのみ使用する。
       if (canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
         await ref.set({
@@ -946,14 +911,10 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     const localQuestionCount = Array.isArray(questions) ? questions.length : 0;
     const remoteQuestionCount = remoteQuestions.length;
     const hasBundledBase = Number(meta.lastBundledSyncAt || 0) > 0 && !meta.localDirty;
-    // 同梱データを持つ端末で、クラウド側だけ極端に少ない件数なら誤上書きを防止する。
-    const suspiciousDownsync =
-      hasBundledBase &&
-      localQuestionCount >= 50 &&
-      remoteQuestionCount > 0 &&
-      remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
 
-    if (suspiciousDownsync) {
+    // 同梱データがある場合は常にローカルを正本とし、クラウド側を上書きする。
+    // これにより他アプリの汚染データがクラウドに残っていても正規データで修正される。
+    if (hasBundledBase && localQuestionCount > 0) {
       if (canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
         await ref.set({
@@ -964,11 +925,7 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
         }, { merge: true });
         markSyncSuccess('questions', now);
       }
-      saveQuestionsMeta({
-        ...meta,
-        lastCloudPullAt: Date.now(),
-        lastCloudHealAt: Date.now()
-      });
+      saveQuestionsMeta({ ...meta, lastCloudPullAt: Date.now() });
       cloudQuestionsLoadedUid = uid;
       return;
     }
@@ -1942,24 +1899,48 @@ function loadData() {
 
 async function syncBundledQuestions() {
   try {
-    if (window.location.protocol === 'file:') {
-      return;
-    }
+    if (window.location.protocol === 'file:') return;
 
     // ユーザーが明示的に接続したデータファイルを優先する。
     if (fileHandle) return;
 
-    const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
     const meta = getQuestionsMeta();
-    // Preserve explicit local edits/imports on this device.
+    // ユーザーが手動で編集・インポートしたデータは保持する。
     if (meta.localDirty) return;
 
-    const cloudLoaded = await pullQuestionsFromCloudIfNeeded(true);
-    if (cloudLoaded) return;
+    // 同梱 JSON をまだ読み込んでいない場合（または質問が空の場合）は
+    // output/all_questions.json をフェッチして正規データをロードする。
+    // これにより hasBundledBase = true になり、クラウド側の汚染データを上書きできる。
+    const alreadyLoaded = Number(meta.lastBundledSyncAt || 0) > 0 &&
+      Array.isArray(questions) && questions.length > 0;
 
-    // 問題データはFirestoreを正本とする。
-    // ローカルJSONフォールバックは行わない（他アプリのJSONを誤読み込み防止）。
-    return;
+    if (!alreadyLoaded) {
+      try {
+        const res = await fetch('output/all_questions.json');
+        if (res.ok) {
+          const bundled = await res.json();
+          if (Array.isArray(bundled) && bundled.length > 0) {
+            const now = Date.now();
+            questions = bundled;
+            storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
+            saveQuestionsMeta({
+              ...getQuestionsMeta(),
+              localEditedAt: now,
+              lastBundledSyncAt: now,
+              localDirty: false
+            });
+            if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+            if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+            updateMasteryCounts();
+          }
+        }
+      } catch { /* fetch失敗時はローカルデータを維持 */ }
+    }
+
+    // クラウド同期: hasBundledBase = true の状態で呼ぶことで
+    // pullQuestionsFromCloudIfNeeded 内の suspiciousDownsync が機能し、
+    // クラウド側に汚染データがあれば正規データで上書きされる。
+    await pullQuestionsFromCloudIfNeeded(true);
   } catch {
     // Bundled JSON is optional; fall back to existing localStorage data.
   }
