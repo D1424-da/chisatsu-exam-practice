@@ -1,0 +1,10 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "chisatsu_records",
+      "fieldPath": "records",
+      "indexes": []
+    }
+  ]
+}

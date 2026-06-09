@@ -27,10 +27,12 @@ service cloud.firestore {
       allow read, write: if matchesAuthUid(uid);
     }
 
-    // Question set
-    // - shared doc: /question_sets/shared (all signed-in users can read, admin email can write)
-    // - legacy doc: /question_sets/{uid} (kept for migration compatibility)
+    // Question set (legacy collections kept for migration compatibility)
     match /question_sets/{docId} {
+      allow read: if (docId == 'shared' && signedIn()) || matchesAuthUid(docId) || ownsResource();
+      allow create, update, delete: if (docId == 'shared' && isAdminEmail()) || matchesAuthUid(docId) || ownsRequest() || ownsResource();
+    }
+    match /chisatsu_question_sets/{docId} {
       allow read: if (docId == 'shared' && signedIn()) || matchesAuthUid(docId) || ownsResource();
       allow create, update, delete: if (docId == 'shared' && isAdminEmail()) || matchesAuthUid(docId) || ownsRequest() || ownsResource();
     }
@@ -40,13 +42,29 @@ service cloud.firestore {
       allow read: if matchesAuthUid(uid) || ownsResource();
       allow create, update, delete: if matchesAuthUid(uid) || ownsRequest() || ownsResource();
     }
+    match /chisatsu_study_stats/{uid} {
+      allow read: if matchesAuthUid(uid) || ownsResource();
+      allow create, update, delete: if matchesAuthUid(uid) || ownsRequest() || ownsResource();
+    }
 
-    // Records collection supports both:
-    // - current format: /records/{uid} (doc id equals uid)
-    // - legacy format:  /records/{autoId} with field uid
+    // Records collection (legacy and current)
     match /records/{recordId} {
       allow read: if matchesAuthUid(recordId) || ownsResource();
       allow create, update, delete: if matchesAuthUid(recordId) || ownsRequest() || ownsResource();
+    }
+    match /chisatsu_records/{recordId} {
+      allow read: if matchesAuthUid(recordId) || ownsResource();
+      allow create, update, delete: if matchesAuthUid(recordId) || ownsRequest() || ownsResource();
+    }
+
+    // Study sessions
+    match /study_sessions/{uid} {
+      allow read: if matchesAuthUid(uid) || ownsResource();
+      allow create, update, delete: if matchesAuthUid(uid) || ownsRequest() || ownsResource();
+    }
+    match /chisatsu_study_sessions/{uid} {
+      allow read: if matchesAuthUid(uid) || ownsResource();
+      allow create, update, delete: if matchesAuthUid(uid) || ownsRequest() || ownsResource();
     }
   }
 }

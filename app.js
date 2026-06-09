@@ -40,6 +40,12 @@ const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
 const KEY_QUESTIONS_META = 'limb_questions_meta';
 const KEY_WEAK_LIST_PREF = 'limb_weak_list_pref';
 const QUESTION_BANK_COLLECTION = 'question_bank_years';
+// App-specific Firestore collection names to avoid data collision with other apps
+// sharing the same Firebase project.
+const FS_QUESTION_SETS = 'chisatsu_question_sets';
+const FS_RECORDS       = 'chisatsu_records';
+const FS_STUDY_STATS   = 'chisatsu_study_stats';
+const FS_STUDY_SESSIONS = 'chisatsu_study_sessions';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ── 状態 ────────────────────────────────────────────
@@ -222,6 +228,39 @@ function normalizeStudyCalendarData(data) {
   }
   const updatedAtMs = Math.max(0, Number(data?.updatedAtMs || 0));
   return { checkedDates, dailyCounts, updatedAtMs };
+}
+
+// Parse calendar data from Firestore document, supporting both old map format
+// and new JSON string format (studyCalendarJson) to reduce index entry count.
+function parseCalendarFromFirestoreData(data) {
+  if (!data || typeof data !== 'object') return null;
+
+  // New format: JSON strings
+  if (typeof data.studyCalendarJson === 'string' && data.studyCalendarJson) {
+    try {
+      const parsed = JSON.parse(data.studyCalendarJson);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          checkedDates: (parsed.checkedDates && typeof parsed.checkedDates === 'object') ? parsed.checkedDates : {},
+          dailyCounts: (parsed.dailyCounts && typeof parsed.dailyCounts === 'object') ? parsed.dailyCounts : {}
+        };
+      }
+    } catch { /* fall through to old format */ }
+  }
+
+  // Old format: map fields
+  const hasOldFormat = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+    || (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object');
+  if (hasOldFormat) {
+    return {
+      checkedDates: (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
+        ? data.studyCalendarCheckedDates : {},
+      dailyCounts: (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object')
+        ? data.studyCalendarDailyCounts : {}
+    };
+  }
+
+  return null;
 }
 
 function loadStudyCalendarLocal(uid = getAuthUid()) {
@@ -555,7 +594,9 @@ function normalizeWrongDateKeys(values) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
     if (!keys.includes(key)) keys.push(key);
   }
-  return keys.sort();
+  const sorted = keys.sort();
+  // Firestore index entry limit: keep only the 20 most recent dates
+  return sorted.length > 20 ? sorted.slice(sorted.length - 20) : sorted;
 }
 
 function normalizeReviewState(review) {
@@ -836,13 +877,15 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
 
   cloudPullInFlight = true;
   try {
-    const ref = firebase.firestore().collection('question_sets').doc(uid);
+    const ref = firebase.firestore().collection(FS_QUESTION_SETS).doc(uid);
     const snap = await ref.get();
     const meta = getQuestionsMeta();
     const localEditedAt = Number(meta.localEditedAt || 0);
 
     if (!snap.exists) {
-      // First login on this account: seed cloud with current local questions if any.
+      // chisatsu_question_sets が未作成の場合、ローカル同梱データでシードする。
+      // 旧 question_sets コレクションは gyosei-quiz-app と共有されており汚染されている
+      // 可能性があるため、移行せずローカルデータのみ使用する。
       if (canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
         await ref.set({
@@ -868,14 +911,10 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     const localQuestionCount = Array.isArray(questions) ? questions.length : 0;
     const remoteQuestionCount = remoteQuestions.length;
     const hasBundledBase = Number(meta.lastBundledSyncAt || 0) > 0 && !meta.localDirty;
-    // 同梱データを持つ端末で、クラウド側だけ極端に少ない件数なら誤上書きを防止する。
-    const suspiciousDownsync =
-      hasBundledBase &&
-      localQuestionCount >= 50 &&
-      remoteQuestionCount > 0 &&
-      remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
 
-    if (suspiciousDownsync) {
+    // 同梱データがある場合は常にローカルを正本とし、クラウド側を上書きする。
+    // これにより他アプリの汚染データがクラウドに残っていても正規データで修正される。
+    if (hasBundledBase && localQuestionCount > 0) {
       if (canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
         await ref.set({
@@ -886,11 +925,7 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
         }, { merge: true });
         markSyncSuccess('questions', now);
       }
-      saveQuestionsMeta({
-        ...meta,
-        lastCloudPullAt: Date.now(),
-        lastCloudHealAt: Date.now()
-      });
+      saveQuestionsMeta({ ...meta, lastCloudPullAt: Date.now() });
       cloudQuestionsLoadedUid = uid;
       return;
     }
@@ -927,7 +962,7 @@ async function pushQuestionsToCloud() {
   if (!canSyncQuestionsToCloud(questions)) return;
   try {
     const now = Date.now();
-    await firebase.firestore().collection('question_sets').doc(uid).set({
+    await firebase.firestore().collection(FS_QUESTION_SETS).doc(uid).set({
       uid,
       questions,
       updatedAtMs: now,
@@ -987,24 +1022,13 @@ function startCloudRealtimeSubscriptions() {
 
   const db = firebase.firestore();
 
-  unsubscribeRecordsRealtime = db.collection('records').doc(uid).onSnapshot((snap) => {
+  unsubscribeRecordsRealtime = db.collection(FS_RECORDS).doc(uid).onSnapshot((snap) => {
     if (!snap || !snap.exists) return;
     const data = snap.data() || {};
     const remoteRecords = (data.records && typeof data.records === 'object')
       ? normalizeRecordMap(data.records)
       : null;
-    const hasRemoteCalendarField = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
-      || (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object');
-    const remoteCalendar = hasRemoteCalendarField
-      ? {
-          checkedDates: (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
-            ? data.studyCalendarCheckedDates
-            : {},
-          dailyCounts: (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object')
-            ? data.studyCalendarDailyCounts
-            : {}
-        }
-      : null;
+    const remoteCalendar = parseCalendarFromFirestoreData(data);
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
     // 旧フィールド（後方互換）: records ドキュメント内に残存する場合のみ読み取る
     const hasLegacySessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
@@ -1047,7 +1071,7 @@ function startCloudRealtimeSubscriptions() {
     }
   });
 
-  unsubscribeStudyStatsRealtime = db.collection('study_stats').doc(uid).onSnapshot((snap) => {
+  unsubscribeStudyStatsRealtime = db.collection(FS_STUDY_STATS).doc(uid).onSnapshot((snap) => {
     if (!snap || !snap.exists) return;
     const totalMs = Number((snap.data() || {}).totalMs || 0);
     applyRemoteStudyTotal(totalMs, 'study_stats');
@@ -1062,7 +1086,7 @@ function startCloudRealtimeSubscriptions() {
     }
   });
 
-  unsubscribeStudyRecordsRealtime = db.collection('records').doc(uid).onSnapshot((snap) => {
+  unsubscribeStudyRecordsRealtime = db.collection(FS_RECORDS).doc(uid).onSnapshot((snap) => {
     if (!snap || !snap.exists) return;
     const totalMs = Number((snap.data() || {}).studyTotalMs || 0);
     if (totalMs <= 0) return;
@@ -1094,7 +1118,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     try { localRecords = JSON.parse(storageGetItem(localKey)) || {}; } catch { localRecords = {}; }
     localRecords = normalizeRecordMap(localRecords);
 
-    const ref = firebase.firestore().collection('records').doc(uid);
+    const ref = firebase.firestore().collection(FS_RECORDS).doc(uid);
     const snap = await ref.get();
     const meta = getRecordsMeta(uid);
     const now = Date.now();
@@ -1102,8 +1126,40 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     const localAccessAt = Number(meta.lastAccessAt || localEditedAt || 0);
 
     if (!snap.exists) {
+      // Migration from old 'records' collection (before app-specific rename).
+      try {
+        const oldSnap = await firebase.firestore().collection('records').doc(uid).get();
+        if (oldSnap.exists) {
+          const oldData = oldSnap.data() || {};
+          const oldRecords = (oldData.records && typeof oldData.records === 'object')
+            ? normalizeRecordMap(oldData.records) : null;
+          if (oldRecords && !isRecordMapEmpty(oldRecords)) {
+            const migratedAt = now;
+            const merged = mergeRecordsNoLoss(localRecords, oldRecords);
+            records = merged;
+            storageSetItem(localKey, JSON.stringify(merged));
+            saveRecordsMeta({ ...meta, localEditedAt: migratedAt, lastAccessAt: migratedAt, lastCloudPullAt: migratedAt }, uid);
+            await ref.set({
+              uid, records: merged, updatedAtMs: migratedAt, accessedAtMs: migratedAt,
+              migratedFromLegacy: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            markSyncSuccess('records', migratedAt);
+            updateMasteryCounts();
+            tryRenderStatsIfOpen();
+            cloudRecordsLoadedUid = uid;
+            return;
+          }
+        }
+      } catch (migErr) {
+        // 接続エラー以外は外側catchへ伝播。接続エラーは移行読み取り失敗とみなし、
+        // 空シードによる既存データ上書きを避けるため中断（次回再試行）。
+        if (!isFirestoreConnectivityError(migErr)) throw migErr;
+        warnCloudError('クラウド成績データ移行(取得):', migErr);
+        return;
+      }
+
       // Backward compatibility: migrate legacy records collection format.
-      const legacyQuery = await firebase.firestore().collection('records').where('uid', '==', uid).get();
+      const legacyQuery = await firebase.firestore().collection(FS_RECORDS).where('uid', '==', uid).get();
       const aggregatedLegacy = aggregateLegacyRecordDocs(legacyQuery.docs || []);
       if (Object.keys(aggregatedLegacy).length > 0) {
         records = aggregatedLegacy;
@@ -1152,18 +1208,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
 
     const data = snap.data() || {};
     const remoteRecords = (data.records && typeof data.records === 'object') ? normalizeRecordMap(data.records) : null;
-    const hasRemoteCalendarField = (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
-      || (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object');
-    const remoteCalendar = hasRemoteCalendarField
-      ? {
-          checkedDates: (data.studyCalendarCheckedDates && typeof data.studyCalendarCheckedDates === 'object')
-            ? data.studyCalendarCheckedDates
-            : {},
-          dailyCounts: (data.studyCalendarDailyCounts && typeof data.studyCalendarDailyCounts === 'object')
-            ? data.studyCalendarDailyCounts
-            : {}
-        }
-      : null;
+    const remoteCalendar = parseCalendarFromFirestoreData(data);
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
     // 旧フィールド（後方互換）: records ドキュメント内に残存する場合のみ読み取る
     const hasLegacySessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
@@ -1197,7 +1242,7 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     if (remoteCalendar) markSyncSuccess('calendar', remoteCalendarUpdatedAt || now);
     // study_sessions コレクションからセッションスナップショットを取得
     try {
-      const sessionSnap = await firebase.firestore().collection('study_sessions').doc(uid).get();
+      const sessionSnap = await firebase.firestore().collection(FS_STUDY_SESSIONS).doc(uid).get();
       if (sessionSnap && sessionSnap.exists) {
         const sd = sessionSnap.data() || {};
         if (Object.prototype.hasOwnProperty.call(sd, 'studySessionSnapshot')) {
@@ -1230,7 +1275,7 @@ async function pushRecordsToCloud() {
       recordsPendingSync = false;
       const now = Date.now();
       const snapshot = normalizeRecordMap(records);
-      await firebase.firestore().collection('records').doc(uid).set({
+      await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
         uid,
         records: snapshot,
         updatedAtMs: now,
@@ -1308,7 +1353,7 @@ async function flushRecordDeltasToCloudIfNeeded() {
 
       if (Object.keys(recordsPatch).length === 0) continue;
 
-      await firebase.firestore().collection('records').doc(uid).set({
+      await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
         uid,
         records: recordsPatch,
         updatedAtMs: now,
@@ -1457,10 +1502,14 @@ async function pushStudyCalendarToCloud() {
     while (calendarPendingSync) {
       calendarPendingSync = false;
       const latest = loadStudyCalendarLocal(uid);
-      await firebase.firestore().collection('records').doc(uid).set({
+      // Serialize calendar as JSON string to avoid Firestore index entry explosion
+      const calendarJson = JSON.stringify({
+        checkedDates: latest.checkedDates,
+        dailyCounts: latest.dailyCounts || {}
+      });
+      await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
         uid,
-        studyCalendarCheckedDates: latest.checkedDates,
-        studyCalendarDailyCounts: latest.dailyCounts || {},
+        studyCalendarJson: calendarJson,
         studyCalendarUpdatedAtMs: Math.max(0, Number(latest.updatedAtMs || Date.now())),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
@@ -1520,7 +1569,7 @@ async function pushStudySessionSnapshotToCloud() {
       const snapshot = normalizeStudySessionSnapshot(studySessionSnapshotCache[uid] || readSavedStudySession(uid));
       const savedAtMs = Math.max(0, Number(snapshot?.savedAt || Date.now()));
       // records ドキュメントのインデックス上限超過を回避するため専用コレクションへ保存
-      await firebase.firestore().collection('study_sessions').doc(uid).set({
+      await firebase.firestore().collection(FS_STUDY_SESSIONS).doc(uid).set({
         uid,
         studySessionSnapshot: snapshot || null,
         studySessionSnapshotSavedAtMs: savedAtMs,
@@ -1590,18 +1639,18 @@ async function readCloudStudyTotal(uid) {
 
   // Prefer backend decided in prior attempts.
   if (studyTimeBackend === 'records') {
-    const snap = await firebase.firestore().collection('records').doc(uid).get();
+    const snap = await firebase.firestore().collection(FS_RECORDS).doc(uid).get();
     const total = Math.max(0, Number((snap.data() || {}).studyTotalMs || 0));
     return { totalMs: total, backend: 'records', exists: snap.exists };
   }
 
   try {
-    const snap = await firebase.firestore().collection('study_stats').doc(uid).get();
+    const snap = await firebase.firestore().collection(FS_STUDY_STATS).doc(uid).get();
     const total = Math.max(0, Number((snap.data() || {}).totalMs || 0));
     return { totalMs: total, backend: 'study_stats', exists: snap.exists };
   } catch (e) {
     if (!isPermissionDeniedError(e)) throw e;
-    const snap = await firebase.firestore().collection('records').doc(uid).get();
+    const snap = await firebase.firestore().collection(FS_RECORDS).doc(uid).get();
     const total = Math.max(0, Number((snap.data() || {}).studyTotalMs || 0));
     return { totalMs: total, backend: 'records', exists: snap.exists };
   }
@@ -1612,7 +1661,7 @@ async function setCloudStudyTotal(uid, totalMs, backendHint = 'auto') {
   const now = Date.now();
 
   if (backendHint === 'records' || studyTimeBackend === 'records') {
-    await firebase.firestore().collection('records').doc(uid).set({
+    await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
       uid,
       studyTotalMs: total,
       studyUpdatedAtMs: now,
@@ -1622,7 +1671,7 @@ async function setCloudStudyTotal(uid, totalMs, backendHint = 'auto') {
   }
 
   try {
-    await firebase.firestore().collection('study_stats').doc(uid).set({
+    await firebase.firestore().collection(FS_STUDY_STATS).doc(uid).set({
       uid,
       totalMs: total,
       updatedAtMs: now,
@@ -1631,7 +1680,7 @@ async function setCloudStudyTotal(uid, totalMs, backendHint = 'auto') {
     return 'study_stats';
   } catch (e) {
     if (!isPermissionDeniedError(e)) throw e;
-    await firebase.firestore().collection('records').doc(uid).set({
+    await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
       uid,
       studyTotalMs: total,
       studyUpdatedAtMs: now,
@@ -1647,7 +1696,7 @@ async function incrementCloudStudyTotal(uid, deltaMs, backendHint = 'auto') {
   const now = Date.now();
 
   if (backendHint === 'records' || studyTimeBackend === 'records') {
-    await firebase.firestore().collection('records').doc(uid).set({
+    await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
       uid,
       studyTotalMs: firebase.firestore.FieldValue.increment(delta),
       studyUpdatedAtMs: now,
@@ -1657,7 +1706,7 @@ async function incrementCloudStudyTotal(uid, deltaMs, backendHint = 'auto') {
   }
 
   try {
-    await firebase.firestore().collection('study_stats').doc(uid).set({
+    await firebase.firestore().collection(FS_STUDY_STATS).doc(uid).set({
       uid,
       totalMs: firebase.firestore.FieldValue.increment(delta),
       updatedAtMs: now,
@@ -1666,7 +1715,7 @@ async function incrementCloudStudyTotal(uid, deltaMs, backendHint = 'auto') {
     return 'study_stats';
   } catch (e) {
     if (!isPermissionDeniedError(e)) throw e;
-    await firebase.firestore().collection('records').doc(uid).set({
+    await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
       uid,
       studyTotalMs: firebase.firestore.FieldValue.increment(delta),
       studyUpdatedAtMs: now,
@@ -1850,24 +1899,48 @@ function loadData() {
 
 async function syncBundledQuestions() {
   try {
-    if (window.location.protocol === 'file:') {
-      return;
-    }
+    if (window.location.protocol === 'file:') return;
 
     // ユーザーが明示的に接続したデータファイルを優先する。
     if (fileHandle) return;
 
-    const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
     const meta = getQuestionsMeta();
-    // Preserve explicit local edits/imports on this device.
+    // ユーザーが手動で編集・インポートしたデータは保持する。
     if (meta.localDirty) return;
 
-    const cloudLoaded = await pullQuestionsFromCloudIfNeeded(true);
-    if (cloudLoaded) return;
+    // 同梱 JSON をまだ読み込んでいない場合（または質問が空の場合）は
+    // output/all_questions.json をフェッチして正規データをロードする。
+    // これにより hasBundledBase = true になり、クラウド側の汚染データを上書きできる。
+    const alreadyLoaded = Number(meta.lastBundledSyncAt || 0) > 0 &&
+      Array.isArray(questions) && questions.length > 0;
 
-    // 問題データはFirestoreを正本とする。
-    // ローカルJSONフォールバックは行わない（他アプリのJSONを誤読み込み防止）。
-    return;
+    if (!alreadyLoaded) {
+      try {
+        const res = await fetch('output/all_questions.json');
+        if (res.ok) {
+          const bundled = await res.json();
+          if (Array.isArray(bundled) && bundled.length > 0) {
+            const now = Date.now();
+            questions = bundled;
+            storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
+            saveQuestionsMeta({
+              ...getQuestionsMeta(),
+              localEditedAt: now,
+              lastBundledSyncAt: now,
+              localDirty: false
+            });
+            if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+            if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+            updateMasteryCounts();
+          }
+        }
+      } catch { /* fetch失敗時はローカルデータを維持 */ }
+    }
+
+    // クラウド同期: hasBundledBase = true の状態で呼ぶことで
+    // pullQuestionsFromCloudIfNeeded 内の suspiciousDownsync が機能し、
+    // クラウド側に汚染データがあれば正規データで上書きされる。
+    await pullQuestionsFromCloudIfNeeded(true);
   } catch {
     // Bundled JSON is optional; fall back to existing localStorage data.
   }
