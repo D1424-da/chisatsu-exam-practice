@@ -905,6 +905,7 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     }
     markSyncSuccess('questions', remoteEditedAt || Date.now());
     cloudQuestionsLoadedUid = uid;
+    return true;
   } catch (e) {
     markSyncError('questions', e);
     warnCloudError('クラウド問題データ同期(取得):', e);
@@ -1840,53 +1841,16 @@ function loadData() {
 }
 
 async function syncBundledQuestions() {
+  // 問題データはFirestoreを正本とする。
+  // ローカルJSONファイルへのフォールバックは行わない。
   try {
-    if (window.location.protocol === 'file:') {
-      return;
-    }
-
-    // ユーザーが明示的に接続したデータファイルを優先する。
+    if (window.location.protocol === 'file:') return;
     if (fileHandle) return;
-
-    const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
     const meta = getQuestionsMeta();
-    // Preserve explicit local edits/imports on this device.
     if (meta.localDirty) return;
-
-    const cloudLoaded = await pullQuestionsFromCloudIfNeeded(true);
-    if (cloudLoaded) return;
-
-    let resp = await fetch(`output/gyosyo_all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
-    if (!resp.ok) {
-      resp = await fetch(`output/all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
-      if (!resp.ok) return;
-    }
-    const bundled = await resp.json();
-    if (!Array.isArray(bundled) || bundled.length === 0) return;
-
-    const localJson = JSON.stringify(Array.isArray(local) ? local : []);
-    const bundledJson = JSON.stringify(bundled);
-    if (localJson === bundledJson) {
-      saveQuestionsMeta({
-        ...meta,
-        localDirty: false,
-        lastBundledSyncAt: Date.now()
-      });
-      return;
-    }
-
-    const syncedAt = Date.now();
-    storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
-    questions = bundled;
-    saveQuestionsMeta({
-      ...meta,
-      localDirty: false,
-      // 同梱データを適用した時刻を明示し、古いクラウド値での上書きを防ぐ。
-      localEditedAt: syncedAt,
-      lastBundledSyncAt: syncedAt
-    });
+    await pullQuestionsFromCloudIfNeeded(true);
   } catch {
-    // Bundled JSON is optional; fall back to existing localStorage data.
+    // ignore
   }
 }
 
