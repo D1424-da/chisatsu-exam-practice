@@ -1139,10 +1139,25 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
             records = merged;
             storageSetItem(localKey, JSON.stringify(merged));
             saveRecordsMeta({ ...meta, localEditedAt: migratedAt, lastAccessAt: migratedAt, lastCloudPullAt: migratedAt }, uid);
-            await ref.set({
+
+            // 旧ドキュメントのカレンダーデータも移行する
+            const oldCalendar = parseCalendarFromFirestoreData(oldData);
+            const calendarJson = oldCalendar ? JSON.stringify({
+              checkedDates: oldCalendar.checkedDates || {},
+              dailyCounts: oldCalendar.dailyCounts || {}
+            }) : null;
+
+            const newDoc = {
               uid, records: merged, updatedAtMs: migratedAt, accessedAtMs: migratedAt,
               migratedFromLegacy: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+            };
+            if (calendarJson) {
+              newDoc.studyCalendarJson = calendarJson;
+              newDoc.studyCalendarUpdatedAtMs = Number(oldData.studyCalendarUpdatedAtMs || migratedAt);
+            }
+            await ref.set(newDoc, { merge: true });
+
+            if (oldCalendar) applyRemoteStudyCalendar(oldCalendar, Number(oldData.studyCalendarUpdatedAtMs || migratedAt));
             markSyncSuccess('records', migratedAt);
             updateMasteryCounts();
             tryRenderStatsIfOpen();
@@ -1207,6 +1222,35 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     }
 
     const data = snap.data() || {};
+
+    // One-time repair: if chisatsu_records exists but has no calendar data,
+    // copy it from the legacy records collection.
+    if (!data.studyCalendarJson &&
+        !data.studyCalendarCheckedDates &&
+        !data.studyCalendarDailyCounts) {
+      try {
+        const legacySnap = await firebase.firestore().collection('records').doc(uid).get();
+        if (legacySnap.exists) {
+          const legacyCalendar = parseCalendarFromFirestoreData(legacySnap.data() || {});
+          if (legacyCalendar) {
+            const calendarJson = JSON.stringify({
+              checkedDates: legacyCalendar.checkedDates || {},
+              dailyCounts: legacyCalendar.dailyCounts || {}
+            });
+            const legacyUpdatedAt = Number((legacySnap.data() || {}).studyCalendarUpdatedAtMs || now);
+            await ref.set({
+              studyCalendarJson: calendarJson,
+              studyCalendarUpdatedAtMs: legacyUpdatedAt,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            applyRemoteStudyCalendar(legacyCalendar, legacyUpdatedAt);
+          }
+        }
+      } catch (e) {
+        warnCloudError('カレンダーデータ補完エラー:', e);
+      }
+    }
+
     const remoteRecords = (data.records && typeof data.records === 'object') ? normalizeRecordMap(data.records) : null;
     const remoteCalendar = parseCalendarFromFirestoreData(data);
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
