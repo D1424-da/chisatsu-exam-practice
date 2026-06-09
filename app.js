@@ -883,6 +883,37 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     const localEditedAt = Number(meta.localEditedAt || 0);
 
     if (!snap.exists) {
+      // Migration: try legacy question_sets collection before seeding from local.
+      try {
+        const legacySnap = await firebase.firestore().collection('question_sets').doc(uid).get();
+        if (legacySnap.exists) {
+          const legacyData = legacySnap.data() || {};
+          const legacyQuestions = Array.isArray(legacyData.questions) ? legacyData.questions : null;
+          if (legacyQuestions && legacyQuestions.length > 0) {
+            const now = Date.now();
+            await ref.set({
+              uid,
+              questions: legacyQuestions,
+              updatedAtMs: Number(legacyData.updatedAtMs || now),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            questions = legacyQuestions;
+            storageSetItem(KEY_QUESTIONS, JSON.stringify(legacyQuestions));
+            saveQuestionsMeta({
+              ...getQuestionsMeta(),
+              localEditedAt: Number(legacyData.updatedAtMs || now),
+              localDirty: false,
+              lastCloudPullAt: now
+            });
+            if (typeof refreshFilterOptions === 'function') refreshFilterOptions();
+            if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
+            markSyncSuccess('questions', Number(legacyData.updatedAtMs || now));
+            cloudQuestionsLoadedUid = uid;
+            return true;
+          }
+        }
+      } catch { /* legacy collection unavailable, fall through */ }
+
       // First login on this account: seed cloud with current local questions if any.
       if (canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
@@ -1132,6 +1163,32 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
     const localAccessAt = Number(meta.lastAccessAt || localEditedAt || 0);
 
     if (!snap.exists) {
+      // Migration from old 'records' collection (before app-specific rename).
+      try {
+        const oldSnap = await firebase.firestore().collection('records').doc(uid).get();
+        if (oldSnap.exists) {
+          const oldData = oldSnap.data() || {};
+          const oldRecords = (oldData.records && typeof oldData.records === 'object')
+            ? normalizeRecordMap(oldData.records) : null;
+          if (oldRecords && !isRecordMapEmpty(oldRecords)) {
+            const migratedAt = now;
+            const merged = mergeRecordsNoLoss(localRecords, oldRecords);
+            records = merged;
+            storageSetItem(localKey, JSON.stringify(merged));
+            saveRecordsMeta({ ...meta, localEditedAt: migratedAt, lastAccessAt: migratedAt, lastCloudPullAt: migratedAt }, uid);
+            await ref.set({
+              uid, records: merged, updatedAtMs: migratedAt, accessedAtMs: migratedAt,
+              migratedFromLegacy: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            markSyncSuccess('records', migratedAt);
+            updateMasteryCounts();
+            tryRenderStatsIfOpen();
+            cloudRecordsLoadedUid = uid;
+            return;
+          }
+        }
+      } catch { /* old collection unavailable, fall through */ }
+
       // Backward compatibility: migrate legacy records collection format.
       const legacyQuery = await firebase.firestore().collection(FS_RECORDS).where('uid', '==', uid).get();
       const aggregatedLegacy = aggregateLegacyRecordDocs(legacyQuery.docs || []);
