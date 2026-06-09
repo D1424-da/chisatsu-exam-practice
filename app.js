@@ -1139,10 +1139,25 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
             records = merged;
             storageSetItem(localKey, JSON.stringify(merged));
             saveRecordsMeta({ ...meta, localEditedAt: migratedAt, lastAccessAt: migratedAt, lastCloudPullAt: migratedAt }, uid);
-            await ref.set({
+
+            // 旧ドキュメントのカレンダーデータも移行する
+            const oldCalendar = parseCalendarFromFirestoreData(oldData);
+            const calendarJson = oldCalendar ? JSON.stringify({
+              checkedDates: oldCalendar.checkedDates || {},
+              dailyCounts: oldCalendar.dailyCounts || {}
+            }) : null;
+
+            const newDoc = {
               uid, records: merged, updatedAtMs: migratedAt, accessedAtMs: migratedAt,
               migratedFromLegacy: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+            };
+            if (calendarJson) {
+              newDoc.studyCalendarJson = calendarJson;
+              newDoc.studyCalendarUpdatedAtMs = Number(oldData.studyCalendarUpdatedAtMs || migratedAt);
+            }
+            await ref.set(newDoc, { merge: true });
+
+            if (oldCalendar) applyRemoteStudyCalendar(oldCalendar, Number(oldData.studyCalendarUpdatedAtMs || migratedAt));
             markSyncSuccess('records', migratedAt);
             updateMasteryCounts();
             tryRenderStatsIfOpen();
