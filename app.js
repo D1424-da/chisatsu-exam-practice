@@ -2179,30 +2179,43 @@ async function connectHandle(handle) {
 // new prefixed keys, so existing users don't lose their data after the
 // key rename. Runs once; subsequent runs are no-ops since legacy keys
 // will be absent or already migrated.
+//
+// NOTE: limb_questions and limb_questions_meta are intentionally NOT migrated
+// because that key was shared with gyosei-quiz-app and may contain gyosei
+// questions. Questions are always loaded fresh from output/all_questions.json.
 function migrateLegacyLocalStorageKeys() {
+  // One-time cleanup: clear any previously-migrated (contaminated) question
+  // cache so syncBundledQuestions re-fetches from output/all_questions.json.
+  const cleanupFlag = LS_PREFIX + 'questions_cleanup_v1';
+  if (!storageGetItem(cleanupFlag)) {
+    try { localStorage.removeItem(LS_PREFIX + 'limb_questions'); } catch { /* ignore */ }
+    try { localStorage.removeItem(LS_PREFIX + 'limb_questions_meta'); } catch { /* ignore */ }
+    storageSetItem(cleanupFlag, '1');
+  }
+
+  // Non-question keys are safe to migrate (per-user records, calendar, etc.)
   const legacyKeys = [
-    'limb_questions',
     'limb_records_meta',
     'limb_study_goal',
     'limb_study_time',
     'limb_study_calendar',
     'limb_study_session',
     'limb_users',
-    'limb_questions_meta',
     'limb_weak_list_pref',
   ];
   for (const legacyKey of legacyKeys) {
     const newKey = LS_PREFIX + legacyKey;
-    // Only migrate if legacy exists and new key is absent.
     const legacyVal = storageGetItem(legacyKey);
     if (legacyVal !== null && storageGetItem(newKey) === null) {
       storageSetItem(newKey, legacyVal);
     }
-    // Remove legacy key so the gyosei app can no longer read our data.
     try { localStorage.removeItem(legacyKey); } catch { /* ignore */ }
   }
+  // Also remove legacy question keys so gyosei app can no longer read our data.
+  try { localStorage.removeItem('limb_questions'); } catch { /* ignore */ }
+  try { localStorage.removeItem('limb_questions_meta'); } catch { /* ignore */ }
 
-  // Per-user keys: scan for limb_records_<uid>, limb_study_calendar_<uid>, etc.
+  // Per-user keys (records, calendar, etc.) — safe to migrate.
   const perUserPrefixes = [
     'limb_records_',
     'limb_records_meta_',
