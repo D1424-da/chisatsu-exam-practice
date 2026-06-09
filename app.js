@@ -1015,9 +1015,12 @@ function startCloudRealtimeSubscriptions() {
 
     const localKey = getRecordStorageKey(uid);
     if (remoteRecords) {
-      const remoteNormalized = normalizeRecordMap(remoteRecords);
-      records = remoteNormalized;
-      storageSetItem(localKey, JSON.stringify(remoteNormalized));
+      // onSnapshot でも無条件上書きを避け、ローカルとマージする
+      let localSnap = {};
+      try { localSnap = normalizeRecordMap(JSON.parse(storageGetItem(localKey)) || {}); } catch { localSnap = {}; }
+      const merged = mergeRecordsNoLoss(localSnap, remoteRecords);
+      records = merged;
+      storageSetItem(localKey, JSON.stringify(merged));
       const now = Date.now();
       saveRecordsMeta({
         ...getRecordsMeta(uid),
@@ -1173,11 +1176,12 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
       return;
     }
 
-    // クラウド正本: remoteRecords がある場合はクラウド値を採用する。
+    // ローカルとクラウドをマージ（カウンタを減らさない方針）。
+    // 無条件上書きだと回答直後のpullでローカル回答が消えるため mergeRecordsNoLoss を使う。
     if (remoteRecords) {
-      const remoteNormalized = normalizeRecordMap(remoteRecords);
-      records = remoteNormalized;
-      storageSetItem(localKey, JSON.stringify(remoteNormalized));
+      const merged = mergeRecordsNoLoss(localRecords, remoteRecords);
+      records = merged;
+      storageSetItem(localKey, JSON.stringify(merged));
       saveRecordsMeta({
         ...meta,
         localEditedAt: Math.max(remoteEditedAt, localEditedAt, now),
@@ -1233,6 +1237,8 @@ async function pushRecordsToCloud() {
         accessedAtMs: now,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+      // push完了後、次のpullで最新値を再取得できるよう済みフラグをリセット
+      cloudRecordsLoadedUid = null;
     }
   } catch (e) {
     recordsPendingSync = true;
