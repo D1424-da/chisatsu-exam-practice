@@ -671,7 +671,13 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
 function setMasteryCountBarVisible(visible) {
   const bar = document.getElementById('mastery-count-bar');
   if (!bar) return;
-  bar.classList.toggle('hidden', !visible);
+  // インラインstyleのdisplay:noneも合わせて解除する
+  if (visible) {
+    bar.style.removeProperty('display');
+    bar.classList.remove('hidden');
+  } else {
+    bar.classList.add('hidden');
+  }
 }
 
 function updateMasteryCounts() {
