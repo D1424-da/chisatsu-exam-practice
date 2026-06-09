@@ -28,17 +28,21 @@ function isFirestoreConnectivityError(error) {
   );
 }
 
- const KEY_QUESTIONS   = 'limb_questions';
-const KEY_RECORDS     = 'limb_records';    // パーユーザーキー: limb_records_<uid>
-const KEY_RECORDS_META = 'limb_records_meta'; // パーユーザーキー: limb_records_meta_<uid>
-const KEY_STUDY_GOAL  = 'limb_study_goal'; // パーユーザーキー: limb_study_goal_<uid>
-const KEY_STUDY_TIME  = 'limb_study_time'; // パーユーザーキー: limb_study_time_<uid>
-const KEY_STUDY_CALENDAR = 'limb_study_calendar'; // パーユーザーキー: limb_study_calendar_<uid>
-const KEY_STUDY_SESSION = 'limb_study_session'; // パーユーザーキー: limb_study_session_<uid>
-const KEY_USERS       = 'limb_users';
-const KEY_SESSION_USER = 'limb_session_user'; // sessionStorage
-const KEY_QUESTIONS_META = 'limb_questions_meta';
-const KEY_WEAK_LIST_PREF = 'limb_weak_list_pref';
+// App-specific localStorage key prefix to avoid collision with other apps
+// hosted on the same GitHub Pages origin (d1424-da.github.io).
+const LS_PREFIX = 'chisatsu_';
+
+const KEY_QUESTIONS   = LS_PREFIX + 'limb_questions';
+const KEY_RECORDS     = LS_PREFIX + 'limb_records';    // パーユーザーキー: <prefix>limb_records_<uid>
+const KEY_RECORDS_META = LS_PREFIX + 'limb_records_meta'; // パーユーザーキー
+const KEY_STUDY_GOAL  = LS_PREFIX + 'limb_study_goal';
+const KEY_STUDY_TIME  = LS_PREFIX + 'limb_study_time';
+const KEY_STUDY_CALENDAR = LS_PREFIX + 'limb_study_calendar';
+const KEY_STUDY_SESSION = LS_PREFIX + 'limb_study_session';
+const KEY_USERS       = LS_PREFIX + 'limb_users';
+const KEY_SESSION_USER = LS_PREFIX + 'limb_session_user'; // sessionStorage
+const KEY_QUESTIONS_META = LS_PREFIX + 'limb_questions_meta';
+const KEY_WEAK_LIST_PREF = LS_PREFIX + 'limb_weak_list_pref';
 const QUESTION_BANK_COLLECTION = 'question_bank_years';
 // App-specific Firestore collection names to avoid data collision with other apps
 // sharing the same Firebase project.
@@ -2171,6 +2175,61 @@ async function connectHandle(handle) {
   await IDB.set('dataFileHandle', handle);
 }
 
+// Migrate data from legacy localStorage keys (without LS_PREFIX) to the
+// new prefixed keys, so existing users don't lose their data after the
+// key rename. Runs once; subsequent runs are no-ops since legacy keys
+// will be absent or already migrated.
+function migrateLegacyLocalStorageKeys() {
+  const legacyKeys = [
+    'limb_questions',
+    'limb_records_meta',
+    'limb_study_goal',
+    'limb_study_time',
+    'limb_study_calendar',
+    'limb_study_session',
+    'limb_users',
+    'limb_questions_meta',
+    'limb_weak_list_pref',
+  ];
+  for (const legacyKey of legacyKeys) {
+    const newKey = LS_PREFIX + legacyKey;
+    // Only migrate if legacy exists and new key is absent.
+    const legacyVal = storageGetItem(legacyKey);
+    if (legacyVal !== null && storageGetItem(newKey) === null) {
+      storageSetItem(newKey, legacyVal);
+    }
+    // Remove legacy key so the gyosei app can no longer read our data.
+    try { localStorage.removeItem(legacyKey); } catch { /* ignore */ }
+  }
+
+  // Per-user keys: scan for limb_records_<uid>, limb_study_calendar_<uid>, etc.
+  const perUserPrefixes = [
+    'limb_records_',
+    'limb_records_meta_',
+    'limb_study_goal_',
+    'limb_study_time_',
+    'limb_study_calendar_',
+    'limb_study_session_',
+  ];
+  try {
+    const keysToMigrate = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith(LS_PREFIX)) continue; // already prefixed
+      if (perUserPrefixes.some(p => k.startsWith(p))) keysToMigrate.push(k);
+    }
+    for (const k of keysToMigrate) {
+      const newKey = LS_PREFIX + k;
+      const val = localStorage.getItem(k);
+      if (val !== null && storageGetItem(newKey) === null) {
+        storageSetItem(newKey, val);
+      }
+      localStorage.removeItem(k);
+    }
+  } catch { /* ignore */ }
+}
+
 async function initFileStorage() {
   if (!FS_SUPPORTED) { updateFileStatus(); return; }
   try {
@@ -3731,6 +3790,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── ファイルストレージ初期化 ──────────────────────────────
   await initFileStorage();
+
+  // ── 旧localStorageキーからの移行（同一オリジン上の他アプリとの競合対策） ──
+  migrateLegacyLocalStorageKeys();
 
   // ── 配布済みデータの同期 ────────────────────────────────
   await syncBundledQuestions();
