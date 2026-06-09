@@ -1227,27 +1227,35 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
 
     const data = snap.data() || {};
 
-    // One-time repair: if chisatsu_records exists but has no calendar data,
-    // copy it from the legacy records collection.
-    if (!data.studyCalendarJson &&
-        !data.studyCalendarCheckedDates &&
-        !data.studyCalendarDailyCounts) {
+    // Repair: if chisatsu_records has no effective calendar data (either the
+    // field is missing or it was written empty during the broken period),
+    // restore it from the legacy records collection.
+    const currentCalendar = parseCalendarFromFirestoreData(data);
+    const currentCalendarEmpty = !currentCalendar ||
+      (Object.keys(currentCalendar.checkedDates || {}).length === 0 &&
+       Object.keys(currentCalendar.dailyCounts || {}).length === 0);
+    if (currentCalendarEmpty) {
       try {
         const legacySnap = await firebase.firestore().collection('records').doc(uid).get();
         if (legacySnap.exists) {
           const legacyCalendar = parseCalendarFromFirestoreData(legacySnap.data() || {});
-          if (legacyCalendar) {
-            const calendarJson = JSON.stringify({
-              checkedDates: legacyCalendar.checkedDates || {},
-              dailyCounts: legacyCalendar.dailyCounts || {}
-            });
+          const legacyHasData = legacyCalendar &&
+            (Object.keys(legacyCalendar.checkedDates || {}).length > 0 ||
+             Object.keys(legacyCalendar.dailyCounts || {}).length > 0);
+          if (legacyHasData) {
+            // 旧データを正本とし、ローカルとマージして復元する。
             const legacyUpdatedAt = Number((legacySnap.data() || {}).studyCalendarUpdatedAtMs || now);
+            applyRemoteStudyCalendar(legacyCalendar, legacyUpdatedAt);
+            const restored = loadStudyCalendarLocal(uid);
+            const calendarJson = JSON.stringify({
+              checkedDates: restored.checkedDates || {},
+              dailyCounts: restored.dailyCounts || {}
+            });
             await ref.set({
               studyCalendarJson: calendarJson,
-              studyCalendarUpdatedAtMs: legacyUpdatedAt,
+              studyCalendarUpdatedAtMs: Math.max(legacyUpdatedAt, Number(restored.updatedAtMs || now)),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
-            applyRemoteStudyCalendar(legacyCalendar, legacyUpdatedAt);
           }
         }
       } catch (e) {
