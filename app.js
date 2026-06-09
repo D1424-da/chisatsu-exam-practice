@@ -911,10 +911,14 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     const localQuestionCount = Array.isArray(questions) ? questions.length : 0;
     const remoteQuestionCount = remoteQuestions.length;
     const hasBundledBase = Number(meta.lastBundledSyncAt || 0) > 0 && !meta.localDirty;
+    // 同梱データを持つ端末で、クラウド側だけ極端に少ない件数なら誤上書きを防止する。
+    const suspiciousDownsync =
+      hasBundledBase &&
+      localQuestionCount >= 50 &&
+      remoteQuestionCount > 0 &&
+      remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
 
-    // 同梱データがある場合は常にローカルを正本とし、クラウド側を上書きする。
-    // これにより他アプリの汚染データがクラウドに残っていても正規データで修正される。
-    if (hasBundledBase && localQuestionCount > 0) {
+    if (suspiciousDownsync) {
       if (canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
         await ref.set({
@@ -925,7 +929,7 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
         }, { merge: true });
         markSyncSuccess('questions', now);
       }
-      saveQuestionsMeta({ ...meta, lastCloudPullAt: Date.now() });
+      saveQuestionsMeta({ ...meta, lastCloudPullAt: Date.now(), lastCloudHealAt: Date.now() });
       cloudQuestionsLoadedUid = uid;
       return;
     }
