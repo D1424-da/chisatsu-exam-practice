@@ -905,7 +905,6 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     }
     markSyncSuccess('questions', remoteEditedAt || Date.now());
     cloudQuestionsLoadedUid = uid;
-    return true;
   } catch (e) {
     markSyncError('questions', e);
     warnCloudError('クラウド問題データ同期(取得):', e);
@@ -1000,12 +999,11 @@ function startCloudRealtimeSubscriptions() {
         }
       : null;
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
-    // 旧フィールド（後方互換）: records ドキュメント内に残存する場合のみ読み取る。
-    const hasLegacySessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
+    const hasRemoteSessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
       || Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshotSavedAtMs');
-    const legacyRemoteSession = hasLegacySessionField ? data.studySessionSnapshot : undefined;
-    const legacyRemoteSessionSavedAt = Number(data.studySessionSnapshotSavedAtMs || 0);
-    if (!remoteRecords && !remoteCalendar) return;
+    const remoteSession = hasRemoteSessionField ? data.studySessionSnapshot : undefined;
+    const remoteSessionSavedAt = Number(data.studySessionSnapshotSavedAtMs || 0);
+    if (!remoteRecords && !remoteCalendar && !hasRemoteSessionField) return;
 
     const localKey = getRecordStorageKey(uid);
     if (remoteRecords) {
@@ -1024,9 +1022,10 @@ function startCloudRealtimeSubscriptions() {
 
     if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
-    if (hasLegacySessionField) applyRemoteStudySessionSnapshot(legacyRemoteSession, legacyRemoteSessionSavedAt);
+    if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
     if (remoteRecords) markSyncSuccess('records', Number(data.updatedAtMs || Date.now()));
     if (remoteCalendar) markSyncSuccess('calendar', remoteCalendarUpdatedAt || Date.now());
+    if (hasRemoteSessionField) markSyncSuccess('session', remoteSessionSavedAt || Date.now());
     tryRenderStatsIfOpen();
   }, (e) => {
     markSyncError('records', e);
@@ -1156,14 +1155,12 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
         }
       : null;
     const remoteCalendarUpdatedAt = Number(data.studyCalendarUpdatedAtMs || 0);
-    // セッションスナップショットは study_sessions コレクションに移行済みのため、
-    // records ドキュメント内の旧フィールドは読み取りのみ（後方互換）で使用する。
-    const hasLegacySessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
+    const hasRemoteSessionField = Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshot')
       || Object.prototype.hasOwnProperty.call(data, 'studySessionSnapshotSavedAtMs');
-    const legacyRemoteSession = hasLegacySessionField ? data.studySessionSnapshot : undefined;
-    const legacyRemoteSessionSavedAt = Number(data.studySessionSnapshotSavedAtMs || 0);
+    const remoteSession = hasRemoteSessionField ? data.studySessionSnapshot : undefined;
+    const remoteSessionSavedAt = Number(data.studySessionSnapshotSavedAtMs || 0);
     const remoteEditedAt = Number(data.updatedAtMs || 0);
-    if (!remoteRecords && !remoteCalendar) {
+    if (!remoteRecords && !remoteCalendar && !hasRemoteSessionField) {
       cloudRecordsLoadedUid = uid;
       return;
     }
@@ -1182,25 +1179,10 @@ async function pullRecordsFromCloudIfNeeded(force = false) {
       updateMasteryCounts();
     }
     if (remoteCalendar) applyRemoteStudyCalendar(remoteCalendar, remoteCalendarUpdatedAt);
-    // 旧フィールドが残っている場合は後方互換として適用（新コレクションへの移行完了後は不要）
-    if (hasLegacySessionField) applyRemoteStudySessionSnapshot(legacyRemoteSession, legacyRemoteSessionSavedAt);
+    if (hasRemoteSessionField) applyRemoteStudySessionSnapshot(remoteSession, remoteSessionSavedAt);
     if (remoteRecords) markSyncSuccess('records', remoteEditedAt || now);
     if (remoteCalendar) markSyncSuccess('calendar', remoteCalendarUpdatedAt || now);
-
-    // study_sessions コレクションからセッションスナップショットを取得する。
-    try {
-      const sessionSnap = await firebase.firestore().collection('study_sessions').doc(uid).get();
-      if (sessionSnap && sessionSnap.exists) {
-        const sd = sessionSnap.data() || {};
-        if (Object.prototype.hasOwnProperty.call(sd, 'studySessionSnapshot')) {
-          applyRemoteStudySessionSnapshot(sd.studySessionSnapshot, Number(sd.studySessionSnapshotSavedAtMs || 0));
-          markSyncSuccess('session', Number(sd.studySessionSnapshotSavedAtMs || now));
-        }
-      }
-    } catch (e) {
-      warnCloudError('セッションスナップショット同期(取得):', e);
-    }
-
+    if (hasRemoteSessionField) markSyncSuccess('session', remoteSessionSavedAt || now);
     tryRenderStatsIfOpen();
     cloudRecordsLoadedUid = uid;
   } catch (e) {
@@ -1510,9 +1492,7 @@ async function pushStudySessionSnapshotToCloud() {
       sessionSnapshotPendingSync = false;
       const snapshot = normalizeStudySessionSnapshot(studySessionSnapshotCache[uid] || readSavedStudySession(uid));
       const savedAtMs = Math.max(0, Number(snapshot?.savedAt || Date.now()));
-      // セッションスナップショットは専用コレクションに保存し、
-      // records ドキュメントのインデックスエントリ上限超過を回避する。
-      await firebase.firestore().collection('study_sessions').doc(uid).set({
+      await firebase.firestore().collection('records').doc(uid).set({
         uid,
         studySessionSnapshot: snapshot || null,
         studySessionSnapshotSavedAtMs: savedAtMs,
@@ -1841,16 +1821,53 @@ function loadData() {
 }
 
 async function syncBundledQuestions() {
-  // 問題データはFirestoreを正本とする。
-  // ローカルJSONファイルへのフォールバックは行わない。
   try {
-    if (window.location.protocol === 'file:') return;
+    if (window.location.protocol === 'file:') {
+      return;
+    }
+
+    // ユーザーが明示的に接続したデータファイルを優先する。
     if (fileHandle) return;
+
+    const local = JSON.parse(storageGetItem(KEY_QUESTIONS) || '[]');
     const meta = getQuestionsMeta();
+    // Preserve explicit local edits/imports on this device.
     if (meta.localDirty) return;
-    await pullQuestionsFromCloudIfNeeded(true);
+
+    const cloudLoaded = await pullQuestionsFromCloudIfNeeded(true);
+    if (cloudLoaded) return;
+
+    let resp = await fetch(`output/gyosyo_all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
+    if (!resp.ok) {
+      resp = await fetch(`output/all_questions.json?ts=${Date.now()}`, { cache: 'no-store' });
+      if (!resp.ok) return;
+    }
+    const bundled = await resp.json();
+    if (!Array.isArray(bundled) || bundled.length === 0) return;
+
+    const localJson = JSON.stringify(Array.isArray(local) ? local : []);
+    const bundledJson = JSON.stringify(bundled);
+    if (localJson === bundledJson) {
+      saveQuestionsMeta({
+        ...meta,
+        localDirty: false,
+        lastBundledSyncAt: Date.now()
+      });
+      return;
+    }
+
+    const syncedAt = Date.now();
+    storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
+    questions = bundled;
+    saveQuestionsMeta({
+      ...meta,
+      localDirty: false,
+      // 同梱データを適用した時刻を明示し、古いクラウド値での上書きを防ぐ。
+      localEditedAt: syncedAt,
+      lastBundledSyncAt: syncedAt
+    });
   } catch {
-    // ignore
+    // Bundled JSON is optional; fall back to existing localStorage data.
   }
 }
 
@@ -2681,6 +2698,12 @@ function renderCurrentLimb() {
   if (!session) return;
   const { queue, index } = session;
 
+  // 進捗更新
+  document.getElementById('progress-text').textContent = `${index + 1} / ${queue.length}`;
+  const pct = ((index + 1) / queue.length * 100).toFixed(1);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  saveStudySessionSnapshot();
+
   if (index >= queue.length) {
     const fromPage = session.fromPage || 'study';
     endSession({ keepSnapshot: false });
@@ -2692,12 +2715,6 @@ function renderCurrentLimb() {
     }
     return;
   }
-
-  // 進捗更新（セッション終了チェックの後に実施）
-  document.getElementById('progress-text').textContent = `${index + 1} / ${queue.length}`;
-  const pct = ((index + 1) / queue.length * 100).toFixed(1);
-  document.getElementById('progress-bar').style.width = pct + '%';
-  saveStudySessionSnapshot();
 
   const limb = queue[index];
   const rec  = getRecord(limb.id);
