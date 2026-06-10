@@ -3546,10 +3546,11 @@ function getInlineOxExpectedAnswers(limb, items) {
   if (Array.isArray(limb.inlineOxAnswers) && limb.inlineOxAnswers.length >= items.length) {
     return limb.inlineOxAnswers.slice(0, items.length).map(v => !!v);
   }
+  const isInlineOxLimb = Array.isArray(limb.inlineOxWrong) || typeof limb.inlineOxWrong === 'string';
+  if (!isInlineOxLimb) return [];
   const wrongKeys = Array.isArray(limb.inlineOxWrong)
     ? limb.inlineOxWrong
     : parseInlineWrongKeys(limb.inlineOxWrong);
-  if (wrongKeys.length === 0) return [];
   const wrong = new Set(wrongKeys);
   return items.map(it => !wrong.has(it.key));
 }
