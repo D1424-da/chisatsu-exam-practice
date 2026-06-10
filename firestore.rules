@@ -29,11 +29,11 @@ service cloud.firestore {
 
     // Question set (legacy collections kept for migration compatibility)
     match /question_sets/{docId} {
-      allow read: if (docId == 'shared' && signedIn()) || matchesAuthUid(docId) || ownsResource();
+      allow read: if (docId == 'shared') || matchesAuthUid(docId) || ownsResource();
       allow create, update, delete: if (docId == 'shared' && isAdminEmail()) || matchesAuthUid(docId) || ownsRequest() || ownsResource();
     }
     match /chisatsu_question_sets/{docId} {
-      allow read: if (docId == 'shared' && signedIn()) || matchesAuthUid(docId) || ownsResource();
+      allow read: if (docId == 'shared') || matchesAuthUid(docId) || ownsResource();
       allow create, update, delete: if (docId == 'shared' && isAdminEmail()) || matchesAuthUid(docId) || ownsRequest() || ownsResource();
     }
 
