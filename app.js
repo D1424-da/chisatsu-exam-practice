@@ -47,6 +47,7 @@ const QUESTION_BANK_COLLECTION = 'question_bank_years';
 // App-specific Firestore collection names to avoid data collision with other apps
 // sharing the same Firebase project.
 const FS_QUESTION_SETS = 'chisatsu_question_sets';
+const SHARED_QUESTION_DOC_ID = 'shared';
 const FS_RECORDS       = 'chisatsu_records';
 const FS_STUDY_STATS   = 'chisatsu_study_stats';
 const FS_STUDY_SESSIONS = 'chisatsu_study_sessions';
@@ -881,19 +882,19 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
 
   cloudPullInFlight = true;
   try {
-    const ref = firebase.firestore().collection(FS_QUESTION_SETS).doc(uid);
+    // 問題データは全ユーザー共通の "shared" ドキュメントを使用する。
+    // 書き込みは管理者のみ（firestore.rules参照）。
+    const ref = firebase.firestore().collection(FS_QUESTION_SETS).doc(SHARED_QUESTION_DOC_ID);
     const snap = await ref.get();
     const meta = getQuestionsMeta();
     const localEditedAt = Number(meta.localEditedAt || 0);
 
     if (!snap.exists) {
-      // chisatsu_question_sets が未作成の場合、ローカル同梱データでシードする。
-      // 旧 question_sets コレクションは gyosei-quiz-app と共有されており汚染されている
-      // 可能性があるため、移行せずローカルデータのみ使用する。
-      if (canSyncQuestionsToCloud(questions)) {
+      // shared ドキュメントが未作成の場合、管理者のローカル同梱データでシードする。
+      if (isAdminUser() && canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
         await ref.set({
-          uid,
+          uid: SHARED_QUESTION_DOC_ID,
           questions,
           updatedAtMs: now,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -923,10 +924,10 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
       remoteQuestionCount < Math.floor(localQuestionCount * 0.6);
 
     if (suspiciousDownsync) {
-      if (canSyncQuestionsToCloud(questions)) {
+      if (isAdminUser() && canSyncQuestionsToCloud(questions)) {
         const now = Date.now();
         await ref.set({
-          uid,
+          uid: SHARED_QUESTION_DOC_ID,
           questions,
           updatedAtMs: now,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -967,11 +968,13 @@ async function pushQuestionsToCloud() {
   const uid = getAuthUid();
   if (!uid) return;
   if (!(window.firebase && firebase.firestore)) return;
+  // 問題データの書き込みは管理者のみ（firestore.rules参照）。
+  if (!isAdminUser()) return;
   if (!canSyncQuestionsToCloud(questions)) return;
   try {
     const now = Date.now();
-    await firebase.firestore().collection(FS_QUESTION_SETS).doc(uid).set({
-      uid,
+    await firebase.firestore().collection(FS_QUESTION_SETS).doc(SHARED_QUESTION_DOC_ID).set({
+      uid: SHARED_QUESTION_DOC_ID,
       questions,
       updatedAtMs: now,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3053,7 +3056,7 @@ function renderCurrentLimb() {
             limb,
             isThisCorrect,
             `<strong>${esc(inlineItems[i].key)} の判定</strong>：${isThisCorrect ? '正解' : '不正解'}`,
-            { advanceSession: false }
+            { advanceSession: false, requireMasteryOnCorrect: true }
           );
           updateCompletion();
         });
@@ -3146,7 +3149,7 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
   document.getElementById('result-explanation').innerHTML   =
     `<strong>正解：${correctLabel}</strong>${detailHtml ? `<br><br>${detailHtml}` : ''}<br><br>${esc(explanation)}`;
 
-  const shouldRequireMastery = isCorrect && advanceSession;
+  const shouldRequireMastery = isCorrect && (advanceSession || opts.requireMasteryOnCorrect);
   if (masteryActions && btnPerfect && btnAmbiguous) {
     masteryActions.classList.toggle('hidden', !shouldRequireMastery);
     btnPerfect.classList.remove('is-selected');
