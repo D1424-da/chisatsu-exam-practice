@@ -1969,7 +1969,14 @@ async function syncBundledQuestions() {
 
     const meta = getQuestionsMeta();
     // ユーザーが手動で編集・インポートしたデータは保持する。
-    if (meta.localDirty) return;
+    // ただし、後でクラウド同期によりlocalDirtyがfalseに戻った際に
+    // 同梱データで上書きされないよう、同梱チェック済みである旨を記録しておく。
+    if (meta.localDirty) {
+      if (!(Number(meta.lastBundledSyncAt || 0) > 0)) {
+        saveQuestionsMeta({ ...meta, lastBundledSyncAt: Date.now() });
+      }
+      return;
+    }
 
     // 同梱 JSON をまだ読み込んでいない場合（または質問が空の場合）は
     // output/all_questions.json をフェッチして正規データをロードする。
