@@ -1995,7 +1995,11 @@ async function syncBundledQuestions() {
             storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
             saveQuestionsMeta({
               ...getQuestionsMeta(),
-              localEditedAt: now,
+              // 同梱データはユーザー編集ではなく初期シードなので、
+              // localEditedAt は 0 のままにする。これにより
+              // pullQuestionsFromCloudIfNeeded の remoteEditedAt >= localEditedAt
+              // 判定でクラウド側の編集済みデータが常に優先される。
+              localEditedAt: 0,
               lastBundledSyncAt: now,
               localDirty: false
             });
