@@ -2609,7 +2609,8 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
             limbs.push({
               ...limb,
               id: makeInlineRecordId(limb.id, it.key),
-              text: `${limb.text}\n[判定対象: ${it.key}]`,
+              text: buildInlineOxStatText(limb.text, it),
+              isInlineStat: true,
               questionId: q.id,
               subject: q.subject,
               category: q.category,
@@ -3537,9 +3538,33 @@ function parseInlineOxItems(text) {
     const key = extractInlineOxKey(body, items.length);
     const rest = body.replace(/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]\s*/, '').trim();
     if (!rest && !tail) continue;
-    items.push({ key, body, tail });
+    items.push({ key, body, tail, start: m.index, end: re.lastIndex });
   }
   return items;
+}
+
+/**
+ * 文章〇×の特定空欄を、前後の文脈付きで1行表示用に抜き出す（苦手肢トップ50用）。
+ * 肢全文ではなく該当空欄の周辺だけを示すことで、同一問題の各空欄を区別できるようにする。
+ */
+function buildInlineOxStatText(fullText, item) {
+  const text = String(fullText || '');
+  const key = item?.key || '';
+  const BEFORE = 28;
+  const AFTER = 72;
+  let start = Number.isInteger(item?.start) ? item.start : -1;
+  let end = Number.isInteger(item?.end) ? item.end : -1;
+  if (start < 0 && item?.body) {
+    const at = text.indexOf('（' + item.body + '）');
+    if (at >= 0) { start = at; end = at + item.body.length + 2; }
+  }
+  if (start < 0) { start = 0; end = 0; }
+  const ctxStart = Math.max(0, start - BEFORE);
+  const ctxEnd = Math.min(text.length, Math.max(end, start) + AFTER);
+  let snippet = text.slice(ctxStart, ctxEnd).replace(/\s+/g, ' ').trim();
+  if (ctxStart > 0) snippet = '…' + snippet;
+  if (ctxEnd < text.length) snippet = snippet + '…';
+  return key ? `空欄${key}　${snippet}` : snippet;
 }
 
 function extractInlineOxKey(body, idx) {
@@ -3800,10 +3825,13 @@ function renderStats() {
       ? r.wrongDateKeys.slice(-5).reverse().join(', ')
       : '';
     const wrongDateInfo = wrongDates ? ` / 誤答日 ${wrongDates}` : '';
+    // 文章〇×は前後の文脈付き抜粋を表示するため、表示上限を広めにとる。
+    const limbText = String(limb.text || '');
+    const textLimit = limb.isInlineStat ? 140 : 80;
     return `<div class="weak-limb-row" data-limb-id="${esc(limb.id)}" role="button" tabindex="0" aria-label="この問題を再挑戦">
       <span class="weak-rank">${i + 1}</span>
       <div class="weak-limb-info">
-        <div class="weak-limb-text">${esc(limb.text.slice(0, 80))}${limb.text.length > 80 ? '…' : ''}</div>
+        <div class="weak-limb-text">${esc(limbText.slice(0, textLimit))}${limbText.length > textLimit ? '…' : ''}</div>
         <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(normalizeCategoryLabel(limb.category)) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${esc(wrongDateInfo)}</div>
       </div>
     </div>`;
