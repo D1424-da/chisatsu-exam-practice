@@ -662,6 +662,17 @@ function isDueForReview(limbId, nowMs = Date.now()) {
   return dueAt <= 0 || dueAt <= nowMs;
 }
 
+/**
+ * 「間違えたもの」カテゴリの判定。
+ * 一度でも誤答していて（wrong>0）、かつ直近の回答が不正解のもの（review.streak===0）だけを対象とする。
+ * 再学習して正解すると review.streak が1以上になり、このカテゴリから外れる。
+ */
+function isOutstandingWrong(rec) {
+  if (!rec) return false;
+  if (Math.max(0, Number(rec.wrong || 0)) <= 0) return false;
+  return normalizeReviewState(rec.review).streak === 0;
+}
+
 function normalizeRecordMap(map) {
   const src = (map && typeof map === 'object') ? map : {};
   const out = {};
@@ -734,7 +745,7 @@ function updateMasteryCounts() {
   for (const stat of Object.values(records || {})) {
     if (normalizeMasteryValue(stat?.mastery) === 'perfect') perfect++;
     if (normalizeMasteryValue(stat?.mastery) === 'ambiguous') ambiguous++;
-    if (Math.max(0, Number(stat?.wrong || 0)) > 0) wrong++;
+    if (isOutstandingWrong(stat)) wrong++;
   }
 
   const elPerfect = document.getElementById('count-perfect');
@@ -2882,7 +2893,7 @@ function startSession() {
     });
     limbs = shuffle(limbs);
   } else if (mode === 'wrong') {
-    limbs = limbs.filter(l => getRecord(l.id).wrong > 0);
+    limbs = limbs.filter(l => isOutstandingWrong(getRecord(l.id)));
     limbs = shuffle(limbs);
   } else {
     limbs = shuffle(limbs);
