@@ -2869,11 +2869,13 @@ function startSession() {
   }
 
   if (mode === 'weak') {
+    // 実効レコード（文章〇×は各空欄を合算）は parseInlineOxItems を伴い重いので、肢ごとに一度だけ算出して使い回す。
+    const recMap = new Map(limbs.map(l => [l, getEffectiveRecord(l)]));
     limbs = limbs.filter(l => {
-      const r = getEffectiveRecord(l);
+      const r = recMap.get(l);
       return r.wrong > 0 || r.correct === 0;
     });
-    limbs.sort((a, b) => weakScore(getEffectiveRecord(b)) - weakScore(getEffectiveRecord(a)));
+    limbs.sort((a, b) => weakScore(recMap.get(b)) - weakScore(recMap.get(a)));
   } else if (mode === 'perfect') {
     limbs = limbs.filter(l => normalizeMasteryValue(getRecord(l.id).mastery) === 'perfect');
     limbs = shuffle(limbs);
@@ -2893,7 +2895,7 @@ function startSession() {
     });
     limbs = shuffle(limbs);
   } else if (mode === 'wrong') {
-    limbs = limbs.filter(l => isOutstandingWrong(getRecord(l.id)));
+    limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);
   } else {
     limbs = shuffle(limbs);
@@ -3170,7 +3172,7 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
     : (limb.correct ? '正しい（○）' : '誤り（×）');
   const explanation  = limb.explanation || '（解説なし）';
   document.getElementById('result-explanation').innerHTML   =
-    `<strong>正解：${correctLabel}</strong>${detailHtml ? `<br><br>${detailHtml}` : ''}<br><br>${esc(explanation)}`;
+    `<strong>正解：${esc(correctLabel)}</strong>${detailHtml ? `<br><br>${detailHtml}` : ''}<br><br>${esc(explanation)}`;
 
   const shouldRequireMastery = isCorrect && (advanceSession || opts.requireMasteryOnCorrect);
   if (masteryActions && btnPerfect && btnAmbiguous) {
@@ -3839,10 +3841,23 @@ function renderStats() {
     // 文章〇×は前後の文脈付き抜粋を表示するため、表示上限を広めにとる。
     const limbText = String(limb.text || '');
     const textLimit = limb.isInlineStat ? 140 : 80;
-    return `<div class="weak-limb-row" data-limb-id="${esc(limb.id)}" role="button" tabindex="0" aria-label="この問題を再挑戦">
+    const truncated = limbText.slice(0, textLimit);
+    const ellipsis = limbText.length > textLimit ? '…' : '';
+    // 文章〇×の「空欄①　…」は先頭ラベルを視覚的に強調する（全角スペース区切りを目印に分離）。
+    let textHtml;
+    const sepIdx = limb.isInlineStat ? truncated.indexOf('　') : -1;
+    if (sepIdx > 0) {
+      const label = truncated.slice(0, sepIdx);
+      const rest = truncated.slice(sepIdx + 1);
+      textHtml = `<span class="weak-limb-blank-label">${esc(label)}</span>${esc(rest)}${ellipsis}`;
+    } else {
+      textHtml = `${esc(truncated)}${ellipsis}`;
+    }
+    const ariaText = limbText.slice(0, 30).replace(/\s+/g, ' ').trim();
+    return `<div class="weak-limb-row" data-limb-id="${esc(limb.id)}" role="button" tabindex="0" aria-label="${esc(`${limb.subject || ''}：${ariaText} を再挑戦`)}">
       <span class="weak-rank">${i + 1}</span>
       <div class="weak-limb-info">
-        <div class="weak-limb-text">${esc(limbText.slice(0, textLimit))}${limbText.length > textLimit ? '…' : ''}</div>
+        <div class="weak-limb-text">${textHtml}</div>
         <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(normalizeCategoryLabel(limb.category)) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${esc(wrongDateInfo)}</div>
       </div>
     </div>`;
