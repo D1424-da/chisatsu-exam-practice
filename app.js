@@ -662,6 +662,28 @@ function isDueForReview(limbId, nowMs = Date.now()) {
   return dueAt <= 0 || dueAt <= nowMs;
 }
 
+function isPerfectLimb(limbId) {
+  return normalizeMasteryValue(getRecord(limbId).mastery) === 'perfect';
+}
+
+/**
+ * 「優先復習」モードの総合スコア。値が大きいほど優先的に出題する。
+ * 誤答・あいまい・ブックマーク・未回答・復習期限切れ・苦手度を重み付けして合算する。
+ * 文章〇×は getEffectiveRecord で各空欄を合算した成績を用いる。
+ */
+function priorityReviewScore(limb, nowMs = Date.now()) {
+  const r = getEffectiveRecord(limb);
+  const total = r.correct + r.wrong;
+  let s = 0;
+  s += r.wrong * 3;
+  if (normalizeMasteryValue(r.mastery) === 'ambiguous') s += 2;
+  if (r.bookmarked) s += 2;
+  if (total === 0) s += 1;
+  if (isDueForReview(limb.id, nowMs)) s += 2;
+  s += weakScore(r) * 5;
+  return s;
+}
+
 /**
  * 「間違えたもの」カテゴリの判定。
  * 一度でも誤答していて（wrong>0）、かつ直近の回答が不正解のもの（review.streak===0）だけを対象とする。
@@ -2939,6 +2961,12 @@ function startSession() {
   } else if (mode === 'bookmarked') {
     limbs = limbs.filter(l => !!getRecord(l.id).bookmarked);
     limbs = shuffle(limbs);
+  } else if (mode === 'priority') {
+    // 完璧マスター済みは除外（ただしブックマーク済みは残す）。優先スコアは肢ごとに一度だけ算出する。
+    const nowMs = Date.now();
+    limbs = limbs.filter(l => !isPerfectLimb(l.id) || getRecord(l.id).bookmarked);
+    const scoreMap = new Map(limbs.map(l => [l, priorityReviewScore(l, nowMs)]));
+    limbs.sort((a, b) => scoreMap.get(b) - scoreMap.get(a));
   } else {
     limbs = shuffle(limbs);
   }
