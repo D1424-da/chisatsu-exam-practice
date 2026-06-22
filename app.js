@@ -2893,7 +2893,7 @@ function startSession() {
     });
     limbs = shuffle(limbs);
   } else if (mode === 'wrong') {
-    limbs = limbs.filter(l => isOutstandingWrong(getRecord(l.id)));
+    limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);
   } else {
     limbs = shuffle(limbs);
