@@ -330,7 +330,9 @@ body {
   grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: start;
-  margin-bottom: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .limb-note-input {

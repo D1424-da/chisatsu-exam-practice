@@ -685,7 +685,9 @@ function normalizeRecordMap(map) {
       wrongDateKeys: normalizeWrongDateKeys(stat?.wrongDateKeys),
       review: normalizeReviewState(stat?.review),
       mastery: normalizeMasteryValue(stat?.mastery),
-      masteryUpdatedAtMs: Math.max(0, Number(stat?.masteryUpdatedAtMs || 0))
+      masteryUpdatedAtMs: Math.max(0, Number(stat?.masteryUpdatedAtMs || 0)),
+      note: String(stat?.note || '').slice(0, 1000),
+      bookmarked: !!stat?.bookmarked
     };
   }
   return out;
@@ -719,7 +721,9 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
       mastery: masteryFromRemote
         ? normalizeMasteryValue(remote[id]?.mastery)
         : normalizeMasteryValue(local[id]?.mastery),
-      masteryUpdatedAtMs: Math.max(localMasteryAt, remoteMasteryAt)
+      masteryUpdatedAtMs: Math.max(localMasteryAt, remoteMasteryAt),
+      note: String(remote[id]?.note || local[id]?.note || '').slice(0, 1000),
+      bookmarked: !!(local[id]?.bookmarked || remote[id]?.bookmarked)
     };
   }
   return merged;
@@ -2507,7 +2511,9 @@ function getRecord(limbId) {
     wrongDateKeys: [],
     review: normalizeReviewState(null),
     mastery: '',
-    masteryUpdatedAtMs: 0
+    masteryUpdatedAtMs: 0,
+    note: '',
+    bookmarked: false
   };
 }
 
@@ -2519,12 +2525,42 @@ function setLimbMastery(limbId, mastery) {
       wrongDateKeys: [],
       review: normalizeReviewState(null),
       mastery: '',
-      masteryUpdatedAtMs: 0
+      masteryUpdatedAtMs: 0,
+      note: '',
+      bookmarked: false
     };
   }
   records[limbId].mastery = normalizeMasteryValue(mastery);
   records[limbId].masteryUpdatedAtMs = Date.now();
   saveRecords();
+}
+
+function ensureRecord(limbId) {
+  if (!records[limbId]) {
+    records[limbId] = {
+      correct: 0,
+      wrong: 0,
+      wrongDateKeys: [],
+      review: normalizeReviewState(null),
+      mastery: '',
+      masteryUpdatedAtMs: 0,
+      note: '',
+      bookmarked: false
+    };
+  }
+  return records[limbId];
+}
+
+function setLimbNote(limbId, note) {
+  ensureRecord(limbId).note = String(note || '').slice(0, 1000);
+  saveRecords();
+}
+
+function toggleLimbBookmark(limbId) {
+  const rec = ensureRecord(limbId);
+  rec.bookmarked = !rec.bookmarked;
+  saveRecords();
+  return rec.bookmarked;
 }
 
 function addRecord(limbId, isCorrect) {
@@ -2535,7 +2571,9 @@ function addRecord(limbId, isCorrect) {
       wrongDateKeys: [],
       review: normalizeReviewState(null),
       mastery: '',
-      masteryUpdatedAtMs: 0
+      masteryUpdatedAtMs: 0,
+      note: '',
+      bookmarked: false
     };
   }
   if (isCorrect) records[limbId].correct++;
@@ -2650,8 +2688,9 @@ function shuffle(arr) {
 /** 苦手スコア（間違い多く、正答率低いほど高い） */
 function weakScore(r) {
   const total = r.correct + r.wrong;
-  if (total === 0) return 0;
-  return r.wrong / total + r.wrong * 0.1;
+  let s = total === 0 ? 0 : r.wrong / total + r.wrong * 0.1;
+  if (r.bookmarked) s += 2;
+  return s;
 }
 
 function getSubjects() {
@@ -2897,6 +2936,9 @@ function startSession() {
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);
+  } else if (mode === 'bookmarked') {
+    limbs = limbs.filter(l => !!getRecord(l.id).bookmarked);
+    limbs = shuffle(limbs);
   } else {
     limbs = shuffle(limbs);
   }
@@ -3017,6 +3059,15 @@ function renderCurrentLimb() {
       </div>
     `;
 
+  const bookmarkLabel = rec.bookmarked ? '★ ブックマーク済み' : '☆ ブックマーク';
+  const noteSectionHtml = `
+    <div class="limb-tools">
+      <button id="btn-bookmark-limb" class="btn btn-ghost btn-sm" type="button">${bookmarkLabel}</button>
+      <textarea id="limb-note-input" class="limb-note-input" rows="2" placeholder="この肢のメモ（任意）">${esc(rec.note || '')}</textarea>
+      <button id="btn-save-limb-note" class="btn btn-ghost btn-sm" type="button">メモ保存</button>
+    </div>
+  `;
+
   const area = document.getElementById('limb-area');
   area.innerHTML = `
     <div class="limb-card card">
@@ -3025,8 +3076,27 @@ function renderCurrentLimb() {
       <div class="limb-text">${inlineTextHtml}</div>
       <div class="limb-record">${rate !== null ? `正答率 ${rate}% (${rec.correct}○ ${rec.wrong}×)` : '未回答'}</div>
       ${answerSectionHtml}
+      ${noteSectionHtml}
     </div>
   `;
+
+  // ブックマーク・メモは全問題形式で共通。形式別の早期returnより前に登録する。
+  const btnBookmark = document.getElementById('btn-bookmark-limb');
+  const btnSaveNote = document.getElementById('btn-save-limb-note');
+  const noteInput = document.getElementById('limb-note-input');
+  if (btnBookmark) {
+    btnBookmark.addEventListener('click', () => {
+      const flagged = toggleLimbBookmark(limb.id);
+      btnBookmark.textContent = flagged ? '★ ブックマーク済み' : '☆ ブックマーク';
+    });
+  }
+  if (btnSaveNote && noteInput) {
+    btnSaveNote.addEventListener('click', () => {
+      setLimbNote(limb.id, noteInput.value);
+      btnSaveNote.textContent = '保存済み';
+      setTimeout(() => { btnSaveNote.textContent = 'メモ保存'; }, 1000);
+    });
+  }
 
   if (isInlineOxQuestion) {
     startStudyTimerIfNeeded(true);
@@ -3858,7 +3928,7 @@ function renderStats() {
       <span class="weak-rank">${i + 1}</span>
       <div class="weak-limb-info">
         <div class="weak-limb-text">${textHtml}</div>
-        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(normalizeCategoryLabel(limb.category)) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${esc(wrongDateInfo)}</div>
+        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(normalizeCategoryLabel(limb.category)) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${r.bookmarked ? ' / ★' : ''}${esc(wrongDateInfo)}</div>
       </div>
     </div>`;
   }).join('');
