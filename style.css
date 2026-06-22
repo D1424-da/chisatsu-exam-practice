@@ -947,6 +947,16 @@ body {
 
 .weak-limb-info { flex: 1; }
 .weak-limb-text { font-size: .9rem; }
+.weak-limb-blank-label {
+  display: inline-block;
+  font-weight: 700;
+  font-size: .8rem;
+  color: var(--primary);
+  background: #e8eeff;
+  border-radius: 4px;
+  padding: 0 6px;
+  margin-right: 6px;
+}
 .weak-limb-meta { font-size: .8rem; color: var(--text-muted); margin-top: 2px; }
 
 .members-only-cta {
