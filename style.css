@@ -345,6 +345,7 @@ body {
   color: var(--text);
   resize: vertical;
 }
+.result-tools { margin-bottom: 12px; }
 .answer-buttons {
   display: flex;
   gap: 12px;

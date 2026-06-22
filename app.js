@@ -3272,6 +3272,17 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
   document.getElementById('result-explanation').innerHTML   =
     `<strong>正解：${esc(correctLabel)}</strong>${detailHtml ? `<br><br>${detailHtml}` : ''}<br><br>${esc(explanation)}`;
 
+  // 回答後の結果モーダルでもブックマーク・メモを編集できるよう、現在の肢の状態を反映する。
+  const rec = getRecord(limb.id);
+  const resultBookmarkBtn = document.getElementById('result-btn-bookmark');
+  const resultNoteInput = document.getElementById('result-note-input');
+  const resultSaveNoteBtn = document.getElementById('result-btn-save-note');
+  if (resultBookmarkBtn) {
+    resultBookmarkBtn.textContent = rec.bookmarked ? '★ ブックマーク済み' : '☆ ブックマーク';
+  }
+  if (resultNoteInput) resultNoteInput.value = rec.note || '';
+  if (resultSaveNoteBtn) resultSaveNoteBtn.textContent = 'メモ保存';
+
   const shouldRequireMastery = isCorrect && (advanceSession || opts.requireMasteryOnCorrect);
   if (masteryActions && btnPerfect && btnAmbiguous) {
     masteryActions.classList.toggle('hidden', !shouldRequireMastery);
@@ -4220,6 +4231,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       btnMarkAmbiguous.classList.add('is-selected');
       btnMarkPerfect?.classList.remove('is-selected');
       updateMasteryCounts();
+    });
+  }
+
+  // 結果モーダル内のブックマーク・メモ（現在の肢は modal.dataset.currentLimbId から取得）
+  const resultBtnBookmark = document.getElementById('result-btn-bookmark');
+  if (resultBtnBookmark) {
+    resultBtnBookmark.addEventListener('click', () => {
+      const modal = document.getElementById('modal-result');
+      const limbId = String(modal.dataset.currentLimbId || '');
+      if (!limbId) return;
+      const flagged = toggleLimbBookmark(limbId);
+      resultBtnBookmark.textContent = flagged ? '★ ブックマーク済み' : '☆ ブックマーク';
+    });
+  }
+  const resultBtnSaveNote = document.getElementById('result-btn-save-note');
+  const resultNoteInputEl = document.getElementById('result-note-input');
+  if (resultBtnSaveNote && resultNoteInputEl) {
+    resultBtnSaveNote.addEventListener('click', () => {
+      const modal = document.getElementById('modal-result');
+      const limbId = String(modal.dataset.currentLimbId || '');
+      if (!limbId) return;
+      setLimbNote(limbId, resultNoteInputEl.value);
+      resultBtnSaveNote.textContent = '保存済み';
+      setTimeout(() => { resultBtnSaveNote.textContent = 'メモ保存'; }, 1000);
     });
   }
 
