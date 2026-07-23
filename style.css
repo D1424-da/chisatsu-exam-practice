@@ -13,7 +13,7 @@
 #btn-mark-ambiguous.btn-primary:active {
   background: linear-gradient(135deg, var(--mastery-ambiguous-strong) 0%, var(--mastery-ambiguous) 100%) !important;
   color: #fff !important;
-  box-shadow: 0 8px 18px rgba(139, 15, 235, 0.18);
+  box-shadow: 0 8px 18px rgba(54, 2, 94, 0.18);
 }
 /* --- 完璧ボタンのグラデーションとホバー色 --- */
 .btn-mark-perfect.btn-primary,
