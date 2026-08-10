@@ -677,9 +677,13 @@ function priorityReviewScore(limb, nowMs = Date.now()) {
   let s = 0;
   s += r.wrong * 3;
   if (normalizeMasteryValue(r.mastery) === 'ambiguous') s += 2;
-  if (r.bookmarked) s += 2;
-  if (total === 0) s += 1;
-  if (isDueForReview(limb.id, nowMs)) s += 2;
+  if (total === 0) {
+    s += 1 + 2; // 未回答 + 期限切れ扱い
+  } else {
+    const review = normalizeReviewState(r.review);
+    const dueAt = review.dueAtMs || review.lastAnsweredAtMs;
+    if (dueAt <= 0 || dueAt <= nowMs) s += 2;
+  }
   s += weakScore(r) * 5;
   return s;
 }
@@ -2938,7 +2942,7 @@ function startSession() {
     });
     limbs.sort((a, b) => weakScore(recMap.get(b)) - weakScore(recMap.get(a)));
   } else if (mode === 'perfect') {
-    limbs = limbs.filter(l => normalizeMasteryValue(getRecord(l.id).mastery) === 'perfect');
+    limbs = limbs.filter(l => isPerfectLimb(l.id));
     limbs = shuffle(limbs);
   } else if (mode === 'ambiguous') {
     limbs = limbs.filter(l => normalizeMasteryValue(getRecord(l.id).mastery) === 'ambiguous');
@@ -3273,15 +3277,17 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
     `<strong>正解：${esc(correctLabel)}</strong>${detailHtml ? `<br><br>${detailHtml}` : ''}<br><br>${esc(explanation)}`;
 
   // 回答後の結果モーダルでもブックマーク・メモを編集できるよう、現在の肢の状態を反映する。
+  // ただしインライン〇×で既にモーダルが開いている場合はメモの下書きを上書きしない。
   const rec = getRecord(limb.id);
   const resultBookmarkBtn = document.getElementById('result-btn-bookmark');
   const resultNoteInput = document.getElementById('result-note-input');
   const resultSaveNoteBtn = document.getElementById('result-btn-save-note');
+  const modalAlreadyOpen = !overlay.classList.contains('hidden');
   if (resultBookmarkBtn) {
     resultBookmarkBtn.textContent = rec.bookmarked ? '★ ブックマーク済み' : '☆ ブックマーク';
   }
-  if (resultNoteInput) resultNoteInput.value = rec.note || '';
-  if (resultSaveNoteBtn) resultSaveNoteBtn.textContent = 'メモ保存';
+  if (resultNoteInput && !modalAlreadyOpen) resultNoteInput.value = rec.note || '';
+  if (resultSaveNoteBtn && !modalAlreadyOpen) resultSaveNoteBtn.textContent = 'メモ保存';
 
   const shouldRequireMastery = isCorrect && (advanceSession || opts.requireMasteryOnCorrect);
   if (masteryActions && btnPerfect && btnAmbiguous) {
@@ -4239,10 +4245,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (resultBtnBookmark) {
     resultBtnBookmark.addEventListener('click', () => {
       const modal = document.getElementById('modal-result');
+      if (!modal) return;
       const limbId = String(modal.dataset.currentLimbId || '');
       if (!limbId) return;
       const flagged = toggleLimbBookmark(limbId);
-      resultBtnBookmark.textContent = flagged ? '★ ブックマーク済み' : '☆ ブックマーク';
+      const label = flagged ? '★ ブックマーク済み' : '☆ ブックマーク';
+      resultBtnBookmark.textContent = label;
+      const studyBookmarkBtn = document.getElementById('btn-bookmark-limb');
+      if (studyBookmarkBtn) studyBookmarkBtn.textContent = label;
     });
   }
   const resultBtnSaveNote = document.getElementById('result-btn-save-note');
@@ -4250,6 +4260,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (resultBtnSaveNote && resultNoteInputEl) {
     resultBtnSaveNote.addEventListener('click', () => {
       const modal = document.getElementById('modal-result');
+      if (!modal) return;
       const limbId = String(modal.dataset.currentLimbId || '');
       if (!limbId) return;
       setLimbNote(limbId, resultNoteInputEl.value);
