@@ -1,0 +1,35 @@
+{
+  "name": "chisatsu-exam-practice",
+  "version": "1.0.0",
+  "description": "択一問題の選択肢を1肢ずつ○×で判定するWebアプリです。   **Node.js不要** — `index.html` をブラウザで開くだけで動作します。",
+  "main": "app.js",
+  "scripts": {
+    "test": "npm run test:unit && npm run test:playwright",
+    "test:unit": "node --test tests/unit/pure-functions.test.js",
+    "test:playwright": "npx playwright test",
+    "test:ui": "npx playwright test tests/ui/",
+    "test:e2e": "npx playwright test tests/e2e/",
+    "test:a11y": "npx playwright test tests/accessibility/",
+    "test:responsive": "npx playwright test tests/responsive/",
+    "test:performance": "npx playwright test tests/performance/",
+    "test:security": "npx playwright test tests/security/",
+    "test:regression": "npx playwright test tests/e2e/regression.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/D1424-da/chisatsu-exam-practice.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/D1424-da/chisatsu-exam-practice/issues"
+  },
+  "homepage": "https://github.com/D1424-da/chisatsu-exam-practice#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "axe-playwright": "^2.2.2",
+    "http-server": "^14.1.1",
+    "playwright": "^1.62.1"
+  }
+}

@@ -28,3 +28,8 @@ archive/
 # Node/package files (if you add npm later)
 node_modules/
 package-lock.json
+
+# 環境変数・機密情報
+.env
+.env.*
+!.env.example
