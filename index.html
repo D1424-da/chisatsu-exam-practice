@@ -40,7 +40,7 @@
         
         <div class="divider">または</div>
         
-        <div id="google-login-btn" style="text-align: center;"></div>
+        <div id="google-login-btn" class="text-center"></div>
         
         <button id="btn-show-register" class="btn btn-ghost login-submit">新規ユーザー作成</button>
         <button id="btn-show-reset" class="btn-link login-link">パスワードをお忘れですか？</button>
@@ -166,7 +166,7 @@
       </section>
 
       <!-- カウント表示バー -->
-      <div id="mastery-count-bar" class="card mastery-count-bar" style="display:none;">
+      <div id="mastery-count-bar" class="card mastery-count-bar hidden">
         <button id="count-perfect" class="btn btn-primary btn-mark-perfect mastery-count-btn" type="button">完璧: 0</button>
         <button id="count-ambiguous" class="btn btn-primary btn-mark-ambiguous mastery-count-btn" type="button">あいまい: 0</button>
         <button id="count-wrong" class="btn btn-danger mastery-count-btn" type="button">まちがえたもの: 0</button>
@@ -206,7 +206,7 @@
       <div class="card">
         <h2>管理者ページ</h2>
         <p class="login-reset-note">ここは管理者専用の入口ページです。問題管理へ進む前の確認画面として使えます。</p>
-        <div class="members-only-actions" style="justify-content:flex-start; margin-top: 16px;">
+        <div class="members-only-actions justify-start mt-16">
           <button id="btn-open-manage-from-admin" class="btn btn-primary" type="button">問題管理へ進む</button>
           <button id="btn-admin-logout" class="btn btn-ghost" type="button">ログアウト</button>
         </div>
@@ -323,12 +323,12 @@
           <span class="file-reconnect-msg">前回のデータファイルが見つかりました。クリックして再接続してください。</span>
           <button id="btn-reconnect-file" class="btn btn-warn btn-sm">再接続</button>
         </div>
-        <div class="modal-actions" style="margin-top:14px;">
+        <div class="modal-actions mt-14">
           <button id="btn-new-data-file" class="btn btn-primary">新規ファイルを作成</button>
           <button id="btn-open-data-file" class="btn btn-ghost">既存ファイルを開く</button>
           <button id="btn-disconnect-file" class="btn btn-danger" disabled>接続解除</button>
         </div>
-        <p id="fs-not-supported" class="hidden" style="color:var(--danger);font-size:.85rem;margin-top:8px;">
+        <p id="fs-not-supported" class="hidden login-error">
           ※このブラウザはファイル保存に対応していません。Chrome または Edge をご利用ください。
         </p>
       </div>
@@ -397,13 +397,13 @@
           </div>
           <div id="weak-limbs-list"></div>
         </div>
-        <button id="btn-reset-stats" class="btn btn-danger btn-sm" style="margin-top:16px;">統計をリセット</button>
+        <button id="btn-reset-stats" class="btn btn-danger btn-sm mt-16">統計をリセット</button>
       </div>
     </main>
   </div>
 
   <!-- モーダル：問題追加・編集 -->
-  <div id="modal-question" class="modal-overlay hidden">
+  <div id="modal-question" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal">
       <h3 id="modal-title">問題を追加</h3>
       <form id="form-question">
@@ -440,7 +440,7 @@
   </div>
 
   <!-- モーダル：肢の回答確認 -->
-  <div id="modal-result" class="modal-overlay hidden">
+  <div id="modal-result" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="回答結果">
     <div class="modal modal-sm">
       <div id="result-icon" class="result-icon"></div>
       <p id="result-explanation" class="result-explanation"></p>
@@ -453,18 +453,18 @@
         <textarea id="result-note-input" class="limb-note-input" rows="2" placeholder="この肢のメモ（任意）"></textarea>
         <button id="result-btn-save-note" class="btn btn-ghost btn-sm" type="button">メモ保存</button>
       </div>
-      <button id="btn-result-next" class="btn btn-primary" style="width:100%">次の肢へ</button>
+      <button id="btn-result-next" class="btn btn-primary w-full">次の肢へ</button>
     </div>
   </div>
 
   <!-- モーダル：管理者ログイン -->
-  <div id="admin-login-overlay" class="modal-overlay hidden">
+  <div id="admin-login-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-login-title">
     <div class="modal modal-sm admin-login-modal">
-      <h3>管理者ログイン</h3>
+      <h3 id="admin-login-title">管理者ログイン</h3>
       <p class="login-reset-note">問題管理ページは、管理者メールアドレスとパスワードでログインが必要です。</p>
       <div class="form-group">
         <label for="admin-login-username">管理者メールアドレス</label>
-        <input type="email" id="admin-login-username" class="login-input" autocomplete="username" placeholder="ikeda.job08@gmail.com" />
+        <input type="email" id="admin-login-username" class="login-input" autocomplete="username" placeholder="管理者メールアドレスを入力" />
       </div>
       <div class="form-group">
         <label for="admin-login-password">パスワード</label>

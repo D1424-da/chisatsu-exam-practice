@@ -505,6 +505,7 @@ function openAdminLoginOverlay() {
   if (usernameEl) usernameEl.value = '';
   if (passwordEl) passwordEl.value = '';
 
+  if (typeof rememberFocusBeforeModal === 'function') rememberFocusBeforeModal();
   overlay.classList.remove('hidden');
   if (usernameEl) usernameEl.focus();
 }
@@ -514,6 +515,7 @@ function closeAdminLoginOverlay() {
   if (!overlay) return;
   overlay.classList.add('hidden');
   hideError('admin-login-error');
+  if (typeof restoreFocusAfterModal === 'function') restoreFocusAfterModal();
 }
 
 function resolveAdminLoginEmail(inputId) {

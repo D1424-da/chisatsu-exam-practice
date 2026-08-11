@@ -89,13 +89,19 @@ let studySessionSnapshotCache = {};
 // ── ユーティリティ ───────────────────────────────────────────
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-const useLocalStorage = true;
-const volatileStorage = new Map();
+// モーダルを開く直前のフォーカス位置を記憶し、閉じたときに復元する。
+let lastFocusedBeforeModal = null;
+function rememberFocusBeforeModal() {
+  lastFocusedBeforeModal = document.activeElement;
+}
+function restoreFocusAfterModal() {
+  if (lastFocusedBeforeModal && typeof lastFocusedBeforeModal.focus === 'function') {
+    lastFocusedBeforeModal.focus();
+  }
+  lastFocusedBeforeModal = null;
+}
 
 function storageGetItem(key) {
-  if (!useLocalStorage) {
-    return volatileStorage.has(key) ? volatileStorage.get(key) : null;
-  }
   try {
     return window.localStorage.getItem(key);
   } catch {
@@ -104,10 +110,6 @@ function storageGetItem(key) {
 }
 
 function storageSetItem(key, value) {
-  if (!useLocalStorage) {
-    volatileStorage.set(key, String(value));
-    return;
-  }
   try {
     window.localStorage.setItem(key, value);
   } catch {
@@ -116,10 +118,6 @@ function storageSetItem(key, value) {
 }
 
 function storageRemoveItem(key) {
-  if (!useLocalStorage) {
-    volatileStorage.delete(key);
-    return;
-  }
   try {
     window.localStorage.removeItem(key);
   } catch {
@@ -666,6 +664,10 @@ function isPerfectLimb(limbId) {
   return normalizeMasteryValue(getRecord(limbId).mastery) === 'perfect';
 }
 
+function isAmbiguousLimb(limbId) {
+  return normalizeMasteryValue(getRecord(limbId).mastery) === 'ambiguous';
+}
+
 /**
  * 「優先復習」モードの総合スコア。値が大きいほど優先的に出題する。
  * 誤答・あいまい・ブックマーク・未回答・復習期限切れ・苦手度を重み付けして合算する。
@@ -758,13 +760,7 @@ function mergeRecordsNoLoss(localMap, remoteMap) {
 function setMasteryCountBarVisible(visible) {
   const bar = document.getElementById('mastery-count-bar');
   if (!bar) return;
-  // インラインstyleのdisplay:noneも合わせて解除する
-  if (visible) {
-    bar.style.removeProperty('display');
-    bar.classList.remove('hidden');
-  } else {
-    bar.classList.add('hidden');
-  }
+  bar.classList.toggle('hidden', !visible);
 }
 
 function updateMasteryCounts() {
@@ -2530,8 +2526,8 @@ function showChangePwForm() {
   document.getElementById('change-pw-old').focus();
 }
 
-function getRecord(limbId) {
-  return records[limbId] || {
+function makeEmptyRecord() {
+  return {
     correct: 0,
     wrong: 0,
     wrongDateKeys: [],
@@ -2543,18 +2539,13 @@ function getRecord(limbId) {
   };
 }
 
+function getRecord(limbId) {
+  return records[limbId] || makeEmptyRecord();
+}
+
 function setLimbMastery(limbId, mastery) {
   if (!records[limbId]) {
-    records[limbId] = {
-      correct: 0,
-      wrong: 0,
-      wrongDateKeys: [],
-      review: normalizeReviewState(null),
-      mastery: '',
-      masteryUpdatedAtMs: 0,
-      note: '',
-      bookmarked: false
-    };
+    records[limbId] = makeEmptyRecord();
   }
   records[limbId].mastery = normalizeMasteryValue(mastery);
   records[limbId].masteryUpdatedAtMs = Date.now();
@@ -2563,16 +2554,7 @@ function setLimbMastery(limbId, mastery) {
 
 function ensureRecord(limbId) {
   if (!records[limbId]) {
-    records[limbId] = {
-      correct: 0,
-      wrong: 0,
-      wrongDateKeys: [],
-      review: normalizeReviewState(null),
-      mastery: '',
-      masteryUpdatedAtMs: 0,
-      note: '',
-      bookmarked: false
-    };
+    records[limbId] = makeEmptyRecord();
   }
   return records[limbId];
 }
@@ -2591,16 +2573,7 @@ function toggleLimbBookmark(limbId) {
 
 function addRecord(limbId, isCorrect) {
   if (!records[limbId]) {
-    records[limbId] = {
-      correct: 0,
-      wrong: 0,
-      wrongDateKeys: [],
-      review: normalizeReviewState(null),
-      mastery: '',
-      masteryUpdatedAtMs: 0,
-      note: '',
-      bookmarked: false
-    };
+    records[limbId] = makeEmptyRecord();
   }
   if (isCorrect) records[limbId].correct++;
   else {
@@ -2945,7 +2918,7 @@ function startSession() {
     limbs = limbs.filter(l => isPerfectLimb(l.id));
     limbs = shuffle(limbs);
   } else if (mode === 'ambiguous') {
-    limbs = limbs.filter(l => normalizeMasteryValue(getRecord(l.id).mastery) === 'ambiguous');
+    limbs = limbs.filter(l => isAmbiguousLimb(l.id));
     limbs = shuffle(limbs);
   } else if (mode === 'due') {
     const nowMs = Date.now();
@@ -3310,7 +3283,9 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
       }
     }
   }
+  if (!modalAlreadyOpen) rememberFocusBeforeModal();
   overlay.classList.remove('hidden');
+  if (!modalAlreadyOpen) btnNext.focus();
 }
 
 function showCompletionMessage() {
@@ -3438,7 +3413,9 @@ function openAddModal() {
   document.getElementById('form-question').reset();
   document.getElementById('edit-question-id').value = '';
   resetLimbsEditor([{ text: '', correct: true, explanation: '', options: [], correctText: '', inlineOxWrong: [] }]);
+  rememberFocusBeforeModal();
   document.getElementById('modal-question').classList.remove('hidden');
+  document.getElementById('input-subject').focus();
 }
 
 function openEditModal(id) {
@@ -3452,11 +3429,14 @@ function openEditModal(id) {
   document.getElementById('input-source').value      = q.source || '';
   document.getElementById('input-question-text').value = q.questionText || '';
   resetLimbsEditor(q.limbs);
+  rememberFocusBeforeModal();
   document.getElementById('modal-question').classList.remove('hidden');
+  document.getElementById('input-subject').focus();
 }
 
 function closeModal() {
   document.getElementById('modal-question').classList.add('hidden');
+  restoreFocusAfterModal();
 }
 
 function resetLimbsEditor(limbs) {
@@ -4274,6 +4254,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (modal.dataset.requireMastery === '1' && modal.dataset.masterySelected !== '1') return;
     const shouldAdvance = modal.dataset.advanceSession !== '0';
     modal.classList.add('hidden');
+    restoreFocusAfterModal();
     if (shouldAdvance && session) {
       session.index++;
       renderCurrentLimb();
@@ -4324,6 +4305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (modal.dataset.requireMastery === '1' && modal.dataset.masterySelected !== '1') return;
       const shouldAdvance = modal.dataset.advanceSession !== '0';
       modal.classList.add('hidden');
+      restoreFocusAfterModal();
       if (shouldAdvance && session) { session.index++; renderCurrentLimb(); }
     }
   });
