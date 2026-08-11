@@ -76,21 +76,13 @@ test.describe('ローカルストレージのセキュリティ', () => {
 });
 
 test.describe('コンテンツセキュリティ', () => {
+  // BUG-FIX: 管理者メールアドレスの実値を placeholder から汎用テキストに変更済み
   test('管理者メールアドレスがソースコードに埋め込まれていない（HTMLハードコード）', () => {
-    // プレースホルダーに実際のメールアドレスが入っていないか確認
     const emailInPlaceholder = indexHtml.match(/placeholder="[^"]*@[^"]*\.[^"]*"/g) || [];
-    if (emailInPlaceholder.length > 0) {
-      console.warn('HTMLにメールアドレスのハードコード発見:', emailInPlaceholder);
-    }
-    // 現時点でのチェック: ikeda.job08@gmail.com がプレースホルダーに存在するかを記録
     const hasHardcodedEmail = emailInPlaceholder.some(p =>
       !p.includes('example.com') && !p.includes('your@') && !p.includes('メール')
     );
-    if (hasHardcodedEmail) {
-      console.warn('実在するメールアドレスがHTMLに埋め込まれています。汎用的なプレースホルダーに変更してください。');
-    }
-    // テスト自体は警告のみ（ブロッキングなし）
-    expect(true).toBeTruthy();
+    expect(hasHardcodedEmail).toBeFalsy();
   });
 
   test('.gitignore が .env を除外している', () => {

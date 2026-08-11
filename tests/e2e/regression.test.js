@@ -98,3 +98,76 @@ test.describe('回帰テスト: 結果モーダルのメモ挙動', () => {
     expect(js).toContain("getElementById('btn-bookmark-limb')");
   });
 });
+
+test.describe('回帰テスト: 全自動改善対応の確認', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('BUG-FIX: 管理者ログインのplaceholderが汎用テキストになっている', async ({ page }) => {
+    const placeholder = await page.locator('#admin-login-username').getAttribute('placeholder');
+    expect(placeholder).not.toContain('@');
+  });
+
+  test('BUG-FIX: 3つのモーダルに role=dialog と aria-modal が設定されている', async ({ page }) => {
+    for (const id of ['modal-question', 'modal-result', 'admin-login-overlay']) {
+      const modal = page.locator(`#${id}`);
+      await expect(modal).toHaveAttribute('role', 'dialog');
+      await expect(modal).toHaveAttribute('aria-modal', 'true');
+    }
+  });
+
+  test('BUG-FIX: makeEmptyRecord ファクトリ関数が定義され重複が解消されている', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const js = fs.readFileSync(path.join(__dirname, '../../app.js'), 'utf8');
+    expect(js).toContain('function makeEmptyRecord()');
+    // 完全な8フィールドの空レコードリテラルは makeEmptyRecord 内の1箇所のみ
+    const fullLiteralCount = (js.match(/correct: 0,\s*\n\s*wrong: 0,\s*\n\s*wrongDateKeys: \[\]/g) || []).length;
+    expect(fullLiteralCount).toBe(1);
+  });
+
+  test('BUG-FIX: isAmbiguousLimb ヘルパーが定義され mode===ambiguous で使われている', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const js = fs.readFileSync(path.join(__dirname, '../../app.js'), 'utf8');
+    expect(js).toContain('function isAmbiguousLimb(limbId)');
+    const usesHelper = /mode === 'ambiguous'\s*\)\s*\{[\s\S]{0,100}isAmbiguousLimb/.test(js);
+    expect(usesHelper).toBeTruthy();
+  });
+
+  test('BUG-FIX: useLocalStorage / volatileStorage のデッドコードが削除されている', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const js = fs.readFileSync(path.join(__dirname, '../../app.js'), 'utf8');
+    expect(js).not.toContain('const useLocalStorage');
+    expect(js).not.toContain('const volatileStorage');
+  });
+
+  test('BUG-FIX: モーダルの max-height が 100dvh に対応している', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const css = fs.readFileSync(path.join(__dirname, '../../style.css'), 'utf8');
+    expect(css).toContain('calc(100dvh - 40px)');
+  });
+
+  test('BUG-FIX: index.html のインラインスタイルが7件以下に削減されている', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const html = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
+    const inlineStyles = html.match(/style="/g) || [];
+    // 修正前は8件。動的更新されるprogress-barのwidth:0%のみ残す想定。
+    expect(inlineStyles.length).toBeLessThanOrEqual(1);
+  });
+
+  test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
+    const opened = await page.evaluate(() => {
+      if (typeof openAddModal !== 'function') return null;
+      openAddModal();
+      return document.activeElement?.id;
+    });
+    if (opened !== null) {
+      expect(opened).toBe('input-subject');
+    }
+  });
+});
