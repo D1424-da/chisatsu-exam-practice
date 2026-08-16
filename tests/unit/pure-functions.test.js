@@ -86,6 +86,25 @@ function makeInlineRecordId(limbId, key) {
   return `${limbId}::${key}`;
 }
 
+// app.js の priorityReviewScore と同じ計算式（getEffectiveRecord による
+// 実効レコード取得部分を除き、レコード r を直接受け取る形でテストする）
+function priorityReviewScoreFromRecord(r, nowMs = Date.now()) {
+  const total = r.correct + r.wrong;
+  let s = 0;
+  s += r.wrong * 3;
+  if (normalizeMasteryValue(r.mastery) === 'ambiguous') s += 2;
+  if (total === 0) {
+    s += 1 + 2;
+  } else {
+    const review = normalizeReviewState(r.review);
+    const dueAt = review.dueAtMs || review.lastAnsweredAtMs;
+    if (dueAt <= 0 || dueAt <= nowMs) s += 2;
+  }
+  s += 4 / (total + 1);
+  s += weakScore(r) * 5;
+  return s;
+}
+
 function normalizeCategoryLabel(category) {
   const value = String(category || '')
     .replace(/[：:]/g, '・')
@@ -141,6 +160,47 @@ describe('normalizeReviewState', () => {
   test('小数は切り捨て', () => {
     assert.equal(normalizeReviewState({ intervalDays: 3.9 }).intervalDays, 3);
     assert.equal(normalizeReviewState({ streak: 2.7 }).streak, 2);
+  });
+});
+
+describe('priorityReviewScore（回答回数が少ないほど加点）', () => {
+  const nowMs = 1_700_000_000_000;
+  const futureReview = { intervalDays: 10, streak: 3, ease: 2.0, lastAnsweredAtMs: nowMs, dueAtMs: nowMs + 5 * DAY_MS };
+
+  function makeRecord(correct, wrong, overrides = {}) {
+    return {
+      correct, wrong,
+      mastery: '', bookmarked: false,
+      review: futureReview,
+      ...overrides
+    };
+  }
+
+  test('回答回数が少ないほどスコアが高くなる（期限内・非あいまい・非ブックマークの条件を揃えた場合）', () => {
+    const fewAnswers = priorityReviewScoreFromRecord(makeRecord(1, 0));   // total=1
+    const manyAnswers = priorityReviewScoreFromRecord(makeRecord(20, 0)); // total=20
+    assert.ok(fewAnswers > manyAnswers, `回答回数1(${fewAnswers}) > 回答回数20(${manyAnswers}) であるべき`);
+  });
+
+  test('回答回数が増えるほど加点は滑らかに減衰する（単調減少）', () => {
+    const totals = [1, 2, 5, 10, 20, 50];
+    const scores = totals.map(t => priorityReviewScoreFromRecord(makeRecord(t, 0)));
+    for (let i = 1; i < scores.length; i++) {
+      assert.ok(scores[i] < scores[i - 1], `total=${totals[i]}のスコア(${scores[i]})はtotal=${totals[i - 1]}のスコア(${scores[i - 1]})より小さいはず`);
+    }
+  });
+
+  test('未回答(total=0)は依然として最優先される', () => {
+    const unanswered = priorityReviewScoreFromRecord(makeRecord(0, 0));
+    const answeredOnce = priorityReviewScoreFromRecord(makeRecord(1, 0));
+    assert.ok(unanswered > answeredOnce, `未回答(${unanswered}) > 1回回答済み(${answeredOnce}) であるべき`);
+  });
+
+  test('回答回数ボーナスは4/(total+1)で計算される', () => {
+    const r = makeRecord(3, 0); // total=3, wrong=0, ambiguousでない, dueAt未来なので due加点なし
+    const score = priorityReviewScoreFromRecord(r, nowMs);
+    // s = wrong*3(0) + ambiguous(0) + due加点(0, 未来なので) + 4/(3+1)(=1) + weakScore*5(0, wrong=0のため)
+    assert.equal(score, 1);
   });
 });
 
