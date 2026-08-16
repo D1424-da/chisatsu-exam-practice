@@ -670,7 +670,7 @@ function isAmbiguousLimb(limbId) {
 
 /**
  * 「優先復習」モードの総合スコア。値が大きいほど優先的に出題する。
- * 誤答・あいまい・ブックマーク・未回答・復習期限切れ・苦手度を重み付けして合算する。
+ * 誤答・あいまい・ブックマーク・未回答・復習期限切れ・苦手度・回答回数の少なさを重み付けして合算する。
  * 文章〇×は getEffectiveRecord で各空欄を合算した成績を用いる。
  */
 function priorityReviewScore(limb, nowMs = Date.now()) {
@@ -686,6 +686,8 @@ function priorityReviewScore(limb, nowMs = Date.now()) {
     const dueAt = review.dueAtMs || review.lastAnsweredAtMs;
     if (dueAt <= 0 || dueAt <= nowMs) s += 2;
   }
+  // 回答回数が少ないほど加点（総練習量の偏りを均す）。回数が増えるほど滑らかに減衰する。
+  s += 4 / (total + 1);
   s += weakScore(r) * 5;
   return s;
 }
