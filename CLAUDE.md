@@ -81,7 +81,7 @@ A **question** has `id`, `subject`, `category`, `source`, optional `questionText
 
 A **record** (per-limb learning stats, keyed by limb id in the `records` object) tracks `correct`, `wrong`, `wrongDateKeys`, a spaced-repetition `review` state (`intervalDays`/`streak`/`ease`/`dueAtMs`, SM-2-like — see `nextReviewState`), `mastery` (`'perfect' | 'ambiguous' | ''`), `note`, and `bookmarked`. Always construct a fresh empty record via `makeEmptyRecord()` rather than a literal — several functions (`getRecord`, `setLimbMastery`, `ensureRecord`, `addRecord`) rely on it for a consistent shape.
 
-Study-mode filters (`filter-mode` select) each have a dedicated scoring/filter function in `app.js`: `weakScore` (苦手優先), `reviewPriorityScore`/`isDueForReview` (復習優先, uses `getRecord` — does **not** aggregate inline-OX sub-records, a known limitation), `priorityReviewScore` (優先復習, uses `getEffectiveRecord` and correctly aggregates), `isPerfectLimb`/`isAmbiguousLimb` (完璧/あいまい).
+Study-mode filters (`filter-mode` select) each have a dedicated scoring/filter function in `app.js`: `weakScore` (苦手優先), `reviewPriorityScore`/`isDueForReview` (復習優先, uses `getRecord` — does **not** aggregate inline-OX sub-records, a known limitation), `priorityReviewScore` (優先復習, uses `getEffectiveRecord` and correctly aggregates), `isPerfectLimb`/`isAmbiguousLimb` (完璧/あいまい). `priorityReviewScore` additionally adds a smoothly-decaying `4 / (total + 1)` bonus so limbs answered only a few times get surfaced ahead of heavily-drilled ones, without overriding the stronger unanswered (`total === 0`) bonus.
 
 ### Storage: local-first, then synced to Firestore
 Everything reads/writes `localStorage` first (via `storageGetItem`/`storageSetItem`, prefixed `chisatsu_`) so the app is fully usable offline / without an account. When signed in, data additionally syncs to Firestore:
@@ -94,7 +94,11 @@ Everything reads/writes `localStorage` first (via `storageGetItem`/`storageSetIt
 There's also an optional **File System Access API** persistence layer (`FS_SUPPORTED`, `fileHandle`, the `IDB` IndexedDB wrapper for remembering the file handle across reloads) letting a user save their whole local dataset to a JSON file on disk as a backup independent of the cloud — see the "データファイル設定" section in `index.html`/`updateFileStatus()`.
 
 ### Auth & admin model
-`auth-module.js` owns Firebase Auth (email/password, Google popup/redirect). Admin status is **not** a Firestore role — it's a client-side email allowlist (`window.APP_CONFIG.adminEmails` in `firebase-config.js`) checked by `isAdminUser()`, mirrored server-side in `firestore.rules`'s `isAdminEmail()` for write protection on the shared question bank. Anonymous/guest use is fully supported (no `records`/`questions` require sign-in locally); signing in only adds cross-device sync and, for admins, question management.
+`auth-module.js` owns Firebase Auth (email/password + Google). Google sign-in has **two separate code paths** that are easy to conflate:
+- `initGoogleSignIn()` renders the official Google Identity Services (GIS) button (`google.accounts.id.initialize`/`renderButton`) when `APP_CONFIG.googleClientId` is set. No `use_fedcm_for_button` override is set, so this button follows GIS's own default (FedCM in browsers that support it) — there's no explicit FedCM opt-in/opt-out in this codebase.
+- `handleGoogleSignIn()` (used as a fallback via `renderGooglePopupFallbackButton()` when no client ID is configured, and as the retry path on `auth/popup-blocked`) goes through plain Firebase `GoogleAuthProvider` + `signInWithPopup`/`signInWithRedirect` — ordinary OAuth popup/redirect, unrelated to FedCM. `shouldUseRedirectForGoogleSignIn()` decides redirect-vs-popup (Safari needs redirect since it blocks third-party popups more aggressively).
+
+Admin status is **not** a Firestore role — it's a client-side email allowlist (`window.APP_CONFIG.adminEmails` in `firebase-config.js`) checked by `isAdminUser()`, mirrored server-side in `firestore.rules`'s `isAdminEmail()` for write protection on the shared question bank. Anonymous/guest use is fully supported (no `records`/`questions` require sign-in locally); signing in only adds cross-device sync and, for admins, question management.
 
 ## Testing
 
