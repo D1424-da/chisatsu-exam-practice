@@ -74,6 +74,7 @@ let sessionStudyStartedAt = 0;
 let studyTimeBackend = 'auto'; // 'study_stats' | 'records' | 'auto'
 let studyCalendar = { checkedDates: {}, dailyCounts: {}, updatedAtMs: 0 };
 let studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let inlineOxForceFullRedoId = null; // 文中〇×で「すべて解き直す」が押された肢のid
 let unsubscribeRecordsRealtime = null;
 let unsubscribeStudyStatsRealtime = null;
 let unsubscribeStudyRecordsRealtime = null;
@@ -2639,6 +2640,24 @@ function isInlineOxFullyAnswered(limb) {
   });
 }
 
+/**
+ * 文中〇×の再出題時に「もう答えなくてよい空欄」のキー集合を返す。
+ * 直近の回答が正解（review.streak >= 1）の空欄を「習得済み」とみなす。
+ * 全部未回答・全部習得済みのときは絞り込まず、通常どおり全空欄を出題する。
+ */
+function getInlineOxSettledKeys(limb, items) {
+  const settled = new Set();
+  let pending = 0;
+  for (const it of items) {
+    const r = getRecord(makeInlineRecordId(limb.id, it.key));
+    const answered = (r.correct + r.wrong) > 0;
+    if (answered && normalizeReviewState(r.review).streak >= 1) settled.add(it.key);
+    else pending++;
+  }
+  if (settled.size === 0 || pending === 0) return new Set();
+  return settled;
+}
+
 /** 全肢をフラット化して返す */
 function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStats = false) {
   const limbs = [];
@@ -3038,7 +3057,17 @@ function renderCurrentLimb() {
   const isInlineOxQuestion = inlineItems.length > 0 && inlineExpected.length === inlineItems.length;
   const isTextAnswerQuestion = isTextQuestion(limb);
 
-  const inlineTextHtml = isInlineOxQuestion ? renderInlineOxText(limb.text) : esc(limb.text);
+  // 再出題時は既に正解済みの空欄を出題対象から外す（「すべて解き直す」で解除できる）。
+  const inlineSettledMap = new Map();
+  if (isInlineOxQuestion && inlineOxForceFullRedoId !== limb.id) {
+    const settledKeys = getInlineOxSettledKeys(limb, inlineItems);
+    inlineItems.forEach((it, i) => {
+      if (settledKeys.has(it.key)) inlineSettledMap.set(it.key, { expected: inlineExpected[i] });
+    });
+  }
+  const inlineTextHtml = isInlineOxQuestion
+    ? renderInlineOxText(limb.text, inlineSettledMap.size > 0 ? inlineSettledMap : null)
+    : esc(limb.text);
   const isChoiceQuestion = Array.isArray(limb.options) && limb.options.length >= 2;
   const answerButtonsHtml = isChoiceQuestion
     ? limb.options.map(opt => `<button class="btn-answer btn-choice" data-answer="${esc(opt)}">${esc(opt)}</button>`).join('')
@@ -3048,6 +3077,11 @@ function renderCurrentLimb() {
       `;
   const answerSectionHtml = isInlineOxQuestion
     ? `
+      ${inlineSettledMap.size > 0 ? `
+      <div class="inline-ox-focus-note">
+        <span>正解済みの ${inlineSettledMap.size} 箇所は答えを表示しています。残り ${inlineItems.length - inlineSettledMap.size} 箇所に回答してください。</span>
+        <button id="btn-inline-full-redo" class="btn btn-ghost btn-sm" type="button">すべて解き直す</button>
+      </div>` : ''}
       <div class="inline-next-area">
         <span id="inline-ox-status" class="inline-ox-status">すべての〇×を選択してください。</span>
         <button id="btn-inline-next" class="btn btn-primary" disabled>次の肢へ</button>
@@ -3107,24 +3141,35 @@ function renderCurrentLimb() {
 
   if (isInlineOxQuestion) {
     startStudyTimerIfNeeded(true);
-    const groups = [...area.querySelectorAll('.inline-ox-group')];
+    const allGroups = [...area.querySelectorAll('.inline-ox-group')];
+    // 正解済みで出題を省略した空欄は回答対象から除く。
+    const groups = allGroups.filter(g => g.dataset.settled !== '1');
+    const settledCount = allGroups.length - groups.length;
     const statusEl = document.getElementById('inline-ox-status');
     const nextBtn = document.getElementById('btn-inline-next');
+    const fullRedoBtn = document.getElementById('btn-inline-full-redo');
     let finalized = false;
-    let finalIsCorrect = false;
+
+    if (fullRedoBtn) {
+      fullRedoBtn.addEventListener('click', () => {
+        inlineOxForceFullRedoId = limb.id;
+        renderCurrentLimb();
+      });
+    }
+
+    const countCorrect = () => groups.filter(g => g.dataset.correct === '1').length;
 
     const updateCompletion = () => {
-      const answered = groups.every(g => !!g.dataset.selected);
-      nextBtn.disabled = !answered;
-      if (!answered) {
-        statusEl.textContent = 'すべての〇×を選択してください。';
+      const remaining = groups.filter(g => !g.dataset.selected).length;
+      nextBtn.disabled = remaining > 0;
+      if (remaining > 0) {
+        statusEl.textContent = `残り ${remaining} 箇所の〇×を選択してください。`;
         return;
       }
-      const userAnswers = groups.map(g => g.dataset.selected === 'true');
-      finalIsCorrect = inlineExpected.every((ans, i) => ans === userAnswers[i]);
-      statusEl.textContent = finalIsCorrect
-        ? '全ての判定が一致しました。'
-        : '一致していない箇所があります。';
+      const correctCount = countCorrect();
+      statusEl.textContent = correctCount === groups.length
+        ? `${groups.length} 箇所すべて正解しました。`
+        : `${groups.length} 箇所中 ${correctCount} 箇所正解。`;
     };
 
     const finalizeForRecord = () => {
@@ -3134,7 +3179,9 @@ function renderCurrentLimb() {
       finalized = true;
     };
 
-    groups.forEach((group, i) => {
+    groups.forEach(group => {
+      // 絞り込み出題では配列位置と空欄番号がずれるため、必ず data-index を使う。
+      const i = Number(group.dataset.index);
       group.querySelectorAll('.inline-ox-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           if (group.dataset.locked === '1') return;
@@ -3142,10 +3189,10 @@ function renderCurrentLimb() {
           group.querySelectorAll('.inline-ox-btn').forEach(b => b.classList.remove('selected'));
           btn.classList.add('selected');
           group.dataset.selected = btn.dataset.answer;
-          group.dataset.index = String(i);
           group.dataset.locked = '1';
           group.querySelectorAll('.inline-ox-btn').forEach(b => { b.disabled = true; });
           const isThisCorrect = (btn.dataset.answer === 'true') === inlineExpected[i];
+          group.dataset.correct = isThisCorrect ? '1' : '0';
           addRecord(makeInlineRecordId(limb.id, inlineItems[i].key), isThisCorrect);
           const judgeEl = group.querySelector('.inline-judge-text');
           if (judgeEl) {
@@ -3168,12 +3215,22 @@ function renderCurrentLimb() {
     nextBtn.addEventListener('click', () => {
       if (nextBtn.disabled) return;
       finalizeForRecord();
-      showResult(
-        limb,
-        finalIsCorrect,
-        `<strong>判定結果</strong>：${finalIsCorrect ? '全て正解' : '一部不正解'}`,
-        { advanceSession: true }
-      );
+      const total = groups.length;
+      const correctCount = countCorrect();
+      const allCorrect = correctCount === total;
+      const ratio = total > 0 ? Math.round(correctCount / total * 100) : 0;
+      const missedKeys = groups
+        .filter(g => g.dataset.correct === '0')
+        .map(g => inlineItems[Number(g.dataset.index)].key);
+      const detail = [
+        `<strong>判定結果</strong>：${total} 箇所中 <strong>${correctCount} 箇所正解</strong>（${ratio}%）`,
+        missedKeys.length > 0 ? `間違えた箇所：${esc(missedKeys.join('・'))}` : '',
+        settledCount > 0 ? `<span class="result-sub">※ 既に正解済みの ${settledCount} 箇所は今回の出題を省略しました。</span>` : ''
+      ].filter(Boolean).join('<br>');
+      showResult(limb, allCorrect, detail, {
+        advanceSession: true,
+        partial: { correct: correctCount, total }
+      });
     });
 
     updateCompletion();
@@ -3233,8 +3290,16 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
   overlay.dataset.currentLimbId = String(limb?.id || '');
   btnNext.textContent = advanceSession ? '次の肢へ' : '閉じる';
   btnNext.disabled = false;
-  document.getElementById('result-icon').textContent        = isCorrect ? '✅ 正解！' : '❌ 不正解';
-  document.getElementById('result-icon').className          = 'result-icon ' + (isCorrect ? 'correct' : 'wrong');
+  // 文中〇×は部分点で表示する（全問正解でなくても、何問できたかを示す）。
+  const partial = opts.partial;
+  const iconEl = document.getElementById('result-icon');
+  if (partial && !isCorrect && partial.correct > 0) {
+    iconEl.textContent = `🔶 ${partial.total} 箇所中 ${partial.correct} 箇所正解`;
+    iconEl.className = 'result-icon partial';
+  } else {
+    iconEl.textContent = isCorrect ? '✅ 正解！' : '❌ 不正解';
+    iconEl.className = 'result-icon ' + (isCorrect ? 'correct' : 'wrong');
+  }
   const isChoiceQuestion = Array.isArray(limb.options) && limb.options.length >= 2;
   const isTextAnswerQuestion = isTextQuestion(limb);
   const inlineItems = parseInlineOxItems(limb.text || '');
@@ -3739,7 +3804,12 @@ function isTextAnswerCorrect(limb, userAnswer) {
   return getAcceptedAnswers(limb).some(answer => normalizeTextAnswer(answer) === normalizedUserAnswer);
 }
 
-function renderInlineOxText(text) {
+/**
+ * 文中〇×の本文を、各空欄を回答ボタン付きに変換して描画する。
+ * settledMap（key -> { expected }）を渡すと、その空欄は回答済みとして
+ * 正解を表示したまま出題対象から外す（再出題時の絞り込み用）。
+ */
+function renderInlineOxText(text, settledMap = null) {
   const src = String(text || '');
   const re = /（([^）]+)）(?:〇×\s*([^（\n]*?)|([^（]*?)〇×)/g;
   let out = '';
@@ -3757,21 +3827,23 @@ function renderInlineOxText(text) {
       last = re.lastIndex;
       continue;
     }
-    const isKanaKeyOnly = /^[アイウエオ]$/.test(body);
-    if (isKanaKeyOnly) {
-      out += `<span class="inline-target">（${esc(body)}）</span>` +
-        `<span class="inline-ox-group" data-index="${idx}">` +
-          `<button class="inline-ox-btn" type="button" data-answer="true">○</button>` +
-          `<button class="inline-ox-btn" type="button" data-answer="false">×</button>` +
-          `<span class="inline-judge-text"></span>` +
-        `</span>` + `<span class="inline-target-text">${esc(tail)}</span>`;
-    } else {
-      out += `<span class="inline-target">（${esc(body)}）${esc(tail)}</span>` +
-        `<span class="inline-ox-group" data-index="${idx}">` +
+    const settled = settledMap ? settledMap.get(key) : null;
+    const groupHtml = settled
+      ? `<span class="inline-ox-group inline-ox-settled" data-index="${idx}" data-key="${esc(key)}" data-settled="1">` +
+          `<span class="inline-ox-settled-answer">${settled.expected ? '○' : '×'}</span>` +
+          `<span class="inline-judge-text ok">正解済み</span>` +
+        `</span>`
+      : `<span class="inline-ox-group" data-index="${idx}" data-key="${esc(key)}">` +
           `<button class="inline-ox-btn" type="button" data-answer="true">○</button>` +
           `<button class="inline-ox-btn" type="button" data-answer="false">×</button>` +
           `<span class="inline-judge-text"></span>` +
         `</span>`;
+    const isKanaKeyOnly = /^[アイウエオ]$/.test(body);
+    if (isKanaKeyOnly) {
+      out += `<span class="inline-target">（${esc(body)}）</span>` + groupHtml +
+        `<span class="inline-target-text">${esc(tail)}</span>`;
+    } else {
+      out += `<span class="inline-target">（${esc(body)}）${esc(tail)}</span>` + groupHtml;
     }
     last = re.lastIndex;
     idx++;

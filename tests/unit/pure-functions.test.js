@@ -105,6 +105,21 @@ function priorityReviewScoreFromRecord(r, nowMs = Date.now()) {
   return s;
 }
 
+// app.js の getInlineOxSettledKeys と同じ判定ロジック。
+// records の参照部分だけ、テスト用に key -> record のMapを直接受け取る形にしている。
+function getInlineOxSettledKeysFromRecords(items, recordsByKey) {
+  const settled = new Set();
+  let pending = 0;
+  for (const it of items) {
+    const r = recordsByKey.get(it.key) || { correct: 0, wrong: 0, review: null };
+    const answered = (r.correct + r.wrong) > 0;
+    if (answered && normalizeReviewState(r.review).streak >= 1) settled.add(it.key);
+    else pending++;
+  }
+  if (settled.size === 0 || pending === 0) return new Set();
+  return settled;
+}
+
 function normalizeCategoryLabel(category) {
   const value = String(category || '')
     .replace(/[：:]/g, '・')
@@ -160,6 +175,46 @@ describe('normalizeReviewState', () => {
   test('小数は切り捨て', () => {
     assert.equal(normalizeReviewState({ intervalDays: 3.9 }).intervalDays, 3);
     assert.equal(normalizeReviewState({ streak: 2.7 }).streak, 2);
+  });
+});
+
+describe('getInlineOxSettledKeys（文中〇×の再出題絞り込み）', () => {
+  const items = [{ key: '①' }, { key: '②' }, { key: '③' }];
+  const settledRec = { correct: 1, wrong: 0, review: { streak: 1 } };   // 直近正解
+  const missedRec = { correct: 0, wrong: 1, review: { streak: 0 } };    // 直近不正解
+  const unansweredRec = { correct: 0, wrong: 0, review: null };
+
+  test('直近正解の空欄だけが「正解済み」として絞り込まれる', () => {
+    const recs = new Map([['①', settledRec], ['②', missedRec], ['③', settledRec]]);
+    const settled = getInlineOxSettledKeysFromRecords(items, recs);
+    assert.deepEqual([...settled].sort(), ['①', '③']);
+  });
+
+  test('全部未回答なら絞り込まない（全問出題）', () => {
+    const recs = new Map([['①', unansweredRec], ['②', unansweredRec], ['③', unansweredRec]]);
+    assert.equal(getInlineOxSettledKeysFromRecords(items, recs).size, 0);
+  });
+
+  test('全部正解済みなら絞り込まない（総復習として全問出題）', () => {
+    const recs = new Map([['①', settledRec], ['②', settledRec], ['③', settledRec]]);
+    assert.equal(getInlineOxSettledKeysFromRecords(items, recs).size, 0);
+  });
+
+  test('一度正解しても直近で間違えた空欄は再出題される', () => {
+    // correct=3 と実績はあるが streak=0（最後に間違えた）
+    const relapsed = { correct: 3, wrong: 1, review: { streak: 0 } };
+    const recs = new Map([['①', settledRec], ['②', relapsed], ['③', settledRec]]);
+    const settled = getInlineOxSettledKeysFromRecords(items, recs);
+    assert.ok(!settled.has('②'), '直近不正解の②は再出題対象であるべき');
+    assert.equal(settled.size, 2);
+  });
+
+  test('1箇所だけ間違えた場合、残り1箇所のみが出題対象になる', () => {
+    const recs = new Map([['①', settledRec], ['②', settledRec], ['③', missedRec]]);
+    const settled = getInlineOxSettledKeysFromRecords(items, recs);
+    const pending = items.filter(it => !settled.has(it.key));
+    assert.equal(pending.length, 1);
+    assert.equal(pending[0].key, '③');
   });
 });
 
