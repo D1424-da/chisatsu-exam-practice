@@ -440,6 +440,40 @@ body {
   box-shadow: 0 0 0 2px rgba(190, 52, 52, .15);
   border-radius: 8px;
 }
+/* 再出題時に省略した「正解済み」の空欄 */
+.inline-ox-settled {
+  align-items: center;
+  opacity: .75;
+}
+.inline-ox-settled-answer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 26px;
+  padding: 2px 6px;
+  border: 1px dashed var(--success);
+  border-radius: 8px;
+  background: rgba(34, 179, 92, .08);
+  color: var(--success);
+  font-weight: 700;
+  line-height: 1;
+}
+.inline-ox-focus-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #eef6ff;
+  border: 1px solid #cfe2fa;
+  font-size: .85rem;
+  color: #24557f;
+}
+
 .inline-ox-answer-area { margin-top: 10px; }
 .inline-next-area {
   display: flex;
@@ -711,6 +745,8 @@ body {
 }
 .result-icon.correct { color: var(--success); }
 .result-icon.wrong   { color: var(--danger); }
+.result-icon.partial { color: #b06a00; }
+.result-sub { font-size: .84rem; color: var(--text-muted); }
 .result-explanation {
   font-size: .92rem;
   line-height: 1.8;
@@ -821,6 +857,12 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.weak-limbs-total {
+  font-size: .85rem;
+  color: var(--text-muted);
   margin-bottom: 10px;
 }
 

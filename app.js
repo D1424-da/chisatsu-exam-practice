@@ -74,6 +74,7 @@ let sessionStudyStartedAt = 0;
 let studyTimeBackend = 'auto'; // 'study_stats' | 'records' | 'auto'
 let studyCalendar = { checkedDates: {}, dailyCounts: {}, updatedAtMs: 0 };
 let studyCalendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let inlineOxForceFullRedoId = null; // 文中〇×で「すべて解き直す」が押された肢のid
 let unsubscribeRecordsRealtime = null;
 let unsubscribeStudyStatsRealtime = null;
 let unsubscribeStudyRecordsRealtime = null;
@@ -669,6 +670,18 @@ function isAmbiguousLimb(limbId) {
 }
 
 /**
+ * 「回答数が少ない」とみなす回答回数の上限（この回数以下が対象）。
+ * 出題が特定の肢に偏るのを均すためのカテゴリで、未回答（0回）も含む。
+ */
+const FEW_ANSWERS_MAX = 2;
+
+/** 回答回数が少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
+function isFewAnswersLimb(limb) {
+  const r = getEffectiveRecord(limb);
+  return (r.correct + r.wrong) <= FEW_ANSWERS_MAX;
+}
+
+/**
  * 「優先復習」モードの総合スコア。値が大きいほど優先的に出題する。
  * 誤答・あいまい・ブックマーク・未回答・復習期限切れ・苦手度・回答回数の少なさを重み付けして合算する。
  * 文章〇×は getEffectiveRecord で各空欄を合算した成績を用いる。
@@ -769,19 +782,30 @@ function updateMasteryCounts() {
   let perfect = 0;
   let ambiguous = 0;
   let wrong = 0;
+  let few = 0;
 
-  for (const stat of Object.values(records || {})) {
-    if (normalizeMasteryValue(stat?.mastery) === 'perfect') perfect++;
-    if (normalizeMasteryValue(stat?.mastery) === 'ambiguous') ambiguous++;
-    if (isOutstandingWrong(stat)) wrong++;
+  // 出題キューと同じ肢集合・同じ判定関数を使う。
+  // records を直接走査すると、削除・再インポートで肢が無くなった残骸レコードや、
+  // 文中〇×の空欄単位レコード（limbId::key）まで1件ずつ数えてしまい、
+  // カウント表示と実際の出題数がずれる。
+  for (const limb of getLimbsMatchingFilters()) {
+    const mastery = normalizeMasteryValue(getRecord(limb.id).mastery);
+    if (mastery === 'perfect') perfect++;
+    else if (mastery === 'ambiguous') ambiguous++;
+    // getEffectiveRecord は文中〇×で正規表現パースを伴うため、肢ごとに一度だけ算出する。
+    const eff = getEffectiveRecord(limb);
+    if (isOutstandingWrong(eff)) wrong++;
+    if ((eff.correct + eff.wrong) <= FEW_ANSWERS_MAX) few++;
   }
 
   const elPerfect = document.getElementById('count-perfect');
   const elAmbiguous = document.getElementById('count-ambiguous');
   const elWrong = document.getElementById('count-wrong');
+  const elFew = document.getElementById('count-few');
   if (elPerfect) elPerfect.textContent = `完璧: ${perfect}`;
   if (elAmbiguous) elAmbiguous.textContent = `あいまい: ${ambiguous}`;
   if (elWrong) elWrong.textContent = `まちがえたもの: ${wrong}`;
+  if (elFew) elFew.textContent = `回答数が少ない: ${few}`;
 }
 
 function calcStudyStreak() {
@@ -2611,19 +2635,47 @@ function makeInlineRecordId(limbId, key) {
   return `${limbId}::${key}`;
 }
 
-/** 文中〇×問題は各空欄の記録を合算した「肢単位」の成績を返す */
+/**
+ * 文中〇×問題は各空欄の記録を合算した「肢単位」の成績を返す。
+ * 回答は空欄単位（limbId::key）にしか addRecord されず、親レコードの review は
+ * 初期値のままなので、review も各空欄から集約する（集約しないと streak が常に0になり、
+ * 一度でも間違えた肢が「間違えたもの」から永久に外れなくなる）。
+ * 「1箇所でも未克服なら肢全体も未克服」とみなすため、streak などは最小値を採る。
+ */
 function getEffectiveRecord(limb) {
   const items = parseInlineOxItems(limb.text || '');
   const expected = getInlineOxExpectedAnswers(limb, items);
   if (items.length > 0 && expected.length === items.length) {
     let correct = 0;
     let wrong = 0;
+    let streak = Infinity;
+    let intervalDays = Infinity;
+    let ease = Infinity;
+    let lastAnsweredAtMs = 0;
+    let dueAtMs = Infinity;
     for (const it of items) {
       const r = getRecord(makeInlineRecordId(limb.id, it.key));
       correct += r.correct;
       wrong += r.wrong;
+      const rev = normalizeReviewState(r.review);
+      streak = Math.min(streak, rev.streak);
+      intervalDays = Math.min(intervalDays, rev.intervalDays);
+      ease = Math.min(ease, rev.ease);
+      lastAnsweredAtMs = Math.max(lastAnsweredAtMs, rev.lastAnsweredAtMs);
+      dueAtMs = Math.min(dueAtMs, rev.dueAtMs);
     }
-    return { ...getRecord(limb.id), correct, wrong };
+    return {
+      ...getRecord(limb.id),
+      correct,
+      wrong,
+      review: {
+        intervalDays: Number.isFinite(intervalDays) ? intervalDays : 1,
+        streak: Number.isFinite(streak) ? streak : 0,
+        ease: Number.isFinite(ease) ? ease : 2.0,
+        lastAnsweredAtMs,
+        dueAtMs: Number.isFinite(dueAtMs) ? dueAtMs : 0
+      }
+    };
   }
   return getRecord(limb.id);
 }
@@ -2637,6 +2689,24 @@ function isInlineOxFullyAnswered(limb) {
     const r = getRecord(makeInlineRecordId(limb.id, it.key));
     return (r.correct + r.wrong) > 0;
   });
+}
+
+/**
+ * 文中〇×の再出題時に「もう答えなくてよい空欄」のキー集合を返す。
+ * 直近の回答が正解（review.streak >= 1）の空欄を「習得済み」とみなす。
+ * 全部未回答・全部習得済みのときは絞り込まず、通常どおり全空欄を出題する。
+ */
+function getInlineOxSettledKeys(limb, items) {
+  const settled = new Set();
+  let pending = 0;
+  for (const it of items) {
+    const r = getRecord(makeInlineRecordId(limb.id, it.key));
+    const answered = (r.correct + r.wrong) > 0;
+    if (answered && normalizeReviewState(r.review).streak >= 1) settled.add(it.key);
+    else pending++;
+  }
+  if (settled.size === 0 || pending === 0) return new Set();
+  return settled;
 }
 
 /** 全肢をフラット化して返す */
@@ -2673,6 +2743,28 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
       }
       limbs.push({ ...limb, questionId: q.id, subject: q.subject, category: q.category, questionText: getLeadText(q.questionText), source: q.source });
     }
+  }
+  return limbs;
+}
+
+/**
+ * 現在のフィルター（科目・カテゴリ・年度）に一致する肢を返す。
+ * カウント表示バーと出題キューで必ず同じ集合を使うための単一の入口。
+ * どちらか一方だけを変更すると表示数と出題数がずれるので、必ずここを経由する。
+ */
+function getLimbsMatchingFilters(filters = getStudyFilters()) {
+  let limbs = getAllLimbs(filters.subject, filters.category);
+  const yearFrom = filters.yearFrom;
+  const yearTo = filters.yearTo;
+  if (yearFrom || yearTo) {
+    limbs = limbs.filter(l => {
+      const k = extractYearKey(l.source, l.questionId);
+      if (!k) return true;
+      const ord = yearOrdinal(k);
+      if (yearFrom && ord < yearOrdinal(yearFrom)) return false;
+      if (yearTo   && ord > yearOrdinal(yearTo))   return false;
+      return true;
+    });
   }
   return limbs;
 }
@@ -2894,19 +2986,7 @@ function startSession() {
   const yearTo   = filters.yearTo;
   const mode     = filters.mode;
 
-  let limbs = getAllLimbs(subject, category);
-
-  // 年度フィルター
-  if (yearFrom || yearTo) {
-    limbs = limbs.filter(l => {
-      const k = extractYearKey(l.source, l.questionId);
-      if (!k) return true;
-      const ord = yearOrdinal(k);
-      if (yearFrom && ord < yearOrdinal(yearFrom)) return false;
-      if (yearTo   && ord > yearOrdinal(yearTo))   return false;
-      return true;
-    });
-  }
+  let limbs = getLimbsMatchingFilters({ subject, category, yearFrom, yearTo, mode });
 
   if (mode === 'weak') {
     // 実効レコード（文章〇×は各空欄を合算）は parseInlineOxItems を伴い重いので、肢ごとに一度だけ算出して使い回す。
@@ -2934,6 +3014,15 @@ function startSession() {
       return r.correct === 0 && r.wrong === 0;
     });
     limbs = shuffle(limbs);
+  } else if (mode === 'few') {
+    // 回答回数の少ない順に出題して、肢ごとの練習量の偏りを均す。
+    // 同じ回数の中はランダム（sortが安定なので、先にshuffleすれば同数内の順序は保たれる）。
+    const countMap = new Map(limbs.map(l => {
+      const r = getEffectiveRecord(l);
+      return [l, r.correct + r.wrong];
+    }));
+    limbs = shuffle(limbs.filter(l => countMap.get(l) <= FEW_ANSWERS_MAX));
+    limbs.sort((a, b) => countMap.get(a) - countMap.get(b));
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);
@@ -3038,7 +3127,17 @@ function renderCurrentLimb() {
   const isInlineOxQuestion = inlineItems.length > 0 && inlineExpected.length === inlineItems.length;
   const isTextAnswerQuestion = isTextQuestion(limb);
 
-  const inlineTextHtml = isInlineOxQuestion ? renderInlineOxText(limb.text) : esc(limb.text);
+  // 再出題時は既に正解済みの空欄を出題対象から外す（「すべて解き直す」で解除できる）。
+  const inlineSettledMap = new Map();
+  if (isInlineOxQuestion && inlineOxForceFullRedoId !== limb.id) {
+    const settledKeys = getInlineOxSettledKeys(limb, inlineItems);
+    inlineItems.forEach((it, i) => {
+      if (settledKeys.has(it.key)) inlineSettledMap.set(it.key, { expected: inlineExpected[i] });
+    });
+  }
+  const inlineTextHtml = isInlineOxQuestion
+    ? renderInlineOxText(limb.text, inlineSettledMap.size > 0 ? inlineSettledMap : null)
+    : esc(limb.text);
   const isChoiceQuestion = Array.isArray(limb.options) && limb.options.length >= 2;
   const answerButtonsHtml = isChoiceQuestion
     ? limb.options.map(opt => `<button class="btn-answer btn-choice" data-answer="${esc(opt)}">${esc(opt)}</button>`).join('')
@@ -3048,6 +3147,11 @@ function renderCurrentLimb() {
       `;
   const answerSectionHtml = isInlineOxQuestion
     ? `
+      ${inlineSettledMap.size > 0 ? `
+      <div class="inline-ox-focus-note">
+        <span>正解済みの ${inlineSettledMap.size} 箇所は答えを表示しています。残り ${inlineItems.length - inlineSettledMap.size} 箇所に回答してください。</span>
+        <button id="btn-inline-full-redo" class="btn btn-ghost btn-sm" type="button">すべて解き直す</button>
+      </div>` : ''}
       <div class="inline-next-area">
         <span id="inline-ox-status" class="inline-ox-status">すべての〇×を選択してください。</span>
         <button id="btn-inline-next" class="btn btn-primary" disabled>次の肢へ</button>
@@ -3107,24 +3211,35 @@ function renderCurrentLimb() {
 
   if (isInlineOxQuestion) {
     startStudyTimerIfNeeded(true);
-    const groups = [...area.querySelectorAll('.inline-ox-group')];
+    const allGroups = [...area.querySelectorAll('.inline-ox-group')];
+    // 正解済みで出題を省略した空欄は回答対象から除く。
+    const groups = allGroups.filter(g => g.dataset.settled !== '1');
+    const settledCount = allGroups.length - groups.length;
     const statusEl = document.getElementById('inline-ox-status');
     const nextBtn = document.getElementById('btn-inline-next');
+    const fullRedoBtn = document.getElementById('btn-inline-full-redo');
     let finalized = false;
-    let finalIsCorrect = false;
+
+    if (fullRedoBtn) {
+      fullRedoBtn.addEventListener('click', () => {
+        inlineOxForceFullRedoId = limb.id;
+        renderCurrentLimb();
+      });
+    }
+
+    const countCorrect = () => groups.filter(g => g.dataset.correct === '1').length;
 
     const updateCompletion = () => {
-      const answered = groups.every(g => !!g.dataset.selected);
-      nextBtn.disabled = !answered;
-      if (!answered) {
-        statusEl.textContent = 'すべての〇×を選択してください。';
+      const remaining = groups.filter(g => !g.dataset.selected).length;
+      nextBtn.disabled = remaining > 0;
+      if (remaining > 0) {
+        statusEl.textContent = `残り ${remaining} 箇所の〇×を選択してください。`;
         return;
       }
-      const userAnswers = groups.map(g => g.dataset.selected === 'true');
-      finalIsCorrect = inlineExpected.every((ans, i) => ans === userAnswers[i]);
-      statusEl.textContent = finalIsCorrect
-        ? '全ての判定が一致しました。'
-        : '一致していない箇所があります。';
+      const correctCount = countCorrect();
+      statusEl.textContent = correctCount === groups.length
+        ? `${groups.length} 箇所すべて正解しました。`
+        : `${groups.length} 箇所中 ${correctCount} 箇所正解。`;
     };
 
     const finalizeForRecord = () => {
@@ -3134,7 +3249,9 @@ function renderCurrentLimb() {
       finalized = true;
     };
 
-    groups.forEach((group, i) => {
+    groups.forEach(group => {
+      // 絞り込み出題では配列位置と空欄番号がずれるため、必ず data-index を使う。
+      const i = Number(group.dataset.index);
       group.querySelectorAll('.inline-ox-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           if (group.dataset.locked === '1') return;
@@ -3142,10 +3259,10 @@ function renderCurrentLimb() {
           group.querySelectorAll('.inline-ox-btn').forEach(b => b.classList.remove('selected'));
           btn.classList.add('selected');
           group.dataset.selected = btn.dataset.answer;
-          group.dataset.index = String(i);
           group.dataset.locked = '1';
           group.querySelectorAll('.inline-ox-btn').forEach(b => { b.disabled = true; });
           const isThisCorrect = (btn.dataset.answer === 'true') === inlineExpected[i];
+          group.dataset.correct = isThisCorrect ? '1' : '0';
           addRecord(makeInlineRecordId(limb.id, inlineItems[i].key), isThisCorrect);
           const judgeEl = group.querySelector('.inline-judge-text');
           if (judgeEl) {
@@ -3168,12 +3285,22 @@ function renderCurrentLimb() {
     nextBtn.addEventListener('click', () => {
       if (nextBtn.disabled) return;
       finalizeForRecord();
-      showResult(
-        limb,
-        finalIsCorrect,
-        `<strong>判定結果</strong>：${finalIsCorrect ? '全て正解' : '一部不正解'}`,
-        { advanceSession: true }
-      );
+      const total = groups.length;
+      const correctCount = countCorrect();
+      const allCorrect = correctCount === total;
+      const ratio = total > 0 ? Math.round(correctCount / total * 100) : 0;
+      const missedKeys = groups
+        .filter(g => g.dataset.correct === '0')
+        .map(g => inlineItems[Number(g.dataset.index)].key);
+      const detail = [
+        `<strong>判定結果</strong>：${total} 箇所中 <strong>${correctCount} 箇所正解</strong>（${ratio}%）`,
+        missedKeys.length > 0 ? `間違えた箇所：${esc(missedKeys.join('・'))}` : '',
+        settledCount > 0 ? `<span class="result-sub">※ 既に正解済みの ${settledCount} 箇所は今回の出題を省略しました。</span>` : ''
+      ].filter(Boolean).join('<br>');
+      showResult(limb, allCorrect, detail, {
+        advanceSession: true,
+        partial: { correct: correctCount, total }
+      });
     });
 
     updateCompletion();
@@ -3233,8 +3360,16 @@ function showResult(limb, isCorrect, detailHtml = '', opts = {}) {
   overlay.dataset.currentLimbId = String(limb?.id || '');
   btnNext.textContent = advanceSession ? '次の肢へ' : '閉じる';
   btnNext.disabled = false;
-  document.getElementById('result-icon').textContent        = isCorrect ? '✅ 正解！' : '❌ 不正解';
-  document.getElementById('result-icon').className          = 'result-icon ' + (isCorrect ? 'correct' : 'wrong');
+  // 文中〇×は部分点で表示する（全問正解でなくても、何問できたかを示す）。
+  const partial = opts.partial;
+  const iconEl = document.getElementById('result-icon');
+  if (partial && !isCorrect && partial.correct > 0) {
+    iconEl.textContent = `🔶 ${partial.total} 箇所中 ${partial.correct} 箇所正解`;
+    iconEl.className = 'result-icon partial';
+  } else {
+    iconEl.textContent = isCorrect ? '✅ 正解！' : '❌ 不正解';
+    iconEl.className = 'result-icon ' + (isCorrect ? 'correct' : 'wrong');
+  }
   const isChoiceQuestion = Array.isArray(limb.options) && limb.options.length >= 2;
   const isTextAnswerQuestion = isTextQuestion(limb);
   const inlineItems = parseInlineOxItems(limb.text || '');
@@ -3739,7 +3874,12 @@ function isTextAnswerCorrect(limb, userAnswer) {
   return getAcceptedAnswers(limb).some(answer => normalizeTextAnswer(answer) === normalizedUserAnswer);
 }
 
-function renderInlineOxText(text) {
+/**
+ * 文中〇×の本文を、各空欄を回答ボタン付きに変換して描画する。
+ * settledMap（key -> { expected }）を渡すと、その空欄は回答済みとして
+ * 正解を表示したまま出題対象から外す（再出題時の絞り込み用）。
+ */
+function renderInlineOxText(text, settledMap = null) {
   const src = String(text || '');
   const re = /（([^）]+)）(?:〇×\s*([^（\n]*?)|([^（]*?)〇×)/g;
   let out = '';
@@ -3757,21 +3897,23 @@ function renderInlineOxText(text) {
       last = re.lastIndex;
       continue;
     }
-    const isKanaKeyOnly = /^[アイウエオ]$/.test(body);
-    if (isKanaKeyOnly) {
-      out += `<span class="inline-target">（${esc(body)}）</span>` +
-        `<span class="inline-ox-group" data-index="${idx}">` +
-          `<button class="inline-ox-btn" type="button" data-answer="true">○</button>` +
-          `<button class="inline-ox-btn" type="button" data-answer="false">×</button>` +
-          `<span class="inline-judge-text"></span>` +
-        `</span>` + `<span class="inline-target-text">${esc(tail)}</span>`;
-    } else {
-      out += `<span class="inline-target">（${esc(body)}）${esc(tail)}</span>` +
-        `<span class="inline-ox-group" data-index="${idx}">` +
+    const settled = settledMap ? settledMap.get(key) : null;
+    const groupHtml = settled
+      ? `<span class="inline-ox-group inline-ox-settled" data-index="${idx}" data-key="${esc(key)}" data-settled="1">` +
+          `<span class="inline-ox-settled-answer">${settled.expected ? '○' : '×'}</span>` +
+          `<span class="inline-judge-text ok">正解済み</span>` +
+        `</span>`
+      : `<span class="inline-ox-group" data-index="${idx}" data-key="${esc(key)}">` +
           `<button class="inline-ox-btn" type="button" data-answer="true">○</button>` +
           `<button class="inline-ox-btn" type="button" data-answer="false">×</button>` +
           `<span class="inline-judge-text"></span>` +
         `</span>`;
+    const isKanaKeyOnly = /^[アイウエオ]$/.test(body);
+    if (isKanaKeyOnly) {
+      out += `<span class="inline-target">（${esc(body)}）</span>` + groupHtml +
+        `<span class="inline-target-text">${esc(tail)}</span>`;
+    } else {
+      out += `<span class="inline-target">（${esc(body)}）${esc(tail)}</span>` + groupHtml;
     }
     last = re.lastIndex;
     idx++;
@@ -3913,8 +4055,8 @@ function renderStats() {
   }).join('');
   document.getElementById('subject-stats').innerHTML = subjectHtml || '<p>データなし</p>';
 
-  // 苦手肢トップ50
-  const weakSorted = allLimbs
+  // 苦手肢トップ50（フィルター適用後の総数も表示する）
+  const weakMatched = allLimbs
     .filter(l => getRecord(l.id).wrong > 0)
     .filter((l) => {
       if (!hideHighRate) return true;
@@ -3924,8 +4066,18 @@ function renderStats() {
       const rt = Math.round(r.correct / t * 100);
       return rt < threshold;
     })
-    .sort((a, b) => weakScore(getRecord(b.id)) - weakScore(getRecord(a.id)))
-    .slice(0, 50);
+    .sort((a, b) => weakScore(getRecord(b.id)) - weakScore(getRecord(a.id)));
+  const weakSorted = weakMatched.slice(0, 50);
+
+  const weakTotalEl = document.getElementById('weak-limbs-total');
+  if (weakTotalEl) {
+    const filterNote = hideHighRate ? `（正答率 ${threshold}% 未満に絞り込み）` : '';
+    weakTotalEl.textContent = weakMatched.length === 0
+      ? `該当 0 件${filterNote}`
+      : weakMatched.length > weakSorted.length
+        ? `該当 ${weakMatched.length} 件中 上位 ${weakSorted.length} 件を表示${filterNote}`
+        : `該当 ${weakMatched.length} 件をすべて表示${filterNote}`;
+  }
 
   const weakHtml = weakSorted.map((limb, i) => {
     const r = getRecord(limb.id);
@@ -4182,9 +4334,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const countPerfectBtn = document.getElementById('count-perfect');
   const countAmbiguousBtn = document.getElementById('count-ambiguous');
   const countWrongBtn = document.getElementById('count-wrong');
+  const countFewBtn = document.getElementById('count-few');
   if (countPerfectBtn) countPerfectBtn.addEventListener('click', () => jumpToStudyMode('perfect'));
   if (countAmbiguousBtn) countAmbiguousBtn.addEventListener('click', () => jumpToStudyMode('ambiguous'));
   if (countWrongBtn) countWrongBtn.addEventListener('click', () => jumpToStudyMode('wrong'));
+  if (countFewBtn) countFewBtn.addEventListener('click', () => jumpToStudyMode('few'));
 
   document.getElementById('filter-subject').addEventListener('change', (e) => {
     const cats = getCategories(e.target.value);
