@@ -160,6 +160,69 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(inlineStyles.length).toBeLessThanOrEqual(1);
   });
 
+  test('BUG-FIX: カウント表示バーの数が実際の出題数と一致する', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof updateMasteryCounts !== 'function' || typeof getLimbsMatchingFilters !== 'function') return null;
+      const mk = (o = {}) => ({
+        correct: 1, wrong: 0, wrongDateKeys: [],
+        review: { intervalDays: 1, streak: 1, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 9e15 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false, ...o
+      });
+      questions = [
+        { id: 'q1', subject: 'S', limbs: [{ id: 'A', text: '通常肢', correct: true, explanation: '' }] },
+        { id: 'q2', subject: 'S', limbs: [{ id: 'B', text: '（①x）〇×、（②y）〇×、（③z）〇×。', inlineOxWrong: ['③'], explanation: '' }] }
+      ];
+      records = {
+        'A': mk({ mastery: 'perfect' }),
+        // 文中〇×の空欄レコード3件（1肢として数えるべき）
+        'B::①': mk({ correct: 2, wrong: 1 }),
+        'B::②': mk({ correct: 2, wrong: 1 }),
+        'B::③': mk({ correct: 2, wrong: 1 }),
+        // 削除済み問題の残骸レコード（数えてはいけない）
+        'GONE-1': mk({ mastery: 'perfect' }),
+        'GONE-2': mk({ mastery: 'ambiguous' }),
+        'GONE-3': mk({ correct: 0, wrong: 5, review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 } })
+      };
+      updateMasteryCounts();
+      const num = (id) => Number(String(document.getElementById(id).textContent).replace(/\D/g, ''));
+      const limbs = getLimbsMatchingFilters({ subject: '', category: '', yearFrom: '', yearTo: '', mode: 'all' });
+      return {
+        shown: { perfect: num('count-perfect'), ambiguous: num('count-ambiguous'), wrong: num('count-wrong') },
+        actual: {
+          perfect: limbs.filter(l => isPerfectLimb(l.id)).length,
+          ambiguous: limbs.filter(l => isAmbiguousLimb(l.id)).length,
+          wrong: limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l))).length
+        }
+      };
+    });
+    if (result === null) test.skip();
+    // 残骸レコードや文中〇×の空欄レコードを数えず、出題数と一致する
+    expect(result.shown).toEqual(result.actual);
+    expect(result.shown.perfect).toBe(1);
+  });
+
+  test('BUG-FIX: 文中〇×は全空欄を克服すると「間違えたもの」から外れる', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof getEffectiveRecord !== 'function') return null;
+      const blank = (streak) => ({
+        correct: 2, wrong: 1, wrongDateKeys: [],
+        review: { intervalDays: 3, streak, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 9e15 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      const limb = { id: 'B', text: '（①x）〇×、（②y）〇×、（③z）〇×。', inlineOxWrong: ['③'] };
+      // 全空欄が直近正解 → 克服済み
+      records = { 'B::①': blank(1), 'B::②': blank(1), 'B::③': blank(1) };
+      const settled = isOutstandingWrong(getEffectiveRecord(limb));
+      // ③だけ直近不正解 → 未克服のまま
+      records['B::③'] = blank(0);
+      const unsettled = isOutstandingWrong(getEffectiveRecord(limb));
+      return { settled, unsettled };
+    });
+    if (result === null) test.skip();
+    expect(result.settled).toBe(false);   // 全部克服したら外れる
+    expect(result.unsettled).toBe(true);  // 1箇所でも未克服なら残る
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;

@@ -771,10 +771,15 @@ function updateMasteryCounts() {
   let ambiguous = 0;
   let wrong = 0;
 
-  for (const stat of Object.values(records || {})) {
-    if (normalizeMasteryValue(stat?.mastery) === 'perfect') perfect++;
-    if (normalizeMasteryValue(stat?.mastery) === 'ambiguous') ambiguous++;
-    if (isOutstandingWrong(stat)) wrong++;
+  // 出題キューと同じ肢集合・同じ判定関数を使う。
+  // records を直接走査すると、削除・再インポートで肢が無くなった残骸レコードや、
+  // 文中〇×の空欄単位レコード（limbId::key）まで1件ずつ数えてしまい、
+  // カウント表示と実際の出題数がずれる。
+  for (const limb of getLimbsMatchingFilters()) {
+    const mastery = normalizeMasteryValue(getRecord(limb.id).mastery);
+    if (mastery === 'perfect') perfect++;
+    else if (mastery === 'ambiguous') ambiguous++;
+    if (isOutstandingWrong(getEffectiveRecord(limb))) wrong++;
   }
 
   const elPerfect = document.getElementById('count-perfect');
@@ -2612,19 +2617,47 @@ function makeInlineRecordId(limbId, key) {
   return `${limbId}::${key}`;
 }
 
-/** 文中〇×問題は各空欄の記録を合算した「肢単位」の成績を返す */
+/**
+ * 文中〇×問題は各空欄の記録を合算した「肢単位」の成績を返す。
+ * 回答は空欄単位（limbId::key）にしか addRecord されず、親レコードの review は
+ * 初期値のままなので、review も各空欄から集約する（集約しないと streak が常に0になり、
+ * 一度でも間違えた肢が「間違えたもの」から永久に外れなくなる）。
+ * 「1箇所でも未克服なら肢全体も未克服」とみなすため、streak などは最小値を採る。
+ */
 function getEffectiveRecord(limb) {
   const items = parseInlineOxItems(limb.text || '');
   const expected = getInlineOxExpectedAnswers(limb, items);
   if (items.length > 0 && expected.length === items.length) {
     let correct = 0;
     let wrong = 0;
+    let streak = Infinity;
+    let intervalDays = Infinity;
+    let ease = Infinity;
+    let lastAnsweredAtMs = 0;
+    let dueAtMs = Infinity;
     for (const it of items) {
       const r = getRecord(makeInlineRecordId(limb.id, it.key));
       correct += r.correct;
       wrong += r.wrong;
+      const rev = normalizeReviewState(r.review);
+      streak = Math.min(streak, rev.streak);
+      intervalDays = Math.min(intervalDays, rev.intervalDays);
+      ease = Math.min(ease, rev.ease);
+      lastAnsweredAtMs = Math.max(lastAnsweredAtMs, rev.lastAnsweredAtMs);
+      dueAtMs = Math.min(dueAtMs, rev.dueAtMs);
     }
-    return { ...getRecord(limb.id), correct, wrong };
+    return {
+      ...getRecord(limb.id),
+      correct,
+      wrong,
+      review: {
+        intervalDays: Number.isFinite(intervalDays) ? intervalDays : 1,
+        streak: Number.isFinite(streak) ? streak : 0,
+        ease: Number.isFinite(ease) ? ease : 2.0,
+        lastAnsweredAtMs,
+        dueAtMs: Number.isFinite(dueAtMs) ? dueAtMs : 0
+      }
+    };
   }
   return getRecord(limb.id);
 }
@@ -2692,6 +2725,28 @@ function getAllLimbs(filterSubject = '', filterCategory = '', splitInlineForStat
       }
       limbs.push({ ...limb, questionId: q.id, subject: q.subject, category: q.category, questionText: getLeadText(q.questionText), source: q.source });
     }
+  }
+  return limbs;
+}
+
+/**
+ * 現在のフィルター（科目・カテゴリ・年度）に一致する肢を返す。
+ * カウント表示バーと出題キューで必ず同じ集合を使うための単一の入口。
+ * どちらか一方だけを変更すると表示数と出題数がずれるので、必ずここを経由する。
+ */
+function getLimbsMatchingFilters(filters = getStudyFilters()) {
+  let limbs = getAllLimbs(filters.subject, filters.category);
+  const yearFrom = filters.yearFrom;
+  const yearTo = filters.yearTo;
+  if (yearFrom || yearTo) {
+    limbs = limbs.filter(l => {
+      const k = extractYearKey(l.source, l.questionId);
+      if (!k) return true;
+      const ord = yearOrdinal(k);
+      if (yearFrom && ord < yearOrdinal(yearFrom)) return false;
+      if (yearTo   && ord > yearOrdinal(yearTo))   return false;
+      return true;
+    });
   }
   return limbs;
 }
@@ -2913,19 +2968,7 @@ function startSession() {
   const yearTo   = filters.yearTo;
   const mode     = filters.mode;
 
-  let limbs = getAllLimbs(subject, category);
-
-  // 年度フィルター
-  if (yearFrom || yearTo) {
-    limbs = limbs.filter(l => {
-      const k = extractYearKey(l.source, l.questionId);
-      if (!k) return true;
-      const ord = yearOrdinal(k);
-      if (yearFrom && ord < yearOrdinal(yearFrom)) return false;
-      if (yearTo   && ord > yearOrdinal(yearTo))   return false;
-      return true;
-    });
-  }
+  let limbs = getLimbsMatchingFilters({ subject, category, yearFrom, yearTo, mode });
 
   if (mode === 'weak') {
     // 実効レコード（文章〇×は各空欄を合算）は parseInlineOxItems を伴い重いので、肢ごとに一度だけ算出して使い回す。
