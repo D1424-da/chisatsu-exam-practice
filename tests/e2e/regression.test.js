@@ -554,6 +554,33 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(r.restored).toBe(80);
   });
 
+  test('BUG-FIX: 問題データのサイズガードが実際の書き込み対象(全問1ドキュメント)を検査する', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof canSyncQuestionsToCloud !== 'function') return null;
+      // 1年度あたりは小さいが、合計するとソフト上限(900KB)を超えるデータを作る。
+      // 年度別サイズだけを見ていると通ってしまい、実際の書き込みで失敗する。
+      const big = [];
+      for (let y = 0; y < 20; y++) {
+        for (let q = 0; q < 30; q++) {
+          const limbs = [];
+          for (let l = 0; l < 5; l++) {
+            limbs.push({ id: `h${y}-${q}-${l}`, text: 'あ'.repeat(400), correct: true, explanation: 'い'.repeat(400) });
+          }
+          big.push({ id: `h${y}-${q}`, subject: 'S', source: `H${y}-問${q}`, limbs });
+        }
+      }
+      const small = [{ id: 'q1', subject: 'S', source: 'H17-問1', limbs: [{ id: 'l1', text: 'x', correct: true, explanation: '' }] }];
+      return { bigAllowed: canSyncQuestionsToCloud(big), smallAllowed: canSyncQuestionsToCloud(small), emptyAllowed: canSyncQuestionsToCloud([]) };
+    });
+    if (result === null) test.skip();
+
+    // 合計が上限を超えるものは弾く（年度別だけ見ていると通ってしまっていた）
+    expect(result.bigAllowed).toBe(false);
+    // 通常サイズは通る
+    expect(result.smallAllowed).toBe(true);
+    expect(result.emptyAllowed).toBe(false);
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;
