@@ -223,7 +223,7 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.unsettled).toBe(true);  // 1箇所でも未克服なら残る
   });
 
-  test('FEATURE: 「回答数が少ない」は平均に対する相対値で判定し、少ない順に出題する', async ({ page }) => {
+  test('FEATURE: 「回答数が少ない」は中央値による相対判定で、少ない順に出題する', async ({ page }) => {
     const result = await page.evaluate(() => {
       if (typeof computeFewAnswersInfo !== 'function') return null;
       const mk = (c) => ({
@@ -238,12 +238,17 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
         return getLimbsMatchingFilters({ subject: '', category: '', yearFrom: '', yearTo: '', mode: 'few' });
       };
 
-      // 平均 10.5 → しきい値 5 → 0/1/2回の3件が該当
+      // 中央値20 → 0/1/2回の3件が該当
       const spread = computeFewAnswersInfo(build([0, 1, 2, 20, 20, 20]));
       // 全肢が同じ回数 → 偏りが無いので該当0件
       const even = computeFewAnswersInfo(build([8, 8, 8, 8]));
       // 学習初期（全部未回答）→ しきい値は最低1なので未回答が拾える
       const fresh = computeFewAnswersInfo(build([0, 0, 0, 0]));
+      // BUG回帰: 回答回数が小さい範囲に散らばるケース。
+      // 平均の一定割合だと平均2回→しきい値1回未満となり該当0件（＝出題されない）になっていた。
+      const narrow = computeFewAnswersInfo(build([1, 1, 1, 2, 2, 3, 3, 3]));
+      // BUG回帰: 少数だけ回数が遅れているケース（平均比だと該当0件だった）
+      const laggard = computeFewAnswersInfo(build([1, 3, 3, 3, 3, 3, 3, 3]));
 
       const countOf = (info, l) => info.effMap.get(l).correct + info.effMap.get(l).wrong;
       const matched = (info) => [...info.effMap.keys()].filter(l => countOf(info, l) < info.threshold).length;
@@ -262,20 +267,28 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
         spread: { threshold: spread.threshold, matched: matched(spread) },
         even: { threshold: even.threshold, matched: matched(even) },
         fresh: { threshold: fresh.threshold, matched: matched(fresh) },
+        narrow: { threshold: narrow.threshold, matched: matched(narrow) },
+        laggard: { threshold: laggard.threshold, matched: matched(laggard) },
         queue,
         label: document.getElementById('count-few').textContent
       };
     });
     if (result === null) test.skip();
 
-    // 平均に対する相対判定: 平均10.5 → しきい値5 → 0/1/2回の3件
-    expect(result.spread.threshold).toBe(5);
+    // 中央値による相対判定: 中央値20 → 0/1/2回の3件
+    expect(result.spread.threshold).toBe(20);
     expect(result.spread.matched).toBe(3);
     // 回答回数が揃っていれば「相対的に少ないもの」は存在しない
     expect(result.even.matched).toBe(0);
     // 全部未回答でも、しきい値の下限1により未回答を拾える（初期に空にならない）
     expect(result.fresh.threshold).toBe(1);
     expect(result.fresh.matched).toBe(4);
+    // 回帰: 1〜3回に散らばるケースで、1回の肢がきちんと該当すること
+    expect(result.narrow.threshold).toBe(2);
+    expect(result.narrow.matched).toBe(3);
+    // 回帰: 少数だけ遅れているケースで、その肢が該当すること
+    expect(result.laggard.threshold).toBe(3);
+    expect(result.laggard.matched).toBe(1);
     // 回答回数の少ない順に並ぶ
     expect(result.queue).toEqual([...result.queue].sort((a, b) => a - b));
     // ボタンに現在のしきい値が併記される

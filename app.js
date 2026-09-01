@@ -670,29 +670,29 @@ function isAmbiguousLimb(limbId) {
 }
 
 /**
- * 「回答数が少ない」の判定に使う、平均回答回数に対する比率。
- * 固定回数（例: 2回以下）だと学習初期はほぼ全肢が該当し、学習が進むと誰も
- * 該当しなくなって機能しないため、全体の平均と比べた相対値で判定する。
- */
-const FEW_ANSWERS_RATIO = 0.5;
-
-/**
  * 与えられた肢集合について「回答数が少ない」の判定に必要な情報を1パスで算出する。
- * threshold 未満の回答回数の肢が対象。
- * 平均が0に近い学習初期でも未回答を拾えるよう、しきい値は最低1とする。
- * 逆に全肢の回答回数が揃っていれば該当0件になる（偏りが無い＝やることが無い）。
+ * 回答回数の中央値をしきい値とし、それ未満の回答回数の肢を対象とする。
+ *
+ * 平均の一定割合（例: 平均の50%）で判定すると、平均が小さいときに破綻する。
+ * 例えば1〜3回に散らばって平均2回なら、しきい値が1回未満まで落ちて
+ * 「1回しか答えていない肢」すら拾えず、該当0件になってしまう。
+ * 中央値なら分布の実態に沿って「後ろ半分」を必ず指すため、この問題が起きない。
+ *
+ * - 全肢の回答回数が揃っていれば該当0件（偏りが無い＝やることが無い）
+ * - 半数以上が未回答なら中央値0だが、下限1により未回答を拾える
  */
 function computeFewAnswersInfo(limbs) {
   const effMap = new Map();
-  let sum = 0;
+  const counts = [];
   for (const l of limbs) {
     const r = getEffectiveRecord(l);
     effMap.set(l, r);
-    sum += r.correct + r.wrong;
+    counts.push(r.correct + r.wrong);
   }
-  const average = limbs.length > 0 ? sum / limbs.length : 0;
-  const threshold = Math.max(1, Math.round(average * FEW_ANSWERS_RATIO));
-  return { effMap, average, threshold };
+  counts.sort((a, b) => a - b);
+  const median = counts.length > 0 ? counts[Math.floor(counts.length / 2)] : 0;
+  const threshold = Math.max(1, median);
+  return { effMap, median, threshold };
 }
 
 /** 回答回数が相対的に少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
