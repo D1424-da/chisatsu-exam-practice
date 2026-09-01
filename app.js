@@ -670,15 +670,35 @@ function isAmbiguousLimb(limbId) {
 }
 
 /**
- * 「回答数が少ない」とみなす回答回数の上限（この回数以下が対象）。
- * 出題が特定の肢に偏るのを均すためのカテゴリで、未回答（0回）も含む。
+ * 「回答数が少ない」の判定に使う、平均回答回数に対する比率。
+ * 固定回数（例: 2回以下）だと学習初期はほぼ全肢が該当し、学習が進むと誰も
+ * 該当しなくなって機能しないため、全体の平均と比べた相対値で判定する。
  */
-const FEW_ANSWERS_MAX = 2;
+const FEW_ANSWERS_RATIO = 0.5;
 
-/** 回答回数が少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
-function isFewAnswersLimb(limb) {
+/**
+ * 与えられた肢集合について「回答数が少ない」の判定に必要な情報を1パスで算出する。
+ * threshold 未満の回答回数の肢が対象。
+ * 平均が0に近い学習初期でも未回答を拾えるよう、しきい値は最低1とする。
+ * 逆に全肢の回答回数が揃っていれば該当0件になる（偏りが無い＝やることが無い）。
+ */
+function computeFewAnswersInfo(limbs) {
+  const effMap = new Map();
+  let sum = 0;
+  for (const l of limbs) {
+    const r = getEffectiveRecord(l);
+    effMap.set(l, r);
+    sum += r.correct + r.wrong;
+  }
+  const average = limbs.length > 0 ? sum / limbs.length : 0;
+  const threshold = Math.max(1, Math.round(average * FEW_ANSWERS_RATIO));
+  return { effMap, average, threshold };
+}
+
+/** 回答回数が相対的に少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
+function isFewAnswersLimb(limb, threshold) {
   const r = getEffectiveRecord(limb);
-  return (r.correct + r.wrong) <= FEW_ANSWERS_MAX;
+  return (r.correct + r.wrong) < threshold;
 }
 
 /**
@@ -788,14 +808,16 @@ function updateMasteryCounts() {
   // records を直接走査すると、削除・再インポートで肢が無くなった残骸レコードや、
   // 文中〇×の空欄単位レコード（limbId::key）まで1件ずつ数えてしまい、
   // カウント表示と実際の出題数がずれる。
-  for (const limb of getLimbsMatchingFilters()) {
+  // getEffectiveRecord は文中〇×で正規表現パースを伴うため、肢ごとに一度だけ算出して使い回す。
+  const limbs = getLimbsMatchingFilters();
+  const { effMap, threshold: fewThreshold } = computeFewAnswersInfo(limbs);
+  for (const limb of limbs) {
     const mastery = normalizeMasteryValue(getRecord(limb.id).mastery);
     if (mastery === 'perfect') perfect++;
     else if (mastery === 'ambiguous') ambiguous++;
-    // getEffectiveRecord は文中〇×で正規表現パースを伴うため、肢ごとに一度だけ算出する。
-    const eff = getEffectiveRecord(limb);
+    const eff = effMap.get(limb);
     if (isOutstandingWrong(eff)) wrong++;
-    if ((eff.correct + eff.wrong) <= FEW_ANSWERS_MAX) few++;
+    if ((eff.correct + eff.wrong) < fewThreshold) few++;
   }
 
   const elPerfect = document.getElementById('count-perfect');
@@ -805,7 +827,8 @@ function updateMasteryCounts() {
   if (elPerfect) elPerfect.textContent = `完璧: ${perfect}`;
   if (elAmbiguous) elAmbiguous.textContent = `あいまい: ${ambiguous}`;
   if (elWrong) elWrong.textContent = `まちがえたもの: ${wrong}`;
-  if (elFew) elFew.textContent = `回答数が少ない: ${few}`;
+  // しきい値は学習の進み具合で変わるため、現在値を併記して意味が分かるようにする。
+  if (elFew) elFew.textContent = `回答数が少ない: ${few}（${fewThreshold}回未満）`;
 }
 
 function calcStudyStreak() {
@@ -3015,14 +3038,12 @@ function startSession() {
     });
     limbs = shuffle(limbs);
   } else if (mode === 'few') {
-    // 回答回数の少ない順に出題して、肢ごとの練習量の偏りを均す。
+    // 全体の平均に対して回答回数が相対的に少ない肢を、少ない順に出題して練習量の偏りを均す。
     // 同じ回数の中はランダム（sortが安定なので、先にshuffleすれば同数内の順序は保たれる）。
-    const countMap = new Map(limbs.map(l => {
-      const r = getEffectiveRecord(l);
-      return [l, r.correct + r.wrong];
-    }));
-    limbs = shuffle(limbs.filter(l => countMap.get(l) <= FEW_ANSWERS_MAX));
-    limbs.sort((a, b) => countMap.get(a) - countMap.get(b));
+    const { effMap, threshold } = computeFewAnswersInfo(limbs);
+    const countOf = (l) => effMap.get(l).correct + effMap.get(l).wrong;
+    limbs = shuffle(limbs.filter(l => countOf(l) < threshold));
+    limbs.sort((a, b) => countOf(a) - countOf(b));
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);

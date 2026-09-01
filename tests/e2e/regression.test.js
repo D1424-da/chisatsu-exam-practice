@@ -223,39 +223,63 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.unsettled).toBe(true);  // 1箇所でも未克服なら残る
   });
 
-  test('FEATURE: 「回答数が少ない」カウントと few モードが回答回数の少ない順に出題する', async ({ page }) => {
+  test('FEATURE: 「回答数が少ない」は平均に対する相対値で判定し、少ない順に出題する', async ({ page }) => {
     const result = await page.evaluate(() => {
-      if (typeof FEW_ANSWERS_MAX === 'undefined' || typeof isFewAnswersLimb !== 'function') return null;
+      if (typeof computeFewAnswersInfo !== 'function') return null;
       const mk = (c) => ({
         correct: c, wrong: 0, wrongDateKeys: [],
         review: { intervalDays: 1, streak: 1, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 9e15 },
         mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
       });
-      const counts = [0, 1, 2, 3, 5, 10];
-      questions = [{ id: 'q1', subject: 'S', limbs: counts.map((n, i) => ({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' })) }];
-      records = {};
-      counts.forEach((n, i) => { if (n > 0) records[`L${i}`] = mk(n); });
+      const build = (counts) => {
+        questions = [{ id: 'q1', subject: 'S', limbs: counts.map((n, i) => ({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' })) }];
+        records = {};
+        counts.forEach((n, i) => { if (n > 0) records[`L${i}`] = mk(n); });
+        return getLimbsMatchingFilters({ subject: '', category: '', yearFrom: '', yearTo: '', mode: 'few' });
+      };
 
-      updateMasteryCounts();
-      const shown = Number(String(document.getElementById('count-few').textContent).replace(/\D/g, ''));
+      // 平均 10.5 → しきい値 5 → 0/1/2回の3件が該当
+      const spread = computeFewAnswersInfo(build([0, 1, 2, 20, 20, 20]));
+      // 全肢が同じ回数 → 偏りが無いので該当0件
+      const even = computeFewAnswersInfo(build([8, 8, 8, 8]));
+      // 学習初期（全部未回答）→ しきい値は最低1なので未回答が拾える
+      const fresh = computeFewAnswersInfo(build([0, 0, 0, 0]));
 
+      const countOf = (info, l) => info.effMap.get(l).correct + info.effMap.get(l).wrong;
+      const matched = (info) => [...info.effMap.keys()].filter(l => countOf(info, l) < info.threshold).length;
+
+      // 実際の出題順を確認
+      build([0, 1, 2, 20, 20, 20]);
       document.getElementById('filter-mode').value = 'few';
       startSession();
       const queue = session.queue.map(l => {
         const r = getEffectiveRecord(l);
-        return { id: l.id, count: r.correct + r.wrong };
+        return r.correct + r.wrong;
       });
-      return { max: FEW_ANSWERS_MAX, shown, queue };
+
+      updateMasteryCounts();
+      return {
+        spread: { threshold: spread.threshold, matched: matched(spread) },
+        even: { threshold: even.threshold, matched: matched(even) },
+        fresh: { threshold: fresh.threshold, matched: matched(fresh) },
+        queue,
+        label: document.getElementById('count-few').textContent
+      };
     });
     if (result === null) test.skip();
 
-    // 回答回数が FEW_ANSWERS_MAX 以下の肢だけが対象（0/1/2回の3件）
-    expect(result.shown).toBe(3);
-    expect(result.queue.length).toBe(3);
-    expect(result.queue.every(q => q.count <= result.max)).toBe(true);
+    // 平均に対する相対判定: 平均10.5 → しきい値5 → 0/1/2回の3件
+    expect(result.spread.threshold).toBe(5);
+    expect(result.spread.matched).toBe(3);
+    // 回答回数が揃っていれば「相対的に少ないもの」は存在しない
+    expect(result.even.matched).toBe(0);
+    // 全部未回答でも、しきい値の下限1により未回答を拾える（初期に空にならない）
+    expect(result.fresh.threshold).toBe(1);
+    expect(result.fresh.matched).toBe(4);
     // 回答回数の少ない順に並ぶ
-    const counts = result.queue.map(q => q.count);
-    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+    expect(result.queue).toEqual([...result.queue].sort((a, b) => a - b));
+    // ボタンに現在のしきい値が併記される
+    expect(result.label).toContain('回未満');
   });
 
   test('FEATURE: 苦手肢リストが正答率フィルター適用後の総数を表示する', async ({ page }) => {
