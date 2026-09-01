@@ -853,6 +853,33 @@ function setMasteryCountBarVisible(visible) {
   bar.classList.toggle('hidden', !visible);
 }
 
+/**
+ * カウント表示バーの内訳をコンソールへ出力する。
+ * 表示数と実際の出題数がずれたときの調査用。
+ * 抑止したい場合はコンソールで window.DEBUG_MASTERY_COUNTS = false を実行する。
+ */
+let lastMasteryCountsDebugLabel = '';
+
+function logMasteryCountsDebug(detail) {
+  if (window.DEBUG_MASTERY_COUNTS === false) return;
+  const { limbCount, perfect, ambiguous, wrong, few, fewCutoff, distribution, filters } = detail;
+  const label = `[カウント] 対象${limbCount}肢 / 完璧${perfect} あいまい${ambiguous} まちがえた${wrong} 回答数少${few}`
+    + (fewCutoff >= 0 ? `（${fewCutoff}回以下）` : '（偏りなし）');
+  // 画面初期化時などに同じ内容で連続して呼ばれるため、変化がなければ出力しない。
+  if (label === lastMasteryCountsDebugLabel) return;
+  lastMasteryCountsDebugLabel = label;
+  try {
+    console.groupCollapsed(label);
+    console.log('フィルター:', filters);
+    console.log('回答回数の分布（回数: 肢数）:', distribution);
+    console.log('「回答数が少ない」しきい値:', fewCutoff >= 0 ? `${fewCutoff}回以下` : '該当なし（全肢同じ回数）');
+    console.log('レコード総数:', Object.keys(records || {}).length, '（削除済み問題の残骸や文中〇×の空欄も含むため対象肢数とは一致しない）');
+    console.groupEnd();
+  } catch {
+    console.log(label);
+  }
+}
+
 function updateMasteryCounts() {
   let perfect = 0;
   let ambiguous = 0;
@@ -866,13 +893,16 @@ function updateMasteryCounts() {
   // getEffectiveRecord は文中〇×で正規表現パースを伴うため、肢ごとに一度だけ算出して使い回す。
   const limbs = getLimbsMatchingFilters();
   const { effMap, cutoff: fewCutoff } = computeFewAnswersInfo(limbs);
+  const distribution = {};
   for (const limb of limbs) {
     const mastery = normalizeMasteryValue(getRecord(limb.id).mastery);
     if (mastery === 'perfect') perfect++;
     else if (mastery === 'ambiguous') ambiguous++;
     const eff = effMap.get(limb);
     if (isOutstandingWrong(eff)) wrong++;
-    if (fewCutoff >= 0 && (eff.correct + eff.wrong) <= fewCutoff) few++;
+    const total = eff.correct + eff.wrong;
+    if (fewCutoff >= 0 && total <= fewCutoff) few++;
+    distribution[total] = (distribution[total] || 0) + 1;
   }
 
   const elPerfect = document.getElementById('count-perfect');
@@ -888,6 +918,13 @@ function updateMasteryCounts() {
       ? `回答数が少ない: ${few}（${fewCutoff}回以下）`
       : '回答数が少ない: 0（偏りなし）';
   }
+
+  logMasteryCountsDebug({
+    limbCount: limbs.length,
+    perfect, ambiguous, wrong, few, fewCutoff,
+    distribution,
+    filters: getStudyFilters()
+  });
 }
 
 function calcStudyStreak() {
