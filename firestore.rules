@@ -17,9 +17,11 @@ service cloud.firestore {
       return signedIn() && request.resource != null && request.resource.data.uid is string && request.resource.data.uid == request.auth.uid;
     }
 
+    // 共有問題データを書き換えられるアカウント。
+    // firebase-config.js の APP_CONFIG.adminEmails と必ず揃えること。
     function isAdminEmail() {
       return signedIn() && request.auth.token.email is string &&
-        request.auth.token.email in ['ikeda.job08@gmail.com'];
+        request.auth.token.email in ['ikeda.job08@gmail.com', 'd.i.a.0101@gmail.com'];
     }
 
     // User profile

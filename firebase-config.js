@@ -15,7 +15,10 @@ const firebaseConfig = {
 window.APP_CONFIG = {
   googleClientId: "",
   adminLoginEmail: "ikeda.job08@gmail.com",
-  adminEmails: ["ikeda.job08@gmail.com"]
+  // 問題管理・管理者ページを使えるアカウント。
+  // ここに追加したら firestore.rules の isAdminEmail() にも同じアドレスを足すこと
+  // （クライアント側の判定だけではサーバー側の書き込み権限が付かない）。
+  adminEmails: ["ikeda.job08@gmail.com", "d.i.a.0101@gmail.com"]
 };
 
 // Firebase を初期化（アプリ起動時に実行される）

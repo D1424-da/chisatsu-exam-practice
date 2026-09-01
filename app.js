@@ -1002,21 +1002,26 @@ function estimateUtf8Bytes(value) {
   }
 }
 
+/**
+ * 共有問題データをクラウドへ書き込めるサイズか判定する。
+ * 実際の書き込みは pushQuestionsToCloud が全問を1ドキュメントにまとめて行うため、
+ * 検査対象もその1ドキュメントぶんにする。
+ * （年度別に分けたサイズだけを見ていると、1件あたりは小さくても合計が
+ *   Firestoreの1ドキュメント上限を超えてしまい、書き込みが失敗する。）
+ */
 function canSyncQuestionsToCloud(questionList = questions) {
   if (!Array.isArray(questionList) || questionList.length === 0) return false;
-  const grouped = groupQuestionsByYear(questionList);
-  const now = Date.now();
-  for (const [yearKey, yearQuestions] of grouped.entries()) {
-    const payload = {
-      yearKey,
-      questions: yearQuestions,
-      updatedAtMs: now
-    };
-    const bytes = estimateUtf8Bytes(payload);
-    if (bytes > FIRESTORE_DOC_SOFT_LIMIT_BYTES) {
-      console.warn(`question_bank_years 同期をスキップ: ${yearKey} payload=${bytes} bytes (limit=${FIRESTORE_DOC_SOFT_LIMIT_BYTES})`);
-      return false;
-    }
+  const bytes = estimateUtf8Bytes({
+    uid: SHARED_QUESTION_DOC_ID,
+    questions: questionList,
+    updatedAtMs: Date.now()
+  });
+  if (bytes > FIRESTORE_DOC_SOFT_LIMIT_BYTES) {
+    console.warn(
+      `共有問題データの同期をスキップ: ${questionList.length}問 payload=${bytes} bytes ` +
+      `(上限=${FIRESTORE_DOC_SOFT_LIMIT_BYTES})。年度別ドキュメントへの分割が必要です。`
+    );
+    return false;
   }
   return true;
 }

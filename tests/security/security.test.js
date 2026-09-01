@@ -104,6 +104,31 @@ test.describe('コンテンツセキュリティ', () => {
   });
 });
 
+test.describe('管理者設定の整合性', () => {
+  const readAdminEmailsFromConfig = () => {
+    const cfg = fs.readFileSync(path.join(__dirname, '../../firebase-config.js'), 'utf8');
+    const m = cfg.match(/adminEmails\s*:\s*\[([^\]]*)\]/);
+    if (!m) return null;
+    return (m[1].match(/["']([^"']+)["']/g) || []).map(s => s.slice(1, -1)).sort();
+  };
+  const readAdminEmailsFromRules = () => {
+    const rules = fs.readFileSync(path.join(__dirname, '../../firestore.rules'), 'utf8');
+    const m = rules.match(/request\.auth\.token\.email in \[([^\]]*)\]/);
+    if (!m) return null;
+    return (m[1].match(/["']([^"']+)["']/g) || []).map(s => s.slice(1, -1)).sort();
+  };
+
+  // クライアント側(firebase-config.js)だけ追加してもサーバー側の書き込み権限は付かず、
+  // 管理者のつもりで操作しても permission-denied になる。逆も同様に混乱を招く。
+  test('firebase-config.js と firestore.rules の管理者メールが一致している', () => {
+    const fromConfig = readAdminEmailsFromConfig();
+    const fromRules = readAdminEmailsFromRules();
+    expect(fromConfig, 'firebase-config.js の adminEmails を読み取れない').not.toBeNull();
+    expect(fromRules, 'firestore.rules の isAdminEmail() を読み取れない').not.toBeNull();
+    expect(fromConfig).toEqual(fromRules);
+  });
+});
+
 test.describe('Firestoreセキュリティルール', () => {
   test('firestore.rules ファイルが存在する', () => {
     const rulesPath = path.join(__dirname, '../../firestore.rules');
