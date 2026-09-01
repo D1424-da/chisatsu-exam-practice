@@ -413,7 +413,13 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
       const stubDoc = {
         get: () => Promise.resolve({ exists: false, data: () => null }),
         set: (payload) => {
-          writes.push({ bytes: JSON.stringify(payload).length, limbCount: payload?.records ? Object.keys(payload.records).length : 0 });
+          const recs = payload?.records || {};
+          const firstLimb = Object.keys(recs)[0];
+          writes.push({
+            bytes: JSON.stringify(payload).length,
+            limbCount: Object.keys(recs).length,
+            fields: firstLimb ? recs[firstLimb] : null
+          });
           return Promise.resolve();
         },
         onSnapshot: () => () => {}
@@ -433,12 +439,14 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
           mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
         };
       }
-      queueRecordFieldsSync('L0');
+      // メモだけを変更した想定
+      queueRecordFieldsSync('L0', ['note']);
       await flushRecordFieldsToCloudIfNeeded();
+      const noteOnly = writes.length === 1 ? Object.keys(writes[0].fields || {}) : [];
 
       window.getAuthUid = origGetAuthUid;
       if (origFirestore) window.firebase.firestore = origFirestore;
-      return { writes, totalRecords: 1000 };
+      return { writes, noteOnly };
     });
     if (result === null) test.skip();
 
@@ -447,6 +455,8 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.writes[0].limbCount).toBe(1);
     // 全件送信なら数百KBになるため、桁違いに小さいことを確認する
     expect(result.writes[0].bytes).toBeLessThan(2000);
+    // 変更していないフィールドは送らない（他端末の更新を潰さないため）
+    expect(result.noteOnly).toEqual(['note']);
   });
 
   test('BUG-FIX: 全件スナップショット送信が回答経路から呼ばれていない', () => {
