@@ -403,6 +403,79 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     })).toBe(100);
   });
 
+  test('BUG-FIX: 回答時に全件スナップショットではなく変更した肢だけを送る', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      if (typeof queueRecordFieldsSync !== 'function' || typeof buildRecordFieldsPatch !== 'function') return null;
+
+      // Firestore の書き込みを計測用に差し替える
+      const writes = [];
+      const origFirestore = window.firebase?.firestore;
+      const stubDoc = {
+        get: () => Promise.resolve({ exists: false, data: () => null }),
+        set: (payload) => {
+          writes.push({ bytes: JSON.stringify(payload).length, limbCount: payload?.records ? Object.keys(payload.records).length : 0 });
+          return Promise.resolve();
+        },
+        onSnapshot: () => () => {}
+      };
+      window.firebase = window.firebase || {};
+      window.firebase.firestore = () => ({ collection: () => ({ doc: () => stubDoc }) });
+      window.firebase.firestore.FieldValue = { serverTimestamp: () => 'TS', increment: (n) => ({ __inc: n }) };
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'u1';
+
+      // 1000肢ぶんのレコードを用意し、そのうち1肢だけ更新する
+      records = {};
+      for (let i = 0; i < 1000; i++) {
+        records[`L${i}`] = {
+          correct: 2, wrong: 1, wrongDateKeys: ['2026-08-01', '2026-08-05'],
+          review: { intervalDays: 3, streak: 1, ease: 2.1, lastAnsweredAtMs: 1, dueAtMs: 2 },
+          mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+        };
+      }
+      queueRecordFieldsSync('L0');
+      await flushRecordFieldsToCloudIfNeeded();
+
+      window.getAuthUid = origGetAuthUid;
+      if (origFirestore) window.firebase.firestore = origFirestore;
+      return { writes, totalRecords: 1000 };
+    });
+    if (result === null) test.skip();
+
+    // 1回の送信で、変更した1肢だけが含まれること（全1000件ではない）
+    expect(result.writes.length).toBe(1);
+    expect(result.writes[0].limbCount).toBe(1);
+    // 全件送信なら数百KBになるため、桁違いに小さいことを確認する
+    expect(result.writes[0].bytes).toBeLessThan(2000);
+  });
+
+  test('BUG-FIX: 全件スナップショット送信が回答経路から呼ばれていない', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const js = fs.readFileSync(path.join(__dirname, '../../app.js'), 'utf8');
+
+    // addRecord / setLimbMastery / setLimbNote / toggleLimbBookmark は
+    // 全件送信(pushRecordsToCloud)ではなく肢単位送信を使う
+    for (const fn of ['addRecord', 'setLimbMastery', 'setLimbNote', 'toggleLimbBookmark']) {
+      const m = js.match(new RegExp(`function ${fn}\\([\\s\\S]*?\\n}`));
+      expect(m, `${fn} が見つからない`).toBeTruthy();
+      expect(m[0], `${fn} が全件送信している`).not.toContain('pushRecordsToCloud');
+      expect(m[0], `${fn} が肢単位送信を使っていない`).toContain('queueRecordFieldsSync');
+    }
+  });
+
+  test('BUG-FIX: セッションスナップショットのクラウド送信が間引かれている', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const js = fs.readFileSync(path.join(__dirname, '../../app.js'), 'utf8');
+
+    // 1問ごとに呼ばれる saveStudySessionSnapshot は直接flushせず、間引き経路を通す
+    const m = js.match(/function saveStudySessionSnapshot\(\)[\s\S]*?\n}/);
+    expect(m).toBeTruthy();
+    expect(m[0]).toContain('scheduleStudySessionSnapshotFlush');
+    expect(m[0]).not.toContain('flushStudySessionSnapshotToCloudIfNeeded');
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;
