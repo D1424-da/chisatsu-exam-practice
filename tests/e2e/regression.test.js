@@ -486,6 +486,74 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(m[0]).not.toContain('flushStudySessionSnapshotToCloudIfNeeded');
   });
 
+  test('BUG-FIX: 学習フィルターを変更するとカウント表示バーが再計算される', async ({ page }) => {
+    // アプリの初期化(DOMContentLoaded内のawait)は、テストデータの投入後に
+    // loadData() でグローバルを上書きし、change ハンドラもその後に登録する。
+    // そのため毎回データを入れ直してから操作する形でリトライする。
+    const setupAndChangeYear = () => page.evaluate(() => {
+      if (typeof updateMasteryCounts !== 'function') return null;
+      const mk = () => ({
+        correct: 1, wrong: 0, wrongDateKeys: [],
+        review: { intervalDays: 1, streak: 1, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 9e15 },
+        mastery: 'ambiguous', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      // h27 と h28 に10問(各4肢)ずつ。全肢を「あいまい」にする。
+      const qs = []; records = {};
+      for (const yr of ['h27', 'h28']) {
+        for (let q = 0; q < 10; q++) {
+          const limbs = [];
+          for (let l = 0; l < 4; l++) {
+            const id = `${yr}-${q}-${l}`;
+            limbs.push({ id, text: `肢${id}`, correct: true, explanation: '' });
+            records[id] = mk();
+          }
+          qs.push({ id: `${yr}-${q}`, subject: 'S', category: '総則', source: `${yr.toUpperCase()}-問${q}`, limbs });
+        }
+      }
+      questions = qs;
+      refreshFilterOptions();
+
+      const shown = () => Number(String(document.getElementById('count-ambiguous').textContent).replace(/\D/g, ''));
+      const change = (id, v) => {
+        const el = document.getElementById(id);
+        el.value = v;
+        el.dispatchEvent(new Event('change'));
+      };
+
+      document.getElementById('filter-year-from').value = '';
+      updateMasteryCounts();
+      const all = shown();
+
+      // 年度を h28 以降に絞る。ハンドラが登録されていれば表示も追従する。
+      change('filter-year-from', 'h28');
+      const afterYear = shown();
+
+      change('filter-mode', 'ambiguous');
+      startSession();
+      const queued = session ? session.queue.length : 0;
+      const shownAtSession = shown();
+
+      change('filter-year-from', '');
+      const restored = shown();
+      return { all, afterYear, queued, shownAtSession, restored };
+    });
+
+    const first = await setupAndChangeYear();
+    if (first === null) test.skip();
+
+    // change ハンドラの登録完了までリトライする（操作は何度行っても同じ結果）
+    await expect.poll(async () => (await setupAndChangeYear())?.afterYear).toBe(40);
+
+    const r = await setupAndChangeYear();
+    expect(r.all).toBe(80);
+    // 年度フィルターの変更がカウント表示に反映される（無いと前の条件の数字が残る）
+    expect(r.afterYear).toBe(40);
+    // 表示数と実際の出題数が一致する
+    expect(r.shownAtSession).toBe(r.queued);
+    // フィルターを戻せば表示も戻る
+    expect(r.restored).toBe(80);
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;

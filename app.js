@@ -858,6 +858,18 @@ function setMasteryCountBarVisible(visible) {
  * 表示数と実際の出題数がずれたときの調査用。
  * 抑止したい場合はコンソールで window.DEBUG_MASTERY_COUNTS = false を実行する。
  */
+/**
+ * questions を差し替えた経路と件数をコンソールへ出力する。
+ * カウント表示の対象肢数が途中で変動したとき、どの読み込み経路が原因かを追うため。
+ */
+function logQuestionsReplaced(source) {
+  if (window.DEBUG_MASTERY_COUNTS === false) return;
+  const questionCount = Array.isArray(questions) ? questions.length : 0;
+  let limbCount = 0;
+  for (const q of (questions || [])) limbCount += Array.isArray(q?.limbs) ? q.limbs.length : 0;
+  console.log(`[問題データ] ${source}: ${questionCount}問 / ${limbCount}肢`);
+}
+
 let lastMasteryCountsDebugLabel = '';
 
 function logMasteryCountsDebug(detail) {
@@ -1125,6 +1137,7 @@ async function pullQuestionsFromCloudIfNeeded(force = false) {
     const shouldUseRemote = !Array.isArray(questions) || questions.length === 0 || remoteEditedAt >= localEditedAt;
     if (shouldUseRemote) {
       questions = remoteQuestions;
+      logQuestionsReplaced('クラウド同期で差し替え');
       storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
       saveQuestionsMeta({
         ...meta,
@@ -2195,6 +2208,7 @@ async function resetStudyTime() {
 function loadData() {
   currentUser = getActiveUser();
   try { questions = JSON.parse(storageGetItem(KEY_QUESTIONS)) || []; } catch { questions = []; }
+  logQuestionsReplaced('ローカル保存から読み込み');
   const authUid = getAuthUid();
   const rk = getRecordStorageKey(authUid);
   try { records = normalizeRecordMap(JSON.parse(storageGetItem(rk)) || {}); } catch { records = {}; }
@@ -2263,6 +2277,7 @@ async function syncBundledQuestions() {
           if (Array.isArray(bundled) && bundled.length > 0) {
             const now = Date.now();
             questions = bundled;
+            logQuestionsReplaced('同梱JSON(output/all_questions.json)で差し替え');
             storageSetItem(KEY_QUESTIONS, JSON.stringify(bundled));
             saveQuestionsMeta({
               ...getQuestionsMeta(),
@@ -2436,6 +2451,7 @@ async function applyFileData(data) {
   if (Array.isArray(data.questions)) {
     const now = Date.now();
     questions = data.questions;
+    logQuestionsReplaced('データファイル読込で差し替え');
     storageSetItem(KEY_QUESTIONS, JSON.stringify(questions));
     saveQuestionsMeta({
       ...getQuestionsMeta(),
@@ -4193,6 +4209,7 @@ function importJSONFiles(files) {
       }
     }
     questions = merged;
+    logQuestionsReplaced('JSONインポートで差し替え');
     saveQuestions();
     refreshFilterOptions();
     renderManage();
@@ -4553,11 +4570,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (countWrongBtn) countWrongBtn.addEventListener('click', () => jumpToStudyMode('wrong'));
   if (countFewBtn) countFewBtn.addEventListener('click', () => jumpToStudyMode('few'));
 
+  // カウント表示バーは現在のフィルターに一致する肢を数えるため、
+  // フィルターを変えたら数え直す。数え直さないと、表示件数だけが前の条件のまま残り、
+  // 「あいまい: 393」と表示されているのに実際の出題は207件、といった食い違いになる。
   document.getElementById('filter-subject').addEventListener('change', (e) => {
     const cats = getCategories(e.target.value);
     const fCat = document.getElementById('filter-category');
     fCat.innerHTML = '<option value="">すべて</option>' + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    updateMasteryCounts();
   });
+  for (const id of ['filter-category', 'filter-year-from', 'filter-year-to', 'filter-mode']) {
+    document.getElementById(id)?.addEventListener('change', updateMasteryCounts);
+  }
 
   // 結果モーダル
   const btnMarkPerfect = document.getElementById('btn-mark-perfect');
