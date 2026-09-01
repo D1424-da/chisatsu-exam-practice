@@ -4570,11 +4570,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (countWrongBtn) countWrongBtn.addEventListener('click', () => jumpToStudyMode('wrong'));
   if (countFewBtn) countFewBtn.addEventListener('click', () => jumpToStudyMode('few'));
 
+  // カウント表示バーは現在のフィルターに一致する肢を数えるため、
+  // フィルターを変えたら数え直す。数え直さないと、表示件数だけが前の条件のまま残り、
+  // 「あいまい: 393」と表示されているのに実際の出題は207件、といった食い違いになる。
   document.getElementById('filter-subject').addEventListener('change', (e) => {
     const cats = getCategories(e.target.value);
     const fCat = document.getElementById('filter-category');
     fCat.innerHTML = '<option value="">すべて</option>' + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    updateMasteryCounts();
   });
+  for (const id of ['filter-category', 'filter-year-from', 'filter-year-to', 'filter-mode']) {
+    document.getElementById(id)?.addEventListener('change', updateMasteryCounts);
+  }
 
   // 結果モーダル
   const btnMarkPerfect = document.getElementById('btn-mark-perfect');
