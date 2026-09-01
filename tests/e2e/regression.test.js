@@ -349,6 +349,60 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.on.rows).toBe(40);
   });
 
+  test('FEATURE: 苦手肢リストの表示件数を選択でき、設定が保存される', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof normalizeWeakListLimit !== 'function') return null;
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'test-uid';
+      const mk = () => ({
+        correct: 1, wrong: 2, wrongDateKeys: ['2026-01-01'],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      const limbs = [];
+      records = {};
+      for (let i = 0; i < 300; i++) {
+        limbs.push({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' });
+        records[`L${i}`] = mk();
+      }
+      questions = [{ id: 'q1', subject: 'S', limbs }];
+      document.getElementById('weak-hide-high-rate').checked = false;
+
+      const el = document.getElementById('weak-list-limit');
+      const rowsFor = (v) => {
+        el.value = v;
+        renderStats();
+        return document.querySelectorAll('.weak-limb-row').length;
+      };
+      const at50 = rowsFor('50');
+      const at200 = rowsFor('200');
+      const atAll = rowsFor('0');   // 0 = すべて表示
+      const totalText = document.getElementById('weak-limbs-total').textContent;
+
+      window.getAuthUid = origGetAuthUid;
+      return { at50, at200, atAll, totalText, invalid: normalizeWeakListLimit('abc') };
+    });
+    if (result === null) test.skip();
+
+    expect(result.at50).toBe(50);
+    expect(result.at200).toBe(200);
+    // 0 は「すべて表示」
+    expect(result.atAll).toBe(300);
+    expect(result.totalText).toContain('すべて表示');
+    // 不正値はデフォルトの50に丸められる
+    expect(result.invalid).toBe(50);
+
+    // change ハンドラは DOMContentLoaded 内の await 後に登録されるため、
+    // 登録が済むまでリトライする（dispatch は何度呼んでも同じ結果になる）。
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.getElementById('weak-list-limit');
+      el.value = '100';
+      el.dispatchEvent(new Event('change'));
+      const saved = JSON.parse(localStorage.getItem('chisatsu_limb_weak_list_pref') || '{}');
+      return saved.limit ?? null;
+    })).toBe(100);
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;

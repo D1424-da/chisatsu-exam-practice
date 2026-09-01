@@ -380,7 +380,7 @@
           <div id="subject-stats"></div>
         </div>
         <div class="stats-detail card">
-            <h3>苦手肢トップ50</h3>
+            <h3>苦手肢リスト</h3>
           <div class="weak-filter-bar">
             <label class="weak-filter-check">
               <input id="weak-hide-high-rate" type="checkbox" />
@@ -394,6 +394,16 @@
                 <option value="80" selected>80%以上</option>
                 <option value="90">90%以上</option>
                 <option value="95">95%以上</option>
+              </select>
+            </label>
+            <label class="weak-filter-threshold">
+              表示件数
+              <select id="weak-list-limit">
+                <option value="50" selected>上位50件</option>
+                <option value="100">上位100件</option>
+                <option value="200">上位200件</option>
+                <option value="500">上位500件</option>
+                <option value="0">すべて</option>
               </select>
             </label>
           </div>

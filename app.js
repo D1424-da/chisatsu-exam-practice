@@ -149,22 +149,33 @@ function saveQuestionsMeta(meta) {
   storageSetItem(KEY_QUESTIONS_META, JSON.stringify(meta || {}));
 }
 
+/** 苦手肢リストの表示件数の選択肢。0 は「すべて表示」 */
+const WEAK_LIST_LIMITS = [50, 100, 200, 500, 0];
+const WEAK_LIST_DEFAULT_LIMIT = 50;
+
+function normalizeWeakListLimit(value) {
+  const n = Number(value);
+  return WEAK_LIST_LIMITS.includes(n) ? n : WEAK_LIST_DEFAULT_LIMIT;
+}
+
 function getWeakListPref() {
   try {
     const raw = JSON.parse(storageGetItem(KEY_WEAK_LIST_PREF) || '{}');
     return {
       hideHighRate: !!raw.hideHighRate,
-      threshold: [60, 70, 80, 90, 95].includes(Number(raw.threshold)) ? Number(raw.threshold) : 80
+      threshold: [60, 70, 80, 90, 95].includes(Number(raw.threshold)) ? Number(raw.threshold) : 80,
+      limit: normalizeWeakListLimit(raw.limit)
     };
   } catch {
-    return { hideHighRate: false, threshold: 80 };
+    return { hideHighRate: false, threshold: 80, limit: WEAK_LIST_DEFAULT_LIMIT };
   }
 }
 
 function saveWeakListPref(pref) {
   const safe = {
     hideHighRate: !!pref?.hideHighRate,
-    threshold: [60, 70, 80, 90, 95].includes(Number(pref?.threshold)) ? Number(pref.threshold) : 80
+    threshold: [60, 70, 80, 90, 95].includes(Number(pref?.threshold)) ? Number(pref.threshold) : 80,
+    limit: normalizeWeakListLimit(pref?.limit)
   };
   storageSetItem(KEY_WEAK_LIST_PREF, JSON.stringify(safe));
 }
@@ -4041,10 +4052,12 @@ function renderStats() {
 
   const weakHideHighRateEl = document.getElementById('weak-hide-high-rate');
   const weakThresholdEl = document.getElementById('weak-hide-threshold');
+  const weakLimitEl = document.getElementById('weak-list-limit');
   const hideHighRate = !!weakHideHighRateEl?.checked;
   const threshold = [60, 70, 80, 90, 95].includes(Number(weakThresholdEl?.value))
     ? Number(weakThresholdEl.value)
     : 80;
+  const weakLimit = normalizeWeakListLimit(weakLimitEl?.value);
 
   const allLimbs = getAllLimbs('', '', true);
   let total = 0;
@@ -4100,7 +4113,7 @@ function renderStats() {
   }).join('');
   document.getElementById('subject-stats').innerHTML = subjectHtml || '<p>データなし</p>';
 
-  // 苦手肢トップ50（フィルター適用後の総数も表示する）
+  // 苦手肢リスト（表示件数は選択式。フィルター適用後の総数も表示する）
   const weakMatched = allLimbs
     .filter(l => getRecord(l.id).wrong > 0)
     .filter((l) => {
@@ -4112,7 +4125,8 @@ function renderStats() {
       return rt < threshold;
     })
     .sort((a, b) => weakScore(getRecord(b.id)) - weakScore(getRecord(a.id)));
-  const weakSorted = weakMatched.slice(0, 50);
+  // weakLimit が 0 のときは「すべて表示」
+  const weakSorted = weakLimit > 0 ? weakMatched.slice(0, weakLimit) : weakMatched;
 
   const weakTotalEl = document.getElementById('weak-limbs-total');
   if (weakTotalEl) {
@@ -4336,29 +4350,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const weakHideHighRateEl = document.getElementById('weak-hide-high-rate');
   const weakThresholdEl = document.getElementById('weak-hide-threshold');
+  const weakLimitEl = document.getElementById('weak-list-limit');
   const weakListPref = getWeakListPref();
   if (weakHideHighRateEl) weakHideHighRateEl.checked = weakListPref.hideHighRate;
   if (weakThresholdEl) weakThresholdEl.value = String(weakListPref.threshold);
+  if (weakLimitEl) weakLimitEl.value = String(weakListPref.limit);
 
-  if (weakHideHighRateEl) {
-    weakHideHighRateEl.addEventListener('change', () => {
-      saveWeakListPref({
-        hideHighRate: weakHideHighRateEl.checked,
-        threshold: Number(weakThresholdEl?.value || 80)
-      });
-      renderStats();
+  // 3つのコントロールは同じ設定オブジェクトを更新するため、保存処理を共通化する。
+  const persistWeakListPref = () => {
+    saveWeakListPref({
+      hideHighRate: !!weakHideHighRateEl?.checked,
+      threshold: Number(weakThresholdEl?.value || 80),
+      limit: weakLimitEl?.value
     });
-  }
+    renderStats();
+  };
 
-  if (weakThresholdEl) {
-    weakThresholdEl.addEventListener('change', () => {
-      saveWeakListPref({
-        hideHighRate: !!weakHideHighRateEl?.checked,
-        threshold: Number(weakThresholdEl.value || 80)
-      });
-      renderStats();
-    });
-  }
+  if (weakHideHighRateEl) weakHideHighRateEl.addEventListener('change', persistWeakListPref);
+  if (weakThresholdEl) weakThresholdEl.addEventListener('change', persistWeakListPref);
+  if (weakLimitEl) weakLimitEl.addEventListener('change', persistWeakListPref);
 
   // 学習ページ
   document.getElementById('btn-start').addEventListener('click', startSession);
