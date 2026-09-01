@@ -669,36 +669,56 @@ function isAmbiguousLimb(limbId) {
   return normalizeMasteryValue(getRecord(limbId).mastery) === 'ambiguous';
 }
 
+/** 「回答数が少ない」で1回に確保したい肢数の目安（1セッション分） */
+const FEW_ANSWERS_TARGET = 50;
+
 /**
  * 与えられた肢集合について「回答数が少ない」の判定に必要な情報を1パスで算出する。
- * 回答回数の中央値をしきい値とし、それ未満の回答回数の肢を対象とする。
+ * 回答回数の少ないグループから順に、目安の件数がたまるまで含める。
+ * 返り値の cutoff 「以下」の回答回数の肢が対象（cutoff が -1 なら該当なし）。
  *
- * 平均の一定割合（例: 平均の50%）で判定すると、平均が小さいときに破綻する。
- * 例えば1〜3回に散らばって平均2回なら、しきい値が1回未満まで落ちて
- * 「1回しか答えていない肢」すら拾えず、該当0件になってしまう。
- * 中央値なら分布の実態に沿って「後ろ半分」を必ず指すため、この問題が起きない。
+ * 平均や中央値を直接しきい値にすると、代表値そのもののグループが最下位のときに
+ * 該当0件になってしまう。例えば1回x600・2回x300・3回x100 なら中央値は1で、
+ * 「1回未満」＝未回答のみとなり、明らかに遅れている1回の肢が拾えない。
+ * 実際の分布のグループを下から積む方式なら、この潰れ方をしない。
  *
- * - 全肢の回答回数が揃っていれば該当0件（偏りが無い＝やることが無い）
- * - 半数以上が未回答なら中央値0だが、下限1により未回答を拾える
+ * - 全肢の回答回数が同じなら該当0件（偏りが無い＝やることが無い）
+ *   ただし全肢が未回答なら、絶対的に少ないので全件を対象とする
+ * - 最多グループは「遅れている」とは言えないので含めない
  */
 function computeFewAnswersInfo(limbs) {
   const effMap = new Map();
-  const counts = [];
+  const tierSize = new Map();
   for (const l of limbs) {
     const r = getEffectiveRecord(l);
     effMap.set(l, r);
-    counts.push(r.correct + r.wrong);
+    const c = r.correct + r.wrong;
+    tierSize.set(c, (tierSize.get(c) || 0) + 1);
   }
-  counts.sort((a, b) => a - b);
-  const median = counts.length > 0 ? counts[Math.floor(counts.length / 2)] : 0;
-  const threshold = Math.max(1, median);
-  return { effMap, median, threshold };
+  if (tierSize.size === 0) return { effMap, cutoff: -1 };
+
+  const tiers = [...tierSize.keys()].sort((a, b) => a - b);
+  const maxCount = tiers[tiers.length - 1];
+  if (tiers.length === 1) {
+    // 回答回数が全肢で揃っている。未回答で揃っているときだけ全件を対象にする。
+    return { effMap, cutoff: maxCount === 0 ? 0 : -1 };
+  }
+
+  let cutoff = tiers[0];
+  let acc = tierSize.get(tiers[0]);
+  for (let i = 1; i < tiers.length && acc < FEW_ANSWERS_TARGET; i++) {
+    if (tiers[i] === maxCount) break;
+    cutoff = tiers[i];
+    acc += tierSize.get(tiers[i]);
+  }
+  return { effMap, cutoff };
 }
 
 /** 回答回数が相対的に少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
-function isFewAnswersLimb(limb, threshold) {
+function isFewAnswersLimb(limb, cutoff) {
+  if (cutoff < 0) return false;
   const r = getEffectiveRecord(limb);
-  return (r.correct + r.wrong) < threshold;
+  return (r.correct + r.wrong) <= cutoff;
 }
 
 /**
@@ -810,14 +830,14 @@ function updateMasteryCounts() {
   // カウント表示と実際の出題数がずれる。
   // getEffectiveRecord は文中〇×で正規表現パースを伴うため、肢ごとに一度だけ算出して使い回す。
   const limbs = getLimbsMatchingFilters();
-  const { effMap, threshold: fewThreshold } = computeFewAnswersInfo(limbs);
+  const { effMap, cutoff: fewCutoff } = computeFewAnswersInfo(limbs);
   for (const limb of limbs) {
     const mastery = normalizeMasteryValue(getRecord(limb.id).mastery);
     if (mastery === 'perfect') perfect++;
     else if (mastery === 'ambiguous') ambiguous++;
     const eff = effMap.get(limb);
     if (isOutstandingWrong(eff)) wrong++;
-    if ((eff.correct + eff.wrong) < fewThreshold) few++;
+    if (fewCutoff >= 0 && (eff.correct + eff.wrong) <= fewCutoff) few++;
   }
 
   const elPerfect = document.getElementById('count-perfect');
@@ -828,7 +848,11 @@ function updateMasteryCounts() {
   if (elAmbiguous) elAmbiguous.textContent = `あいまい: ${ambiguous}`;
   if (elWrong) elWrong.textContent = `まちがえたもの: ${wrong}`;
   // しきい値は学習の進み具合で変わるため、現在値を併記して意味が分かるようにする。
-  if (elFew) elFew.textContent = `回答数が少ない: ${few}（${fewThreshold}回未満）`;
+  if (elFew) {
+    elFew.textContent = fewCutoff >= 0
+      ? `回答数が少ない: ${few}（${fewCutoff}回以下）`
+      : '回答数が少ない: 0（偏りなし）';
+  }
 }
 
 function calcStudyStreak() {
@@ -3040,9 +3064,9 @@ function startSession() {
   } else if (mode === 'few') {
     // 全体の平均に対して回答回数が相対的に少ない肢を、少ない順に出題して練習量の偏りを均す。
     // 同じ回数の中はランダム（sortが安定なので、先にshuffleすれば同数内の順序は保たれる）。
-    const { effMap, threshold } = computeFewAnswersInfo(limbs);
+    const { effMap, cutoff } = computeFewAnswersInfo(limbs);
     const countOf = (l) => effMap.get(l).correct + effMap.get(l).wrong;
-    limbs = shuffle(limbs.filter(l => countOf(l) < threshold));
+    limbs = shuffle(limbs.filter(l => cutoff >= 0 && countOf(l) <= cutoff));
     limbs.sort((a, b) => countOf(a) - countOf(b));
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));

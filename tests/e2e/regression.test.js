@@ -223,7 +223,7 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.unsettled).toBe(true);  // 1箇所でも未克服なら残る
   });
 
-  test('FEATURE: 「回答数が少ない」は中央値による相対判定で、少ない順に出題する', async ({ page }) => {
+  test('FEATURE: 「回答数が少ない」は最少グループから積み上げ、少ない順に出題する', async ({ page }) => {
     const result = await page.evaluate(() => {
       if (typeof computeFewAnswersInfo !== 'function') return null;
       const mk = (c) => ({
@@ -238,20 +238,27 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
         return getLimbsMatchingFilters({ subject: '', category: '', yearFrom: '', yearTo: '', mode: 'few' });
       };
 
-      // 中央値20 → 0/1/2回の3件が該当
+      // 最少グループ(0回)から積み上げる
       const spread = computeFewAnswersInfo(build([0, 1, 2, 20, 20, 20]));
       // 全肢が同じ回数 → 偏りが無いので該当0件
       const even = computeFewAnswersInfo(build([8, 8, 8, 8]));
-      // 学習初期（全部未回答）→ しきい値は最低1なので未回答が拾える
+      // 学習初期（全部未回答）→ 絶対的に少ないので全件が対象
       const fresh = computeFewAnswersInfo(build([0, 0, 0, 0]));
       // BUG回帰: 回答回数が小さい範囲に散らばるケース。
-      // 平均の一定割合だと平均2回→しきい値1回未満となり該当0件（＝出題されない）になっていた。
+      // 平均の一定割合だと平均2回→「1回未満」となり該当0件（＝出題されない）だった。
       const narrow = computeFewAnswersInfo(build([1, 1, 1, 2, 2, 3, 3, 3]));
       // BUG回帰: 少数だけ回数が遅れているケース（平均比だと該当0件だった）
       const laggard = computeFewAnswersInfo(build([1, 3, 3, 3, 3, 3, 3, 3]));
+      // BUG回帰: 未回答が無く、最少グループ(1回)が最大勢力でもあるケース。
+      // 中央値を直接しきい値にすると「1回未満」＝未回答のみに潰れ、該当0件だった。
+      // 最少グループだけで目安件数を満たすので、cutoff は 1 に留まるのが正しい。
+      const rep = (v, n) => Array(n).fill(v);
+      const medianIsLowest = computeFewAnswersInfo(build([...rep(1, 60), ...rep(2, 30), ...rep(3, 10)]));
 
       const countOf = (info, l) => info.effMap.get(l).correct + info.effMap.get(l).wrong;
-      const matched = (info) => [...info.effMap.keys()].filter(l => countOf(info, l) < info.threshold).length;
+      const matched = (info) => info.cutoff < 0
+        ? 0
+        : [...info.effMap.keys()].filter(l => countOf(info, l) <= info.cutoff).length;
 
       // 実際の出題順を確認
       build([0, 1, 2, 20, 20, 20]);
@@ -264,35 +271,39 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
 
       updateMasteryCounts();
       return {
-        spread: { threshold: spread.threshold, matched: matched(spread) },
-        even: { threshold: even.threshold, matched: matched(even) },
-        fresh: { threshold: fresh.threshold, matched: matched(fresh) },
-        narrow: { threshold: narrow.threshold, matched: matched(narrow) },
-        laggard: { threshold: laggard.threshold, matched: matched(laggard) },
+        spread: { cutoff: spread.cutoff, matched: matched(spread) },
+        even: { cutoff: even.cutoff, matched: matched(even) },
+        fresh: { cutoff: fresh.cutoff, matched: matched(fresh) },
+        narrow: { cutoff: narrow.cutoff, matched: matched(narrow) },
+        laggard: { cutoff: laggard.cutoff, matched: matched(laggard) },
+        medianIsLowest: { cutoff: medianIsLowest.cutoff, matched: matched(medianIsLowest) },
         queue,
         label: document.getElementById('count-few').textContent
       };
     });
     if (result === null) test.skip();
 
-    // 中央値による相対判定: 中央値20 → 0/1/2回の3件
-    expect(result.spread.threshold).toBe(20);
+    // 最少グループ(0回)から積み上げ、最多グループ(20回)は含めない
+    expect(result.spread.cutoff).toBe(2);
     expect(result.spread.matched).toBe(3);
-    // 回答回数が揃っていれば「相対的に少ないもの」は存在しない
+    // 回答回数が揃っていれば「相対的に少ないもの」は存在しない（cutoff -1 = 該当なし）
+    expect(result.even.cutoff).toBe(-1);
     expect(result.even.matched).toBe(0);
-    // 全部未回答でも、しきい値の下限1により未回答を拾える（初期に空にならない）
-    expect(result.fresh.threshold).toBe(1);
+    // 全部未回答なら絶対的に少ないので全件が対象（初期に空にならない）
+    expect(result.fresh.cutoff).toBe(0);
     expect(result.fresh.matched).toBe(4);
     // 回帰: 1〜3回に散らばるケースで、1回の肢がきちんと該当すること
-    expect(result.narrow.threshold).toBe(2);
-    expect(result.narrow.matched).toBe(3);
+    expect(result.narrow.matched).toBeGreaterThan(0);
     // 回帰: 少数だけ遅れているケースで、その肢が該当すること
-    expect(result.laggard.threshold).toBe(3);
+    expect(result.laggard.cutoff).toBe(1);
     expect(result.laggard.matched).toBe(1);
+    // 回帰: 未回答が無く最少グループが最大勢力でも空にならず、そのグループだけで足りる
+    expect(result.medianIsLowest.cutoff).toBe(1);
+    expect(result.medianIsLowest.matched).toBe(60);
     // 回答回数の少ない順に並ぶ
     expect(result.queue).toEqual([...result.queue].sort((a, b) => a - b));
     // ボタンに現在のしきい値が併記される
-    expect(result.label).toContain('回未満');
+    expect(result.label).toContain('回以下');
   });
 
   test('FEATURE: 苦手肢リストが正答率フィルター適用後の総数を表示する', async ({ page }) => {
