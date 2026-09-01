@@ -670,6 +670,18 @@ function isAmbiguousLimb(limbId) {
 }
 
 /**
+ * 「回答数が少ない」とみなす回答回数の上限（この回数以下が対象）。
+ * 出題が特定の肢に偏るのを均すためのカテゴリで、未回答（0回）も含む。
+ */
+const FEW_ANSWERS_MAX = 2;
+
+/** 回答回数が少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
+function isFewAnswersLimb(limb) {
+  const r = getEffectiveRecord(limb);
+  return (r.correct + r.wrong) <= FEW_ANSWERS_MAX;
+}
+
+/**
  * 「優先復習」モードの総合スコア。値が大きいほど優先的に出題する。
  * 誤答・あいまい・ブックマーク・未回答・復習期限切れ・苦手度・回答回数の少なさを重み付けして合算する。
  * 文章〇×は getEffectiveRecord で各空欄を合算した成績を用いる。
@@ -770,6 +782,7 @@ function updateMasteryCounts() {
   let perfect = 0;
   let ambiguous = 0;
   let wrong = 0;
+  let few = 0;
 
   // 出題キューと同じ肢集合・同じ判定関数を使う。
   // records を直接走査すると、削除・再インポートで肢が無くなった残骸レコードや、
@@ -779,15 +792,20 @@ function updateMasteryCounts() {
     const mastery = normalizeMasteryValue(getRecord(limb.id).mastery);
     if (mastery === 'perfect') perfect++;
     else if (mastery === 'ambiguous') ambiguous++;
-    if (isOutstandingWrong(getEffectiveRecord(limb))) wrong++;
+    // getEffectiveRecord は文中〇×で正規表現パースを伴うため、肢ごとに一度だけ算出する。
+    const eff = getEffectiveRecord(limb);
+    if (isOutstandingWrong(eff)) wrong++;
+    if ((eff.correct + eff.wrong) <= FEW_ANSWERS_MAX) few++;
   }
 
   const elPerfect = document.getElementById('count-perfect');
   const elAmbiguous = document.getElementById('count-ambiguous');
   const elWrong = document.getElementById('count-wrong');
+  const elFew = document.getElementById('count-few');
   if (elPerfect) elPerfect.textContent = `完璧: ${perfect}`;
   if (elAmbiguous) elAmbiguous.textContent = `あいまい: ${ambiguous}`;
   if (elWrong) elWrong.textContent = `まちがえたもの: ${wrong}`;
+  if (elFew) elFew.textContent = `回答数が少ない: ${few}`;
 }
 
 function calcStudyStreak() {
@@ -2996,6 +3014,15 @@ function startSession() {
       return r.correct === 0 && r.wrong === 0;
     });
     limbs = shuffle(limbs);
+  } else if (mode === 'few') {
+    // 回答回数の少ない順に出題して、肢ごとの練習量の偏りを均す。
+    // 同じ回数の中はランダム（sortが安定なので、先にshuffleすれば同数内の順序は保たれる）。
+    const countMap = new Map(limbs.map(l => {
+      const r = getEffectiveRecord(l);
+      return [l, r.correct + r.wrong];
+    }));
+    limbs = shuffle(limbs.filter(l => countMap.get(l) <= FEW_ANSWERS_MAX));
+    limbs.sort((a, b) => countMap.get(a) - countMap.get(b));
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);
@@ -4028,8 +4055,8 @@ function renderStats() {
   }).join('');
   document.getElementById('subject-stats').innerHTML = subjectHtml || '<p>データなし</p>';
 
-  // 苦手肢トップ50
-  const weakSorted = allLimbs
+  // 苦手肢トップ50（フィルター適用後の総数も表示する）
+  const weakMatched = allLimbs
     .filter(l => getRecord(l.id).wrong > 0)
     .filter((l) => {
       if (!hideHighRate) return true;
@@ -4039,8 +4066,18 @@ function renderStats() {
       const rt = Math.round(r.correct / t * 100);
       return rt < threshold;
     })
-    .sort((a, b) => weakScore(getRecord(b.id)) - weakScore(getRecord(a.id)))
-    .slice(0, 50);
+    .sort((a, b) => weakScore(getRecord(b.id)) - weakScore(getRecord(a.id)));
+  const weakSorted = weakMatched.slice(0, 50);
+
+  const weakTotalEl = document.getElementById('weak-limbs-total');
+  if (weakTotalEl) {
+    const filterNote = hideHighRate ? `（正答率 ${threshold}% 未満に絞り込み）` : '';
+    weakTotalEl.textContent = weakMatched.length === 0
+      ? `該当 0 件${filterNote}`
+      : weakMatched.length > weakSorted.length
+        ? `該当 ${weakMatched.length} 件中 上位 ${weakSorted.length} 件を表示${filterNote}`
+        : `該当 ${weakMatched.length} 件をすべて表示${filterNote}`;
+  }
 
   const weakHtml = weakSorted.map((limb, i) => {
     const r = getRecord(limb.id);
@@ -4297,9 +4334,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const countPerfectBtn = document.getElementById('count-perfect');
   const countAmbiguousBtn = document.getElementById('count-ambiguous');
   const countWrongBtn = document.getElementById('count-wrong');
+  const countFewBtn = document.getElementById('count-few');
   if (countPerfectBtn) countPerfectBtn.addEventListener('click', () => jumpToStudyMode('perfect'));
   if (countAmbiguousBtn) countAmbiguousBtn.addEventListener('click', () => jumpToStudyMode('ambiguous'));
   if (countWrongBtn) countWrongBtn.addEventListener('click', () => jumpToStudyMode('wrong'));
+  if (countFewBtn) countFewBtn.addEventListener('click', () => jumpToStudyMode('few'));
 
   document.getElementById('filter-subject').addEventListener('change', (e) => {
     const cats = getCategories(e.target.value);

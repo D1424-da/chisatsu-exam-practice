@@ -223,6 +223,84 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.unsettled).toBe(true);  // 1箇所でも未克服なら残る
   });
 
+  test('FEATURE: 「回答数が少ない」カウントと few モードが回答回数の少ない順に出題する', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof FEW_ANSWERS_MAX === 'undefined' || typeof isFewAnswersLimb !== 'function') return null;
+      const mk = (c) => ({
+        correct: c, wrong: 0, wrongDateKeys: [],
+        review: { intervalDays: 1, streak: 1, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 9e15 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      const counts = [0, 1, 2, 3, 5, 10];
+      questions = [{ id: 'q1', subject: 'S', limbs: counts.map((n, i) => ({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' })) }];
+      records = {};
+      counts.forEach((n, i) => { if (n > 0) records[`L${i}`] = mk(n); });
+
+      updateMasteryCounts();
+      const shown = Number(String(document.getElementById('count-few').textContent).replace(/\D/g, ''));
+
+      document.getElementById('filter-mode').value = 'few';
+      startSession();
+      const queue = session.queue.map(l => {
+        const r = getEffectiveRecord(l);
+        return { id: l.id, count: r.correct + r.wrong };
+      });
+      return { max: FEW_ANSWERS_MAX, shown, queue };
+    });
+    if (result === null) test.skip();
+
+    // 回答回数が FEW_ANSWERS_MAX 以下の肢だけが対象（0/1/2回の3件）
+    expect(result.shown).toBe(3);
+    expect(result.queue.length).toBe(3);
+    expect(result.queue.every(q => q.count <= result.max)).toBe(true);
+    // 回答回数の少ない順に並ぶ
+    const counts = result.queue.map(q => q.count);
+    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+  });
+
+  test('FEATURE: 苦手肢リストが正答率フィルター適用後の総数を表示する', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof renderStats !== 'function') return null;
+      // renderStats は未ログインだと早期returnするため、認証済みに見せかける
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'test-uid';
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: ['2026-01-01'],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      const limbs = [];
+      records = {};
+      for (let i = 0; i < 60; i++) {
+        limbs.push({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' });
+        records[`L${i}`] = i < 20 ? mk(9, 1) : mk(1, 4); // 正答率90% / 20%
+      }
+      questions = [{ id: 'q1', subject: 'S', limbs }];
+      const read = () => ({
+        total: document.getElementById('weak-limbs-total').textContent,
+        rows: document.querySelectorAll('.weak-limb-row').length
+      });
+      document.getElementById('weak-hide-high-rate').checked = false;
+      renderStats();
+      const off = read();
+      document.getElementById('weak-hide-high-rate').checked = true;
+      document.getElementById('weak-hide-threshold').value = '80';
+      renderStats();
+      const on = read();
+      window.getAuthUid = origGetAuthUid;
+      return { off, on };
+    });
+    if (result === null) test.skip();
+
+    // 上限50件を超える場合は総数と表示件数の両方を示す
+    expect(result.off.total).toContain('60');
+    expect(result.off.total).toContain('50');
+    expect(result.off.rows).toBe(50);
+    // 正答率フィルターを適用すると総数もそれに追従する
+    expect(result.on.total).toContain('40');
+    expect(result.on.rows).toBe(40);
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;

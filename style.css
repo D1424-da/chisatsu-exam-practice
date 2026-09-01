@@ -860,6 +860,12 @@ body {
   margin-bottom: 10px;
 }
 
+.weak-limbs-total {
+  font-size: .85rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
 .weak-filter-check {
   display: inline-flex;
   align-items: center;
