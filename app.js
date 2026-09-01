@@ -453,8 +453,32 @@ function saveStudySessionSnapshot() {
   studySessionSnapshotCache[uid] = snapshot;
   storageSetItem(key, JSON.stringify(snapshot));
   sessionSnapshotPendingSync = true;
-  flushStudySessionSnapshotToCloudIfNeeded();
+  // 1問ごとに呼ばれるが、キューID配列を含むため1回あたり十数KBになる。
+  // ローカル保存は即時、クラウド送信は間引く（離脱時・終了時には必ず送られる）。
+  scheduleStudySessionSnapshotFlush();
   updateResumeSessionButton();
+}
+
+/** セッションスナップショットのクラウド送信の最短間隔 */
+const SESSION_SNAPSHOT_FLUSH_INTERVAL_MS = 10000;
+let sessionSnapshotFlushTimer = null;
+let lastSessionSnapshotFlushAtMs = 0;
+
+function scheduleStudySessionSnapshotFlush() {
+  const now = Date.now();
+  const elapsed = now - lastSessionSnapshotFlushAtMs;
+  if (elapsed >= SESSION_SNAPSHOT_FLUSH_INTERVAL_MS) {
+    lastSessionSnapshotFlushAtMs = now;
+    flushStudySessionSnapshotToCloudIfNeeded();
+    return;
+  }
+  // 間引いた分は末尾で1回だけ送る（送りっぱなしの取りこぼしを防ぐ）。
+  if (sessionSnapshotFlushTimer) return;
+  sessionSnapshotFlushTimer = setTimeout(() => {
+    sessionSnapshotFlushTimer = null;
+    lastSessionSnapshotFlushAtMs = Date.now();
+    flushStudySessionSnapshotToCloudIfNeeded();
+  }, SESSION_SNAPSHOT_FLUSH_INTERVAL_MS - elapsed);
 }
 
 function clearStudySessionSnapshot() {
@@ -1509,6 +1533,95 @@ function hasPendingRecordDeltas() {
   return Object.values(pendingRecordDeltas).some(v => Number(v?.correct || 0) > 0 || Number(v?.wrong || 0) > 0);
 }
 
+/**
+ * 変更のあった肢だけをクラウドへ反映するためのキュー。
+ * 全件スナップショット送信は肢数に比例して重く（約1900肢で1回522KB）、
+ * 回答のたびに送るとFirestoreの書き込みキューが溢れる
+ * （resource-exhausted: Write stream exhausted maximum allowed queued writes）。
+ * correct/wrong は複数端末で加算が競合しても失われないよう差分(increment)で送り、
+ * それ以外のフィールドはこのキューで肢単位に上書き送信する。
+ */
+let pendingRecordFieldSync = new Map(); // limbId -> Set<フィールド名>
+let cloudRecordFieldsFlushInFlight = false;
+
+/**
+ * 送信は肢単位の上書きになるため、その操作が実際に変更したフィールドだけを積む。
+ * 全フィールドを常に送ると、別端末で更新された note / bookmarked を
+ * 手元の古い値で潰してしまう。
+ */
+function queueRecordFieldsSync(limbId, fields) {
+  const key = String(limbId || '');
+  if (!key) return;
+  const set = pendingRecordFieldSync.get(key) || new Set();
+  for (const f of fields) set.add(f);
+  pendingRecordFieldSync.set(key, set);
+}
+
+/** increment で送る correct/wrong 以外の、指定フィールドだけのパッチを作る */
+function buildRecordFieldsPatch(rec, fields) {
+  const out = {};
+  if (fields.has('wrongDateKeys')) out.wrongDateKeys = normalizeWrongDateKeys(rec?.wrongDateKeys);
+  if (fields.has('review')) out.review = normalizeReviewState(rec?.review);
+  if (fields.has('mastery')) {
+    out.mastery = normalizeMasteryValue(rec?.mastery);
+    out.masteryUpdatedAtMs = Math.max(0, Number(rec?.masteryUpdatedAtMs || 0));
+  }
+  if (fields.has('note')) out.note = String(rec?.note || '').slice(0, 1000);
+  if (fields.has('bookmarked')) out.bookmarked = !!rec?.bookmarked;
+  return out;
+}
+
+async function flushRecordFieldsToCloudIfNeeded() {
+  const uid = getAuthUid();
+  if (!uid) return;
+  if (!(window.firebase && firebase.firestore)) return;
+  if (cloudRecordFieldsFlushInFlight) return;
+  if (pendingRecordFieldSync.size === 0) return;
+
+  cloudRecordFieldsFlushInFlight = true;
+  let inFlight = null;
+  try {
+    while (pendingRecordFieldSync.size > 0) {
+      inFlight = pendingRecordFieldSync;
+      pendingRecordFieldSync = new Map();
+
+      // 送信対象の肢が records から消えている場合（統計リセット等）は送るデータが無いので捨てる。
+      // ここで再キューすると永久ループになる。
+      const patch = {};
+      for (const [limbId, fields] of inFlight) {
+        if (records[limbId]) patch[limbId] = buildRecordFieldsPatch(records[limbId], fields);
+      }
+      if (Object.keys(patch).length === 0) { inFlight = null; continue; }
+
+      // await をまたぐ間にログアウト/アカウント切替が起きうる。
+      // 別ユーザーのドキュメントへ書き込まないよう、送信直前に uid を再確認する。
+      if (getAuthUid() !== uid) {
+        inFlight = null;
+        pendingRecordFieldSync = new Map();
+        return;
+      }
+
+      const now = Date.now();
+      await firebase.firestore().collection(FS_RECORDS).doc(uid).set({
+        uid,
+        records: patch,
+        updatedAtMs: now,
+        accessedAtMs: now,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      markSyncSuccess('records', now);
+      inFlight = null;
+    }
+  } catch (e) {
+    markSyncError('records', e);
+    warnCloudError('クラウド成績データ同期(肢単位保存):', e);
+    // 送信に失敗した肢は再送できるようキューへ戻す。
+    if (inFlight) for (const [id, fields] of inFlight) queueRecordFieldsSync(id, fields);
+  } finally {
+    cloudRecordFieldsFlushInFlight = false;
+  }
+}
+
 async function flushRecordDeltasToCloudIfNeeded() {
   const uid = getAuthUid();
   if (!uid) return;
@@ -2444,6 +2557,7 @@ async function hashPassword(pw) {
 async function logout() {
   stopStudyTimerAndAccumulate();
   await flushRecordDeltasToCloudIfNeeded();
+  await flushRecordFieldsToCloudIfNeeded();
   await flushRecordsToCloudIfNeeded();
   await flushStudyCalendarToCloudIfNeeded();
   await flushStudySessionSnapshotToCloudIfNeeded();
@@ -2464,6 +2578,8 @@ async function logout() {
   sessionSnapshotPendingSync = false;
   studySessionSnapshotCache = {};
   pendingRecordDeltas = {};
+  // 未送信の肢IDを残すと、次にログインしたユーザーのレコードとして送信されてしまう。
+  pendingRecordFieldSync = new Map();
   showLoginOverlay();
 }
 
@@ -2633,7 +2749,9 @@ function setLimbMastery(limbId, mastery) {
   }
   records[limbId].mastery = normalizeMasteryValue(mastery);
   records[limbId].masteryUpdatedAtMs = Date.now();
-  saveRecords();
+  saveRecords({ skipCloudSnapshot: true });
+  queueRecordFieldsSync(limbId, ['mastery']);
+  flushRecordFieldsToCloudIfNeeded();
 }
 
 function ensureRecord(limbId) {
@@ -2645,13 +2763,17 @@ function ensureRecord(limbId) {
 
 function setLimbNote(limbId, note) {
   ensureRecord(limbId).note = String(note || '').slice(0, 1000);
-  saveRecords();
+  saveRecords({ skipCloudSnapshot: true });
+  queueRecordFieldsSync(limbId, ['note']);
+  flushRecordFieldsToCloudIfNeeded();
 }
 
 function toggleLimbBookmark(limbId) {
   const rec = ensureRecord(limbId);
   rec.bookmarked = !rec.bookmarked;
-  saveRecords();
+  saveRecords({ skipCloudSnapshot: true });
+  queueRecordFieldsSync(limbId, ['bookmarked']);
+  flushRecordFieldsToCloudIfNeeded();
   return rec.bookmarked;
 }
 
@@ -2681,12 +2803,11 @@ function addRecord(limbId, isCorrect) {
 
   saveRecords({ skipCloudSnapshot: true });
   addPendingRecordDelta(limbId, isCorrect);
+  // review / wrongDateKeys / mastery は差分(increment)では送れないため、
+  // 全件スナップショットではなくこの肢のぶんだけを送る。
+  queueRecordFieldsSync(limbId, ['review', 'wrongDateKeys', 'mastery']);
   flushRecordDeltasToCloudIfNeeded();
-
-  if (!isCorrect) {
-    recordsPendingSync = true;
-    pushRecordsToCloud();
-  }
+  flushRecordFieldsToCloudIfNeeded();
 }
 
 function makeInlineRecordId(limbId, key) {
@@ -4559,6 +4680,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.hidden) {
       stopStudyTimerAndAccumulate();
       flushRecordDeltasToCloudIfNeeded();
+      flushRecordFieldsToCloudIfNeeded();
       flushRecordsToCloudIfNeeded();
       flushStudyCalendarToCloudIfNeeded();
       flushStudySessionSnapshotToCloudIfNeeded();
@@ -4572,6 +4694,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('beforeunload', () => {
     stopStudyTimerAndAccumulate();
     flushRecordDeltasToCloudIfNeeded();
+    flushRecordFieldsToCloudIfNeeded();
     flushStudyCalendarToCloudIfNeeded();
     flushStudySessionSnapshotToCloudIfNeeded();
   });
