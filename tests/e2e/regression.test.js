@@ -619,22 +619,28 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.weak).toBe(0);
   });
 
-  test('FEATURE: 成績ページが通算正答率と習得率（全肢・学習済み）を出し分ける', async ({ page }) => {
+  test('FEATURE: 成績ページが通算正答率・習得率(全肢)・習得率(完璧＋あいまい)を出し分ける', async ({ page }) => {
     const result = await page.evaluate(() => {
       if (typeof renderStats !== 'function' || typeof MASTERED_STREAK_MIN === 'undefined') return null;
       const origGetAuthUid = window.getAuthUid;
       window.getAuthUid = () => 'test-uid';
-      const mk = (c, w, streak) => ({
+      const mk = (c, w, streak, mastery = '') => ({
         correct: c, wrong: w, wrongDateKeys: [],
         review: { intervalDays: 1, streak, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
-        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+        mastery, masteryUpdatedAtMs: 1, note: '', bookmarked: false
       });
-      // 全200肢: 80肢=直近正解(習得), 40肢=直近不正解(未習得), 80肢=未回答
+      // 全200肢:
+      //   完璧60・あいまい20（直近正解）→ 評価済み80・習得80
+      //   正解したが未評価20（直近正解） → 習得のみ +20
+      //   直近不正解40（誤答で評価はクリアされる）
+      //   未回答60
       const limbs = []; records = {};
       for (let i = 0; i < 200; i++) {
         limbs.push({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' });
-        if (i < 80) records[`L${i}`] = mk(3, 1, 1);
-        else if (i < 120) records[`L${i}`] = mk(1, 3, 0);
+        if (i < 60) records[`L${i}`] = mk(3, 1, 1, 'perfect');
+        else if (i < 80) records[`L${i}`] = mk(3, 1, 1, 'ambiguous');
+        else if (i < 100) records[`L${i}`] = mk(3, 1, 1, '');
+        else if (i < 140) records[`L${i}`] = mk(1, 3, 0, '');
       }
       questions = [{ id: 'q1', subject: 'S', source: 'H27-問1', limbs }];
       renderStats();
@@ -643,7 +649,8 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
         total: num('stat-total'),
         rate: num('stat-rate'),
         masteredAll: num('stat-mastered-all'),
-        masteredStudied: num('stat-mastered-studied'),
+        assessed: num('stat-mastered-studied'),
+        assessedLabel: document.getElementById('stat-mastered-studied')?.previousElementSibling?.textContent,
         studied: num('stat-limbs'),
         label: document.querySelector('#stat-rate')?.previousElementSibling?.textContent
       };
@@ -652,13 +659,16 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     });
     if (result === null) test.skip();
 
-    // 通算正答率は「回答回数」に対する割合: (80*3 + 40*1) / 480 = 58%
-    expect(result.total).toBe(480);
-    expect(result.rate).toBe(58);
-    // 習得率は「肢」に対する割合。未回答も分母に含める全肢版と、学習済みのみの版
-    expect(result.masteredAll).toBe(40);      // 80 / 200
-    expect(result.masteredStudied).toBe(67);  // 80 / 120
-    expect(result.studied).toBe(120);
+    // 通算正答率は「回答回数」に対する割合: 正解 100*3+40*1=340 / 総 100*4+40*4=560 = 61%
+    expect(result.total).toBe(560);
+    expect(result.rate).toBe(61);
+    // 習得率(全肢)は「直近が正解」の肢。100 / 200 = 50%
+    expect(result.masteredAll).toBe(50);
+    // 習得率(完璧＋あいまい)は自己評価済みの肢。(60+20) / 200 = 40%
+    // 未評価だが正解している20肢を含まない点で、上と別の値になる
+    expect(result.assessed).toBe(40);
+    expect(result.assessedLabel).toContain('完璧');
+    expect(result.studied).toBe(140);
     // 通算であることが分かるラベルになっている
     expect(result.label).toContain('通算');
   });
