@@ -673,6 +673,79 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.label).toContain('通算');
   });
 
+  test('BUG-FIX: 文中〇×の空欄を誤答すると親肢の完璧/あいまいも外れる', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof getInlineOxParentLimbId !== 'function') return null;
+      const mk = (c, w, streak, mastery) => ({
+        correct: c, wrong: w, wrongDateKeys: [],
+        review: { intervalDays: 1, streak, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery, masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      questions = [{ id: 'q1', subject: 'S', source: 'H27-問1', limbs: [
+        { id: 'IL', text: '（①x）〇×、（②y）〇×。', inlineOxWrong: ['②'], explanation: '' },
+        { id: 'NL', text: '通常の肢', correct: true, explanation: '' }
+      ]}];
+      records = {
+        'IL': mk(0, 0, 0, 'perfect'),      // 親肢に評価だけ付いている
+        'IL::①': mk(2, 0, 1, ''), 'IL::②': mk(2, 0, 1, ''),
+        'NL': mk(2, 0, 1, 'perfect')
+      };
+      addRecord('IL::②', false);   // 空欄を誤答
+      const inlineParentAfter = records['IL'].mastery;
+      addRecord('NL', false);      // 通常の肢を誤答（従来から動く挙動）
+      return {
+        inlineParentAfter,
+        normalAfter: records['NL'].mastery,
+        parentOf: getInlineOxParentLimbId('IL::②'),
+        parentOfPlain: getInlineOxParentLimbId('NL')
+      };
+    });
+    if (result === null) test.skip();
+
+    // 空欄の誤答で親肢の評価も外れる（外れないと「完璧」なのに一部未克服の状態が残る）
+    expect(result.inlineParentAfter).toBe('');
+    // 通常の肢は従来どおり
+    expect(result.normalAfter).toBe('');
+    expect(result.parentOf).toBe('IL');
+    expect(result.parentOfPlain).toBe('');
+  });
+
+  test('FEATURE: 「未評価」カウントとモードが評価待ちの肢だけを出題する', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof isUnassessedLimb !== 'function') return null;
+      const mk = (c, w, streak, mastery) => ({
+        correct: c, wrong: w, wrongDateKeys: [],
+        review: { intervalDays: 1, streak, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery, masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      // 完璧40 / あいまい20 / まちがえた30 / 未評価(正解済み)25 / 未回答15 = 130肢
+      const limbs = []; records = {};
+      for (let i = 0; i < 130; i++) {
+        limbs.push({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' });
+        if (i < 40) records[`L${i}`] = mk(3, 1, 1, 'perfect');
+        else if (i < 60) records[`L${i}`] = mk(2, 2, 1, 'ambiguous');
+        else if (i < 90) records[`L${i}`] = mk(1, 3, 0, '');
+        else if (i < 115) records[`L${i}`] = mk(2, 0, 1, '');
+      }
+      questions = [{ id: 'q1', subject: 'S', source: 'H27-問1', limbs }];
+      updateMasteryCounts();
+      const shown = Number(String(document.getElementById('count-unassessed').textContent).replace(/\D/g, ''));
+      document.getElementById('filter-mode').value = 'unassessed';
+      startSession();
+      return {
+        shown,
+        queued: session ? session.queue.length : 0,
+        allUnassessed: session ? session.queue.every(l => isUnassessedLimb(l)) : false
+      };
+    });
+    if (result === null) test.skip();
+
+    // 未評価＝回答済み・未克服の誤答でない・完璧/あいまい未設定
+    expect(result.shown).toBe(25);
+    expect(result.queued).toBe(25);
+    expect(result.allUnassessed).toBe(true);
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;
