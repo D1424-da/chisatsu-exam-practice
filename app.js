@@ -4245,8 +4245,15 @@ function renderStats() {
   let answeredCount = 0;
   let weakCount = 0;
 
-  // 端末差をなくすため、上段カードの集計は問題一覧ではなく records 正本を使う。
-  for (const v of Object.values(records || {})) {
+  // 上段カードは records を正本として集計する（端末差をなくすため）が、
+  // 現在の問題データに存在する肢のぶんだけを数える。
+  // records には削除・再インポートで肢が無くなった残骸レコードが残っており、
+  // 素通しで走査すると、存在しない問題への回答まで総回答数と正答率に混ざる。
+  // splitInlineForStats=true の allLimbs は、文中〇×を空欄単位（limbId::key）に
+  // 展開した「addRecord が実際に書き込むID」の集合そのものなので、そのまま使える。
+  const validRecordIds = new Set(allLimbs.map(l => l.id));
+  for (const [limbId, v] of Object.entries(records || {})) {
+    if (!validRecordIds.has(limbId)) continue;
     const c = Math.max(0, Number(v?.correct || 0));
     const w = Math.max(0, Number(v?.wrong || 0));
     const t = c + w;

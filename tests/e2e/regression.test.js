@@ -581,6 +581,44 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.emptyAllowed).toBe(false);
   });
 
+  test('BUG-FIX: 成績ページの集計が存在しない肢の残骸レコードを含めない', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof renderStats !== 'function') return null;
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'test-uid';
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: [],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+
+      // 実在する肢100件（各3正解1誤答 → 正答率75%）
+      const limbs = [];
+      records = {};
+      for (let i = 0; i < 100; i++) {
+        limbs.push({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' });
+        records[`L${i}`] = mk(3, 1);
+      }
+      questions = [{ id: 'q1', subject: 'S', source: 'H27-問1', limbs }];
+      // 削除・再インポートで肢が無くなった残骸レコード（各4誤答 → 正答率0%）
+      for (let i = 0; i < 50; i++) records[`GONE-${i}`] = mk(0, 4);
+
+      renderStats();
+      const num = (id) => Number(String(document.getElementById(id).textContent).replace(/\D/g, ''));
+      const out = { total: num('stat-total'), rate: num('stat-rate'), limbs: num('stat-limbs'), weak: num('stat-weak') };
+      window.getAuthUid = origGetAuthUid;
+      return out;
+    });
+    if (result === null) test.skip();
+
+    // 残骸を含めると 総回答数600 / 正答率50% / 学習肢数150 / 苦手肢50 になっていた
+    expect(result.total).toBe(400);
+    expect(result.rate).toBe(75);
+    // 学習肢数は実在する肢数を超えない
+    expect(result.limbs).toBe(100);
+    expect(result.weak).toBe(0);
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;
