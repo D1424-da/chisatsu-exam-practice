@@ -619,6 +619,50 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.weak).toBe(0);
   });
 
+  test('FEATURE: 成績ページが通算正答率と習得率（全肢・学習済み）を出し分ける', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof renderStats !== 'function' || typeof MASTERED_STREAK_MIN === 'undefined') return null;
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'test-uid';
+      const mk = (c, w, streak) => ({
+        correct: c, wrong: w, wrongDateKeys: [],
+        review: { intervalDays: 1, streak, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      // 全200肢: 80肢=直近正解(習得), 40肢=直近不正解(未習得), 80肢=未回答
+      const limbs = []; records = {};
+      for (let i = 0; i < 200; i++) {
+        limbs.push({ id: `L${i}`, text: `肢${i}`, correct: true, explanation: '' });
+        if (i < 80) records[`L${i}`] = mk(3, 1, 1);
+        else if (i < 120) records[`L${i}`] = mk(1, 3, 0);
+      }
+      questions = [{ id: 'q1', subject: 'S', source: 'H27-問1', limbs }];
+      renderStats();
+      const num = (id) => Number(String(document.getElementById(id).textContent).replace(/[^\d]/g, ''));
+      const out = {
+        total: num('stat-total'),
+        rate: num('stat-rate'),
+        masteredAll: num('stat-mastered-all'),
+        masteredStudied: num('stat-mastered-studied'),
+        studied: num('stat-limbs'),
+        label: document.querySelector('#stat-rate')?.previousElementSibling?.textContent
+      };
+      window.getAuthUid = origGetAuthUid;
+      return out;
+    });
+    if (result === null) test.skip();
+
+    // 通算正答率は「回答回数」に対する割合: (80*3 + 40*1) / 480 = 58%
+    expect(result.total).toBe(480);
+    expect(result.rate).toBe(58);
+    // 習得率は「肢」に対する割合。未回答も分母に含める全肢版と、学習済みのみの版
+    expect(result.masteredAll).toBe(40);      // 80 / 200
+    expect(result.masteredStudied).toBe(67);  // 80 / 120
+    expect(result.studied).toBe(120);
+    // 通算であることが分かるラベルになっている
+    expect(result.label).toContain('通算');
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;

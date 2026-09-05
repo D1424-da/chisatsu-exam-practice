@@ -798,6 +798,7 @@ body {
 .stat-card { text-align: center; padding: 20px 10px; }
 .stat-label { font-size: .8rem; color: var(--text-muted); margin-bottom: 6px; }
 .stat-value { font-size: 2rem; font-weight: 800; color: var(--primary); }
+.stat-sub { font-size: .72rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
 .stats-detail { margin-bottom: 14px; }
 .stats-detail h3 { font-size: 1rem; margin-bottom: 12px; }
 
