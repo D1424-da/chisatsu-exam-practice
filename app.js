@@ -708,6 +708,12 @@ function isAmbiguousLimb(limbId) {
 const FEW_ANSWERS_TARGET = 50;
 
 /**
+ * 成績ページの「習得率」で習得済みとみなす連続正解数。
+ * 1 は「直近の回答が正解」。厳しくしたい場合は 2（2回連続正解）にする。
+ */
+const MASTERED_STREAK_MIN = 1;
+
+/**
  * 与えられた肢集合について「回答数が少ない」の判定に必要な情報を1パスで算出する。
  * 回答回数の少ないグループから順に、目安の件数がたまるまで含める。
  * 返り値の cutoff 「以下」の回答回数の肢が対象（cutoff が -1 なら該当なし）。
@@ -4251,6 +4257,8 @@ function renderStats() {
   // 素通しで走査すると、存在しない問題への回答まで総回答数と正答率に混ざる。
   // splitInlineForStats=true の allLimbs は、文中〇×を空欄単位（limbId::key）に
   // 展開した「addRecord が実際に書き込むID」の集合そのものなので、そのまま使える。
+  // 直近の回答が正解の肢を「習得済み」とみなす（nextReviewState が不正解で streak を0に戻す）。
+  let masteredCount = 0;
   const validRecordIds = new Set(allLimbs.map(l => l.id));
   for (const [limbId, v] of Object.entries(records || {})) {
     if (!validRecordIds.has(limbId)) continue;
@@ -4261,14 +4269,29 @@ function renderStats() {
     correct += c;
     if (t > 0) answeredCount++;
     if (w > c) weakCount++;
+    if (t > 0 && normalizeReviewState(v?.review).streak >= MASTERED_STREAK_MIN) masteredCount++;
   }
 
+  // 通算正答率は「回答回数」に対する割合。1肢を10回解けば分母も10増えるため、
+  // 過去の誤答が残り続けて現在の実力とはずれていく。
+  // そのため「今どれだけ解けるか」を示す習得率を別に出す。
   const rate = total > 0 ? Math.round(correct / total * 100) : null;
+  const allLimbCount = allLimbs.length;
+  const masteredAllRate = allLimbCount > 0 ? Math.round(masteredCount / allLimbCount * 100) : null;
+  const masteredStudiedRate = answeredCount > 0 ? Math.round(masteredCount / answeredCount * 100) : null;
+  const pct = (v) => v !== null ? v + '%' : '-%';
 
   document.getElementById('stat-total').textContent  = total;
-  document.getElementById('stat-rate').textContent   = rate !== null ? rate + '%' : '-%';
+  document.getElementById('stat-rate').textContent   = pct(rate);
   document.getElementById('stat-limbs').textContent  = answeredCount;
   document.getElementById('stat-weak').textContent   = weakCount;
+  const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  setText('stat-rate-sub', `${correct} / ${total} 回`);
+  setText('stat-mastered-all', pct(masteredAllRate));
+  setText('stat-mastered-all-sub', `${masteredCount} / ${allLimbCount} 肢`);
+  setText('stat-mastered-studied', pct(masteredStudiedRate));
+  setText('stat-mastered-studied-sub', `${masteredCount} / ${answeredCount} 肢`);
+  setText('stat-limbs-sub', `全 ${allLimbCount} 肢中`);
   const studyEl = document.getElementById('stat-study-time');
   if (studyEl) studyEl.textContent = formatStudyDuration(studyTime.totalMs);
   renderStudyCalendar();
