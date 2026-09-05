@@ -4259,6 +4259,8 @@ function renderStats() {
   // 展開した「addRecord が実際に書き込むID」の集合そのものなので、そのまま使える。
   // 直近の回答が正解の肢を「習得済み」とみなす（nextReviewState が不正解で streak を0に戻す）。
   let masteredCount = 0;
+  // 完璧・あいまいの自己評価を付けた肢の数。評価済み＝一通り仕上げた範囲とみなす。
+  let assessedCount = 0;
   const validRecordIds = new Set(allLimbs.map(l => l.id));
   for (const [limbId, v] of Object.entries(records || {})) {
     if (!validRecordIds.has(limbId)) continue;
@@ -4270,6 +4272,7 @@ function renderStats() {
     if (t > 0) answeredCount++;
     if (w > c) weakCount++;
     if (t > 0 && normalizeReviewState(v?.review).streak >= MASTERED_STREAK_MIN) masteredCount++;
+    if (normalizeMasteryValue(v?.mastery)) assessedCount++;
   }
 
   // 通算正答率は「回答回数」に対する割合。1肢を10回解けば分母も10増えるため、
@@ -4278,7 +4281,8 @@ function renderStats() {
   const rate = total > 0 ? Math.round(correct / total * 100) : null;
   const allLimbCount = allLimbs.length;
   const masteredAllRate = allLimbCount > 0 ? Math.round(masteredCount / allLimbCount * 100) : null;
-  const masteredStudiedRate = answeredCount > 0 ? Math.round(masteredCount / answeredCount * 100) : null;
+  // 完璧・あいまいを付け終えた肢が全体のどれだけかを示す（自己評価のカバー率）。
+  const assessedRate = allLimbCount > 0 ? Math.round(assessedCount / allLimbCount * 100) : null;
   const pct = (v) => v !== null ? v + '%' : '-%';
 
   document.getElementById('stat-total').textContent  = total;
@@ -4289,8 +4293,8 @@ function renderStats() {
   setText('stat-rate-sub', `${correct} / ${total} 回`);
   setText('stat-mastered-all', pct(masteredAllRate));
   setText('stat-mastered-all-sub', `${masteredCount} / ${allLimbCount} 肢`);
-  setText('stat-mastered-studied', pct(masteredStudiedRate));
-  setText('stat-mastered-studied-sub', `${masteredCount} / ${answeredCount} 肢`);
+  setText('stat-mastered-studied', pct(assessedRate));
+  setText('stat-mastered-studied-sub', `${assessedCount} / ${allLimbCount} 肢`);
   setText('stat-limbs-sub', `全 ${allLimbCount} 肢中`);
   const studyEl = document.getElementById('stat-study-time');
   if (studyEl) studyEl.textContent = formatStudyDuration(studyTime.totalMs);
