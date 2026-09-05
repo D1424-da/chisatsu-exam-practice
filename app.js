@@ -755,6 +755,18 @@ function computeFewAnswersInfo(limbs) {
   return { effMap, cutoff };
 }
 
+/**
+ * 回答済みだが「完璧」「あいまい」の評価が付いていない肢か。
+ * 正解しているので「まちがえたもの」にも入らず、完璧/あいまいにも入らないため、
+ * これまでどのカウント表示からも辿り着けなかった肢を拾う。
+ */
+function isUnassessedLimb(limb) {
+  if (normalizeMasteryValue(getRecord(limb.id).mastery)) return false;
+  const r = getEffectiveRecord(limb);
+  if ((r.correct + r.wrong) <= 0) return false;   // 未回答は対象外
+  return !isOutstandingWrong(r);                   // 未克服の誤答は「まちがえたもの」に任せる
+}
+
 /** 回答回数が相対的に少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
 function isFewAnswersLimb(limb, cutoff) {
   if (cutoff < 0) return false;
@@ -903,6 +915,7 @@ function updateMasteryCounts() {
   let ambiguous = 0;
   let wrong = 0;
   let few = 0;
+  let unassessed = 0;
 
   // 出題キューと同じ肢集合・同じ判定関数を使う。
   // records を直接走査すると、削除・再インポートで肢が無くなった残骸レコードや、
@@ -920,6 +933,9 @@ function updateMasteryCounts() {
     if (isOutstandingWrong(eff)) wrong++;
     const total = eff.correct + eff.wrong;
     if (fewCutoff >= 0 && total <= fewCutoff) few++;
+    // 回答済みで、まちがえたものでもなく、完璧/あいまいも付いていない肢。
+    // どのカウント表示にも出ないため、専用に数えて拾えるようにする。
+    if (!mastery && total > 0 && !isOutstandingWrong(eff)) unassessed++;
     distribution[total] = (distribution[total] || 0) + 1;
   }
 
@@ -927,6 +943,7 @@ function updateMasteryCounts() {
   const elAmbiguous = document.getElementById('count-ambiguous');
   const elWrong = document.getElementById('count-wrong');
   const elFew = document.getElementById('count-few');
+  const elUnassessed = document.getElementById('count-unassessed');
   if (elPerfect) elPerfect.textContent = `完璧: ${perfect}`;
   if (elAmbiguous) elAmbiguous.textContent = `あいまい: ${ambiguous}`;
   if (elWrong) elWrong.textContent = `まちがえたもの: ${wrong}`;
@@ -936,6 +953,7 @@ function updateMasteryCounts() {
       ? `回答数が少ない: ${few}（${fewCutoff}回以下）`
       : '回答数が少ない: 0（偏りなし）';
   }
+  if (elUnassessed) elUnassessed.textContent = `未評価: ${unassessed}`;
 
   logMasteryCountsDebug({
     limbCount: limbs.length,
@@ -2857,6 +2875,17 @@ function addRecord(limbId, isCorrect) {
   }
   records[limbId].review = nextReviewState(records[limbId].review, isCorrect);
 
+  // 文中〇×は空欄ID(limbId::key)にしか addRecord されないため、空欄を間違えても
+  // 親肢の「完璧」「あいまい」が残ってしまい、通常の肢と挙動が食い違っていた。
+  // （「完璧」と表示されているのに一部の空欄は未克服、という状態になる。）
+  // 通常の肢と同様に、誤答したら親肢の評価も外す。
+  const parentLimbId = !isCorrect ? getInlineOxParentLimbId(limbId) : '';
+  if (parentLimbId && records[parentLimbId] && normalizeMasteryValue(records[parentLimbId].mastery)) {
+    records[parentLimbId].mastery = '';
+    records[parentLimbId].masteryUpdatedAtMs = Date.now();
+    queueRecordFieldsSync(parentLimbId, ['mastery']);
+  }
+
   // 回答が発生した時点で当日を学習済みにする（タイマー更新の取りこぼし対策）。
   markTodayAsStudied();
   incrementStudyDailyCount(toDateKey(), 1);
@@ -2876,6 +2905,13 @@ function addRecord(limbId, isCorrect) {
 
 function makeInlineRecordId(limbId, key) {
   return `${limbId}::${key}`;
+}
+
+/** 文中〇×の空欄ID(limbId::key)なら親肢のIDを返す。空欄IDでなければ空文字。 */
+function getInlineOxParentLimbId(recordId) {
+  const id = String(recordId || '');
+  const at = id.indexOf('::');
+  return at > 0 ? id.slice(0, at) : '';
 }
 
 /**
@@ -3264,6 +3300,8 @@ function startSession() {
     const countOf = (l) => effMap.get(l).correct + effMap.get(l).wrong;
     limbs = shuffle(limbs.filter(l => cutoff >= 0 && countOf(l) <= cutoff));
     limbs.sort((a, b) => countOf(a) - countOf(b));
+  } else if (mode === 'unassessed') {
+    limbs = shuffle(limbs.filter(l => isUnassessedLimb(l)));
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);
@@ -4608,6 +4646,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (countAmbiguousBtn) countAmbiguousBtn.addEventListener('click', () => jumpToStudyMode('ambiguous'));
   if (countWrongBtn) countWrongBtn.addEventListener('click', () => jumpToStudyMode('wrong'));
   if (countFewBtn) countFewBtn.addEventListener('click', () => jumpToStudyMode('few'));
+  const countUnassessedBtn = document.getElementById('count-unassessed');
+  if (countUnassessedBtn) countUnassessedBtn.addEventListener('click', () => jumpToStudyMode('unassessed'));
 
   // カウント表示バーは現在のフィルターに一致する肢を数えるため、
   // フィルターを変えたら数え直す。数え直さないと、表示件数だけが前の条件のまま残り、
