@@ -746,6 +746,41 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.allUnassessed).toBe(true);
   });
 
+  test('BUG-FIX: ログイン済みの状態で再ログインしてもログイン画面が閉じる', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      if (typeof closeLoginOverlayAfterSignIn !== 'function') return null;
+      const overlay = document.getElementById('login-overlay');
+      const appEl = document.getElementById('app');
+
+      // 何らかの操作でログイン画面が開いた状態を作る
+      openAuthOverlay('login');
+      const opened = overlay.className;
+
+      // ログイン画面を閉じるのを onAuthStateChanged だけに頼ると、
+      // 既にログイン済みでは認証状態が変わらず発火しないため閉じられない。
+      // サインイン処理側から呼ぶこの関数で閉じる。
+      closeLoginOverlayAfterSignIn();
+      return { opened, closed: overlay.className, app: appEl.className };
+    });
+    if (result === null) test.skip();
+
+    expect(result.opened).not.toContain('hidden');
+    expect(result.closed).toContain('hidden');
+    expect(result.app).not.toContain('hidden');
+  });
+
+  test('BUG-FIX: サインイン成功時にログイン画面を閉じる処理が呼ばれている', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const js = fs.readFileSync(path.join(__dirname, '../../auth-module.js'), 'utf8');
+
+    // メール/パスワードとGoogleの両方の成功経路から呼ぶ必要がある
+    const emailPath = /signInWithEmailAndPassword[\s\S]{0,300}?closeLoginOverlayAfterSignIn\(\)/.test(js);
+    const googlePath = /signInWithPopup[\s\S]{0,300}?closeLoginOverlayAfterSignIn\(\)/.test(js);
+    expect(emailPath, 'メール/パスワードの成功経路から呼ばれていない').toBeTruthy();
+    expect(googlePath, 'Googleログインの成功経路から呼ばれていない').toBeTruthy();
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;
