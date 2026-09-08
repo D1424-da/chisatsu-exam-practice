@@ -237,6 +237,7 @@ async function handleEmailLogin() {
     const auth = firebase.auth();
     const result = await auth.signInWithEmailAndPassword(email, password);
     console.log('✓ ログイン成功:', result.user.email);
+    closeLoginOverlayAfterSignIn();
   } catch (error) {
     console.error('✗ ログイン失敗:', error.code);
     let msg = 'ログインに失敗しました';
@@ -369,6 +370,7 @@ async function handleGoogleSignIn() {
     const result = await auth.signInWithPopup(provider);
     console.log('✓ Google ログイン成功:', result.user.email);
     setGoogleRedirectPending(false);
+    closeLoginOverlayAfterSignIn();
     
     // 新規ユーザーの場合、Firestore に情報を保存
     const db = firebase.firestore();
@@ -447,6 +449,23 @@ function closeLoginOverlayToHome() {
   if (overlay) overlay.classList.add('hidden');
   switchAuthForm('login');
   if (typeof showPage === 'function') showPage('study');
+}
+
+/**
+ * ログイン成功時にログイン画面を閉じる。
+ *
+ * 画面を閉じるのを onAuthStateChanged だけに任せていると、
+ * 既にログイン済みの状態でもう一度ログインした場合に認証状態が変化せず、
+ * リスナーが発火しないためログイン画面が開いたままになる。
+ * （ログイン自体は毎回成功しているのに閉じないので、失敗しているように見える。）
+ * サインイン処理側からも明示的に閉じる。
+ */
+function closeLoginOverlayAfterSignIn() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.classList.remove('hidden');
+  switchAuthForm('login');
 }
 
 function updateStatsNavAvailability(isLoggedIn) {
