@@ -781,6 +781,55 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(googlePath, 'Googleログインの成功経路から呼ばれていない').toBeTruthy();
   });
 
+  test('BUG-FIX: 管理者でログインしても学習日カレンダーが会員向け表示になる', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof updateMembersOnlyPanels !== 'function') return null;
+      const origGetAuthUid = window.getAuthUid;
+      const cal = document.getElementById('study-calendar-section');
+      const cta = document.getElementById('study-calendar-guest-cta');
+
+      // ログアウト直後の状態（ゲスト表示）を作る
+      window.getAuthUid = () => null;
+      window.currentUser = null;
+      updateMembersOnlyPanels();
+      const loggedOut = { cal: !cal.classList.contains('hidden'), cta: !cta.classList.contains('hidden') };
+
+      // 管理者としてログインし直した状態
+      window.getAuthUid = () => 'u1';
+      window.currentUser = { uid: 'u1', email: (window.APP_CONFIG?.adminEmails || [])[0] || 'admin@example.com' };
+      updateMembersOnlyPanels();
+      const loggedIn = { cal: !cal.classList.contains('hidden'), cta: !cta.classList.contains('hidden') };
+
+      window.getAuthUid = origGetAuthUid;
+      window.currentUser = null;
+      return { loggedOut, loggedIn };
+    });
+    if (result === null) test.skip();
+
+    // ログアウト中はゲスト用CTA
+    expect(result.loggedOut.cal).toBe(false);
+    expect(result.loggedOut.cta).toBe(true);
+    // ログインしたらカレンダーに切り替わる
+    expect(result.loggedIn.cal).toBe(true);
+    expect(result.loggedIn.cta).toBe(false);
+  });
+
+  test('BUG-FIX: ログイン成功時に会員向けパネルの更新が呼ばれている', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const js = fs.readFileSync(path.join(__dirname, '../../auth-module.js'), 'utf8');
+
+    // updateMembersOnlyPanels は showPage 経由でしか呼ばれず、管理者は
+    // showPage('study') を通らないため、認証リスナー側で明示的に呼ぶ必要がある。
+    const listener = js.match(/auth\.onAuthStateChanged\([\s\S]*?\n    \} else \{/);
+    expect(listener, '認証リスナーが見つからない').toBeTruthy();
+    expect(listener[0], 'ログイン成功時に会員向けパネルを更新していない').toContain('updateMembersOnlyPanels');
+    // 再ログイン（リスナーが発火しない）経路でも更新する
+    const afterSignIn = js.match(/function closeLoginOverlayAfterSignIn\(\)[\s\S]*?\n}/);
+    expect(afterSignIn).toBeTruthy();
+    expect(afterSignIn[0]).toContain('updateMembersOnlyPanels');
+  });
+
   test('BUG-FIX: 問題追加モーダルを開くと input-subject にフォーカスが移る', async ({ page }) => {
     const opened = await page.evaluate(() => {
       if (typeof openAddModal !== 'function') return null;

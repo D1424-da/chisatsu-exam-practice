@@ -466,6 +466,9 @@ function closeLoginOverlayAfterSignIn() {
   const appEl = document.getElementById('app');
   if (appEl) appEl.classList.remove('hidden');
   switchAuthForm('login');
+  // onAuthStateChanged が発火しない再ログインでも会員向け表示に切り替える。
+  if (typeof updateMembersOnlyPanels === 'function') updateMembersOnlyPanels();
+  if (typeof renderStudyGoalPanel === 'function') renderStudyGoalPanel();
 }
 
 function updateStatsNavAvailability(isLoggedIn) {
@@ -648,6 +651,14 @@ function setupAuthStateListener() {
         if (typeof updateResumeSessionButton === 'function') updateResumeSessionButton();
         if (typeof showPage === 'function') showPage('study');
       }
+
+      // 会員向け表示（学習日カレンダー・今日の目標・成績）の切り替えは
+      // 管理者かどうかに関係なく必要。
+      // updateMembersOnlyPanels は showPage / renderStats / 初期化からしか呼ばれず、
+      // 管理者は上の showPage('study') を通らないため、ログインしてもカレンダーが
+      // ゲスト用CTAのまま切り替わらなかった。
+      if (typeof updateMembersOnlyPanels === 'function') updateMembersOnlyPanels();
+      if (typeof renderStudyGoalPanel === 'function') renderStudyGoalPanel();
 
       if (canManage) closeAdminLoginOverlay();
 
