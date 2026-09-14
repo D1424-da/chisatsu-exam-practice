@@ -841,3 +841,145 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     }
   });
 });
+
+test.describe('回帰テスト: 本番モード（5肢まとめて出題）', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('FEATURE: 文中〇×・選択式・記述式を含む問題は本番モードの対象外', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof getExamEligibleQuestions !== 'function') return null;
+      questions = [
+        { id: 'plain', subject: 'S', limbs: [
+          { id: 'p1', text: 'ア', correct: true, explanation: '' },
+          { id: 'p2', text: 'イ', correct: false, explanation: '' },
+        ] },
+        { id: 'onelimb', subject: 'S', limbs: [
+          { id: 'o1', text: 'ア', correct: true, explanation: '' },
+        ] },
+        { id: 'choice', subject: 'S', limbs: [
+          { id: 'c1', text: 'ア', correct: true, explanation: '', options: ['1', '2'], correctText: '1' },
+          { id: 'c2', text: 'イ', correct: true, explanation: '' },
+        ] },
+        { id: 'text', subject: 'S', limbs: [
+          { id: 't1', text: 'ア', correct: true, explanation: '', acceptedAnswers: ['甲'] },
+          { id: 't2', text: 'イ', correct: true, explanation: '' },
+        ] },
+        { id: 'inlineox', subject: 'S', limbs: [
+          { id: 'i1', text: '（①x）〇×、（②y）〇×。', correct: true, explanation: '' },
+          { id: 'i2', text: 'イ', correct: true, explanation: '' },
+        ] },
+      ];
+      const eligible = getExamEligibleQuestions({}).map(q => q.id);
+      return eligible;
+    });
+    if (result === null) test.skip();
+    expect(result).toEqual(['plain']);
+  });
+
+  test('FEATURE: filter-mode=exam で startSession すると肢単位ではなく問題単位のキューになる', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof startExamSession !== 'function') return null;
+      questions = [
+        { id: 'q1', subject: 'S', limbs: [
+          { id: 'q1a', text: 'ア', correct: true, explanation: '' },
+          { id: 'q1b', text: 'イ', correct: false, explanation: '' },
+        ] },
+      ];
+      records = {};
+      document.getElementById('filter-mode').value = 'exam';
+      startSession();
+      return {
+        examMode: !!session.examMode,
+        queueLen: session.queue.length,
+        firstHasLimbs: Array.isArray(session.queue[0]?.limbs),
+        resumeEligible: session.resumeEligible,
+      };
+    });
+    if (result === null) test.skip();
+    expect(result.examMode).toBe(true);
+    expect(result.queueLen).toBe(1);
+    expect(result.firstHasLimbs).toBe(true);
+    expect(result.resumeEligible).toBe(false);
+  });
+
+  test('FEATURE: 本番モードの採点結果は records に一切反映されない', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof startExamSession !== 'function') return null;
+      questions = [
+        { id: 'q1', subject: 'S', limbs: [
+          { id: 'q1a', text: 'ア', correct: true, explanation: '' },
+          { id: 'q1b', text: 'イ', correct: false, explanation: '' },
+        ] },
+      ];
+      records = {};
+      document.getElementById('filter-mode').value = 'exam';
+      startSession();
+      // 全肢に正しく回答（q1a=○, q1b=×）してから採点ボタンをクリックする一連の流れを再現
+      document.querySelector('.exam-answer-btn[data-limb-id="q1a"][data-answer="true"]').click();
+      document.querySelector('.exam-answer-btn[data-limb-id="q1b"][data-answer="false"]').click();
+      document.getElementById('btn-exam-grade').click();
+      const recordsAfterGrading = JSON.stringify(records);
+      const correctCount = session.examCorrectQuestions;
+      const resultText = document.querySelector('.exam-question-result')?.textContent || '';
+      return { recordsAfterGrading, correctCount, resultText };
+    });
+    if (result === null) test.skip();
+    expect(result.recordsAfterGrading).toBe('{}');
+    expect(result.correctCount).toBe(1);
+    expect(result.resultText).toContain('全肢正解');
+  });
+
+  test('FEATURE: 一部誤答すると不合格になり、次の問題で正答数は増えない', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof startExamSession !== 'function') return null;
+      questions = [
+        { id: 'q1', subject: 'S', limbs: [
+          { id: 'q1a', text: 'ア', correct: true, explanation: '' },
+          { id: 'q1b', text: 'イ', correct: false, explanation: '' },
+        ] },
+      ];
+      records = {};
+      document.getElementById('filter-mode').value = 'exam';
+      startSession();
+      // q1a を誤って×と回答する
+      document.querySelector('.exam-answer-btn[data-limb-id="q1a"][data-answer="false"]').click();
+      document.querySelector('.exam-answer-btn[data-limb-id="q1b"][data-answer="false"]').click();
+      document.getElementById('btn-exam-grade').click();
+      const resultText = document.querySelector('.exam-question-result')?.textContent || '';
+      return { correctCount: session.examCorrectQuestions, resultText };
+    });
+    if (result === null) test.skip();
+    expect(result.correctCount).toBe(0);
+    expect(result.resultText).toContain('肢誤り');
+  });
+
+  test('FEATURE: 全問終了すると本番モード専用の完了メッセージが表示され、通常の完了メッセージと異なる', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof startExamSession !== 'function') return null;
+      questions = [
+        { id: 'q1', subject: 'S', limbs: [
+          { id: 'q1a', text: 'ア', correct: true, explanation: '' },
+          { id: 'q1b', text: 'イ', correct: false, explanation: '' },
+        ] },
+      ];
+      records = {};
+      document.getElementById('filter-mode').value = 'exam';
+      startSession();
+      document.querySelector('.exam-answer-btn[data-limb-id="q1a"][data-answer="true"]').click();
+      document.querySelector('.exam-answer-btn[data-limb-id="q1b"][data-answer="false"]').click();
+      document.getElementById('btn-exam-grade').click();
+      document.getElementById('btn-exam-next').click();
+      return {
+        sessionEnded: session === null,
+        completionText: document.getElementById('limb-area').textContent,
+      };
+    });
+    if (result === null) test.skip();
+    expect(result.sessionEnded).toBe(true);
+    expect(result.completionText).toContain('本番モード終了');
+    expect(result.completionText).toContain('1 / 1');
+    expect(result.completionText).toContain('記録');
+  });
+});
