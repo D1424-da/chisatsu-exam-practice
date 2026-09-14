@@ -385,6 +385,49 @@ body {
 .badge-x { background: #fdeaea; color: var(--danger);  padding: 2px 6px; border-radius: 4px; font-weight: 700; }
 .badge-choice { background: #eef3ff; color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: 700; }
 .badge-inline-ox { background: #fff4e8; color: #9b5a00; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.badge-exam-mode { background: #f3e8ff; color: #6a2fb0; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+
+/* ─── 本番モード ────────────────────────────────────────── */
+.exam-limbs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 14px 0;
+}
+.exam-limb {
+  border: 1px solid var(--border, #e2e2e2);
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+.exam-limb-correct { border-color: var(--success); background: #f4fbf5; }
+.exam-limb-incorrect { border-color: var(--danger); background: #fdf5f5; }
+.exam-limb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.exam-limb-text { margin-bottom: 10px; line-height: 1.6; }
+.exam-limb-buttons.answer-buttons { gap: 8px; }
+.exam-limb-buttons .btn-answer { padding: 10px; font-size: .95rem; }
+.exam-limb-buttons .btn-answer.selected { opacity: 1; box-shadow: 0 0 0 3px rgba(0,0,0,.08) inset; }
+.exam-limb-explanation {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border, #e2e2e2);
+  font-size: .92rem;
+  color: var(--text-muted);
+}
+.exam-question-footer { margin-top: 16px; text-align: center; }
+.exam-question-result {
+  margin-bottom: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.exam-pass { background: #eaf6ee; color: var(--success); }
+.exam-fail { background: #fdeaea; color: var(--danger); }
+.exam-mode-note { font-size: .85rem; color: var(--text-muted); margin-top: 6px; }
 
 .inline-ox-group {
   display: inline-flex;

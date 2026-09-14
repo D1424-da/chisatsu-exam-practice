@@ -3265,6 +3265,11 @@ function startSession() {
   const yearTo   = filters.yearTo;
   const mode     = filters.mode;
 
+  if (mode === 'exam') {
+    startExamSession(filters);
+    return;
+  }
+
   let limbs = getLimbsMatchingFilters({ subject, category, yearFrom, yearTo, mode });
 
   if (mode === 'weak') {
@@ -3353,6 +3358,160 @@ function startSessionWithLimbId(limbId) {
   renderCurrentLimb();
 }
 
+/** 本番モード対象肢: ○×判定のみ（文中〇×・選択式・記述式は元の5択マッピング情報が無いため対象外） */
+function isPlainOxLimb(l) {
+  if (Array.isArray(l.options) && l.options.length >= 2) return false;
+  if (isTextQuestion(l)) return false;
+  if (parseInlineOxItems(l.text || '').length > 0) return false;
+  return true;
+}
+
+/** 本番モード対象問題: 全肢が○×判定のみの、肢が2つ以上ある問題 */
+function getExamEligibleQuestions(filters = {}) {
+  const { subject = '', category = '', yearFrom = '', yearTo = '' } = filters;
+  const normalizedCategory = normalizeCategoryLabel(category);
+  return questions.filter(q => {
+    if (subject && q.subject !== subject) return false;
+    if (normalizedCategory && normalizeCategoryLabel(q.category) !== normalizedCategory) return false;
+    if (yearFrom || yearTo) {
+      const k = extractYearKey(q.source, q.id);
+      if (k) {
+        const ord = yearOrdinal(k);
+        if (yearFrom && ord < yearOrdinal(yearFrom)) return false;
+        if (yearTo   && ord > yearOrdinal(yearTo))   return false;
+      }
+    }
+    return Array.isArray(q.limbs) && q.limbs.length >= 2 && q.limbs.every(isPlainOxLimb);
+  });
+}
+
+// 本番モード（5肢まとめて出題・採点はまとめて・通常の学習記録には一切反映しない）。
+// 元の試験の「1〜5番のどの組合せが正解か」という選択肢文言はスクレイピングされておらず
+// データに存在しないため、各肢を○×で個別に判定させ、5肢すべて正解したら合格扱いとする。
+function startExamSession(filters) {
+  const eligible = getExamEligibleQuestions(filters);
+  if (eligible.length === 0) {
+    alert('条件に合う「本番モード」対象の問題がありません（文中〇×・記述式・選択式の肢を含む問題は対象外です）。');
+    return;
+  }
+  session = {
+    queue: shuffle(eligible),
+    index: 0,
+    fromPage: 'study',
+    filters,
+    answeredCount: 0,
+    resumeEligible: false,
+    examMode: true,
+    examAnswers: {},
+    examGraded: false,
+    examCorrectQuestions: 0,
+  };
+  startStudyTimerIfNeeded();
+  document.getElementById('session-info').classList.remove('hidden');
+  document.getElementById('btn-start').textContent = '最初から';
+  renderCurrentLimb();
+}
+
+function renderExamQuestion() {
+  if (!session) return;
+  const { queue, index } = session;
+  const q = queue[index];
+  const chosen = session.examAnswers[q.id] || (session.examAnswers[q.id] = {});
+  const graded = !!session.examGraded;
+
+  const limbsHtml = q.limbs.map((l, i) => {
+    const picked = chosen[l.id];
+    let resultClass = '';
+    let resultBadge = '';
+    if (graded) {
+      const isRight = picked === !!l.correct;
+      resultClass = isRight ? 'exam-limb-correct' : 'exam-limb-incorrect';
+      resultBadge = `<span class="exam-limb-badge ${isRight ? 'badge-o' : 'badge-x'}">${isRight ? '正解' : '不正解'}（正解は ${l.correct ? '○' : '×'}）</span>`;
+    }
+    return `
+      <div class="exam-limb ${resultClass}">
+        <div class="exam-limb-head">
+          <span class="limb-index">肢${i + 1}</span>
+          ${resultBadge}
+        </div>
+        <div class="exam-limb-text">${esc(l.text)}</div>
+        <div class="answer-buttons exam-limb-buttons">
+          <button class="btn-answer btn-correct exam-answer-btn${picked === true ? ' selected' : ''}" data-limb-id="${esc(l.id)}" data-answer="true" ${graded ? 'disabled' : ''}>○ 正しい</button>
+          <button class="btn-answer btn-wrong exam-answer-btn${picked === false ? ' selected' : ''}" data-limb-id="${esc(l.id)}" data-answer="false" ${graded ? 'disabled' : ''}>× 誤り</button>
+        </div>
+        ${graded && l.explanation ? `<div class="exam-limb-explanation">${esc(l.explanation)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const answeredCount = q.limbs.filter(l => chosen[l.id] === true || chosen[l.id] === false).length;
+  const allAnswered = answeredCount === q.limbs.length;
+  const correctCount = q.limbs.filter(l => chosen[l.id] === !!l.correct).length;
+  const allCorrect = correctCount === q.limbs.length;
+
+  const footerHtml = graded
+    ? `
+      <div class="exam-question-result ${allCorrect ? 'exam-pass' : 'exam-fail'}">
+        ${allCorrect ? '✅ 全肢正解' : `❌ ${q.limbs.length - correctCount}肢誤り`}（${correctCount} / ${q.limbs.length} 肢 正解）
+      </div>
+      <button id="btn-exam-next" class="btn btn-primary">次の問題へ</button>
+    `
+    : `<button id="btn-exam-grade" class="btn btn-primary" ${allAnswered ? '' : 'disabled'}>採点する（${answeredCount} / ${q.limbs.length} 肢 回答済み）</button>`;
+
+  const area = document.getElementById('limb-area');
+  area.innerHTML = `
+    <div class="limb-card card exam-question-card">
+      <div class="limb-meta">
+        <span class="badge badge-subject">${esc(q.subject)}</span>
+        ${q.category ? `<span class="badge badge-category">${esc(normalizeCategoryLabel(q.category))}</span>` : ''}
+        ${q.source ? `<span class="badge badge-source">${esc(q.source)}</span>` : ''}
+        <span class="badge badge-exam-mode">本番モード（記録には反映されません）</span>
+      </div>
+      ${q.questionText ? `<div class="question-shared"><span class="question-label">問題文</span><span class="question-body">${esc(q.questionText)}</span></div>` : ''}
+      <div class="exam-limbs">${limbsHtml}</div>
+      <div class="exam-question-footer">${footerHtml}</div>
+    </div>
+  `;
+
+  if (!graded) {
+    area.querySelectorAll('.exam-answer-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        chosen[btn.dataset.limbId] = btn.dataset.answer === 'true';
+        renderExamQuestion();
+      });
+    });
+    const btnGrade = document.getElementById('btn-exam-grade');
+    if (btnGrade) {
+      btnGrade.addEventListener('click', () => {
+        session.examGraded = true;
+        if (allCorrect) session.examCorrectQuestions = (session.examCorrectQuestions || 0) + 1;
+        renderExamQuestion();
+      });
+    }
+  } else {
+    const btnNext = document.getElementById('btn-exam-next');
+    if (btnNext) {
+      btnNext.addEventListener('click', () => {
+        session.index++;
+        session.examGraded = false;
+        renderCurrentLimb();
+      });
+    }
+  }
+}
+
+function showExamCompletionMessage(summary) {
+  const area = document.getElementById('limb-area');
+  const total = summary?.total || 0;
+  const correct = summary?.correctQuestions || 0;
+  const rate = total > 0 ? Math.round(correct / total * 100) : 0;
+  area.innerHTML = `<div class="empty-state card">
+    <p>🎯 本番モード終了！<br>${correct} / ${total} 問 正解（${rate}%）</p>
+    <p class="exam-mode-note">※この結果は通常の学習記録（習得率・復習スケジュール・苦手肢リストなど）には反映されません。</p>
+    <button class="btn btn-primary" onclick="startSession()">もう一度</button>
+  </div>`;
+}
+
 function endSession(opts = {}) {
   const resumeEligible = !!session && session.resumeEligible !== false;
   const shouldKeepSnapshot = opts.keepSnapshot !== false && resumeEligible;
@@ -3381,10 +3540,13 @@ function renderCurrentLimb() {
   // セッション終了チェックを先に行い、終了時はDOM更新・スナップショット保存を行わない
   if (index >= queue.length) {
     const fromPage = session.fromPage || 'study';
+    const examSummary = session.examMode ? { correctQuestions: session.examCorrectQuestions || 0, total: queue.length } : null;
     endSession({ keepSnapshot: false });
     if (fromPage === 'stats') {
       showPage('stats');
       renderStats();
+    } else if (examSummary) {
+      showExamCompletionMessage(examSummary);
     } else {
       showCompletionMessage();
     }
@@ -3396,6 +3558,11 @@ function renderCurrentLimb() {
   const pct = ((index + 1) / queue.length * 100).toFixed(1);
   document.getElementById('progress-bar').style.width = pct + '%';
   saveStudySessionSnapshot();
+
+  if (session.examMode) {
+    renderExamQuestion();
+    return;
+  }
 
   const limb = queue[index];
   const rec  = getRecord(limb.id);
