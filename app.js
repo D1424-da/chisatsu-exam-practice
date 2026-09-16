@@ -155,6 +155,9 @@ const WEAK_LIST_DEFAULT_LIMIT = 50;
 /** 苦手肢リストの並び順。weak=苦手スコア順（デフォルト）, fewAnswers=回答数が少ない順 */
 const WEAK_LIST_SORTS = ['weak', 'fewAnswers'];
 const WEAK_LIST_DEFAULT_SORT = 'weak';
+/** 苦手肢リストのグループ表示。none=まとめない, question=同じ問題の肢をまとめる, topic=論点（キーワード）でまとめる */
+const WEAK_GROUP_MODES = ['none', 'question', 'topic'];
+const WEAK_GROUP_DEFAULT_MODE = 'none';
 
 function normalizeWeakListLimit(value) {
   const n = Number(value);
@@ -165,17 +168,24 @@ function normalizeWeakListSort(value) {
   return WEAK_LIST_SORTS.includes(value) ? value : WEAK_LIST_DEFAULT_SORT;
 }
 
+function normalizeWeakGroupMode(value) {
+  return WEAK_GROUP_MODES.includes(value) ? value : WEAK_GROUP_DEFAULT_MODE;
+}
+
 function getWeakListPref() {
   try {
     const raw = JSON.parse(storageGetItem(KEY_WEAK_LIST_PREF) || '{}');
+    // 旧バージョンは groupByQuestion:boolean を保存していた。groupMode が無ければそこから移行する。
+    const legacyGroupMode = raw.groupMode == null && raw.groupByQuestion ? 'question' : raw.groupMode;
     return {
       hideHighRate: !!raw.hideHighRate,
       threshold: [60, 70, 80, 90, 95].includes(Number(raw.threshold)) ? Number(raw.threshold) : 80,
       limit: normalizeWeakListLimit(raw.limit),
-      sort: normalizeWeakListSort(raw.sort)
+      sort: normalizeWeakListSort(raw.sort),
+      groupMode: normalizeWeakGroupMode(legacyGroupMode)
     };
   } catch {
-    return { hideHighRate: false, threshold: 80, limit: WEAK_LIST_DEFAULT_LIMIT, sort: WEAK_LIST_DEFAULT_SORT };
+    return { hideHighRate: false, threshold: 80, limit: WEAK_LIST_DEFAULT_LIMIT, sort: WEAK_LIST_DEFAULT_SORT, groupMode: WEAK_GROUP_DEFAULT_MODE };
   }
 }
 
@@ -184,9 +194,49 @@ function saveWeakListPref(pref) {
     hideHighRate: !!pref?.hideHighRate,
     threshold: [60, 70, 80, 90, 95].includes(Number(pref?.threshold)) ? Number(pref.threshold) : 80,
     limit: normalizeWeakListLimit(pref?.limit),
-    sort: normalizeWeakListSort(pref?.sort)
+    sort: normalizeWeakListSort(pref?.sort),
+    groupMode: normalizeWeakGroupMode(pref?.groupMode)
   };
   storageSetItem(KEY_WEAK_LIST_PREF, JSON.stringify(safe));
+}
+
+/**
+ * 苦手肢を「論点」でまとめるためのキーワード辞書。上から順に最初に一致した論点に割り当てる
+ * （固有・限定的なキーワードを先に、汎用的なキーワードを後に置くことで誤分類を減らす）。
+ * あくまで問題文・肢文の文言に基づく目安であり、法的に厳密な論点分類ではない。
+ */
+const WEAK_TOPIC_RULES = [
+  { key: '建物の合体・合併・分割の登記', keywords: ['合体', '建物の合併', '合併の登記', '分割の登記', '附属建物'] },
+  { key: '分筆・合筆（第三者の権利の取扱い）', keywords: ['分筆', '合筆'] },
+  { key: '登記記録等の保存期間', keywords: ['保存期間'] },
+  { key: '区分建物・敷地権の表示登記', keywords: ['区分建物', '区分所有', '敷地権', '共用部分'] },
+  { key: '筆界特定手続', keywords: ['筆界特定'] },
+  { key: '登記所の管轄・えい行移転', keywords: ['管轄登記所', 'えい行移転', '登記所の管轄'] },
+  { key: '地目の認定', keywords: ['地目'] },
+  { key: '建物の認定・床面積', keywords: ['建物の認定', '床面積', '開閉式'] },
+  { key: '図面・測量図（建物図面・各階平面図・地積測量図等）', keywords: ['建物図面', '各階平面図', '地積測量図', '地役権図面', '土地所在図'] },
+  { key: '代位による登記申請', keywords: ['代位'] },
+  { key: '登記識別情報', keywords: ['登記識別情報'] },
+  { key: '審査請求（登記官の処分・不作為への不服）', keywords: ['審査請求'] },
+  { key: '遺産分割・相続', keywords: ['遺産分割', '代襲相続', '相続人', '相続の承認', '相続の放棄'] },
+  { key: '意思表示（虚偽表示・詐欺・錯誤）', keywords: ['意思表示', '虚偽表示', '錯誤', '詐欺'] },
+  { key: '代理・無権代理', keywords: ['代理', '無権代理', '表見代理'] },
+  { key: '物権変動の対抗要件', keywords: ['対抗すること', '対抗要件', '物権変動'] },
+  { key: '時効（取得時効・消滅時効）', keywords: ['時効'] },
+  { key: '相隣関係', keywords: ['相隣関係', '囲繞地', '境界線'] },
+  { key: '土地家屋調査士名簿・登録・入会', keywords: ['名簿', '登録', '入会'] },
+  { key: '調査士法人の業務・社員の責任', keywords: ['調査士法人', '社員'] },
+  { key: '業務の受任制限・懲戒', keywords: ['懲戒', '受任', '利益相反'] },
+  { key: '添付情報・申請情報一般', keywords: ['添付情報', '申請情報'] },
+];
+const WEAK_TOPIC_OTHER = 'その他（未分類）';
+
+function classifyWeakTopic(limb) {
+  const text = `${limb.questionText || ''} ${limb.text || ''}`;
+  for (const rule of WEAK_TOPIC_RULES) {
+    if (rule.keywords.some(k => text.includes(k))) return rule.key;
+  }
+  return WEAK_TOPIC_OTHER;
 }
 
 function getRecordStorageKey(uid = getAuthUid()) {
@@ -4454,12 +4504,16 @@ function renderStats() {
   const weakThresholdEl = document.getElementById('weak-hide-threshold');
   const weakLimitEl = document.getElementById('weak-list-limit');
   const weakSortEl = document.getElementById('weak-list-sort');
+  const weakGroupModeEl = document.getElementById('weak-group-mode');
   const hideHighRate = !!weakHideHighRateEl?.checked;
   const threshold = [60, 70, 80, 90, 95].includes(Number(weakThresholdEl?.value))
     ? Number(weakThresholdEl.value)
     : 80;
   const weakLimit = normalizeWeakListLimit(weakLimitEl?.value);
   const weakSort = normalizeWeakListSort(weakSortEl?.value);
+  const weakGroupMode = normalizeWeakGroupMode(weakGroupModeEl?.value);
+  // グループ表示中は肢単位の並び順（weakSort）を使わないため、混乱を避けるため無効化する。
+  if (weakSortEl) weakSortEl.disabled = weakGroupMode !== 'none';
 
   const allLimbs = getAllLimbs('', '', true);
   let total = 0;
@@ -4553,31 +4607,13 @@ function renderStats() {
       if (t <= 0) return true;
       const rt = Math.round(r.correct / t * 100);
       return rt < threshold;
-    })
-    .sort((a, b) => {
-      if (weakSort === 'fewAnswers') {
-        const ra = getRecord(a.id);
-        const rb = getRecord(b.id);
-        const countDiff = (ra.correct + ra.wrong) - (rb.correct + rb.wrong);
-        if (countDiff !== 0) return countDiff;
-        return weakScore(rb) - weakScore(ra);
-      }
-      return weakScore(getRecord(b.id)) - weakScore(getRecord(a.id));
     });
-  // weakLimit が 0 のときは「すべて表示」
-  const weakSorted = weakLimit > 0 ? weakMatched.slice(0, weakLimit) : weakMatched;
 
   const weakTotalEl = document.getElementById('weak-limbs-total');
-  if (weakTotalEl) {
-    const filterNote = hideHighRate ? `（正答率 ${threshold}% 未満に絞り込み）` : '';
-    weakTotalEl.textContent = weakMatched.length === 0
-      ? `該当 0 件${filterNote}`
-      : weakMatched.length > weakSorted.length
-        ? `該当 ${weakMatched.length} 件中 上位 ${weakSorted.length} 件を表示${filterNote}`
-        : `該当 ${weakMatched.length} 件をすべて表示${filterNote}`;
-  }
+  const weakListEl = document.getElementById('weak-limbs-list');
 
-  const weakHtml = weakSorted.map((limb, i) => {
+  // 個々の肢の行HTML。フラット表示・問題ごとのグループ表示の両方から使う。
+  const renderWeakLimbRow = (limb, rank = null) => {
     const r = getRecord(limb.id);
     const t = r.correct + r.wrong;
     const rt = Math.round(r.correct / t * 100);
@@ -4602,14 +4638,110 @@ function renderStats() {
     }
     const ariaText = limbText.slice(0, 30).replace(/\s+/g, ' ').trim();
     return `<div class="weak-limb-row" data-limb-id="${esc(limb.id)}" role="button" tabindex="0" aria-label="${esc(`${limb.subject || ''}：${ariaText} を再挑戦`)}">
-      <span class="weak-rank">${i + 1}</span>
+      ${rank !== null ? `<span class="weak-rank">${rank}</span>` : ''}
       <div class="weak-limb-info">
         <div class="weak-limb-text">${textHtml}</div>
-        <div class="weak-limb-meta">${esc(limb.subject)}${limb.category ? ' / ' + esc(normalizeCategoryLabel(limb.category)) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${r.bookmarked ? ' / ★' : ''}${esc(wrongDateInfo)}</div>
+        <div class="weak-limb-meta">${limb.source ? esc(limb.source) + ' / ' : ''}${esc(limb.subject)}${limb.category ? ' / ' + esc(normalizeCategoryLabel(limb.category)) : ''}　 正答率 ${rt}% (${r.correct}○ ${r.wrong}×)${r.bookmarked ? ' / ★' : ''}${esc(wrongDateInfo)}</div>
       </div>
     </div>`;
-  }).join('');
-  document.getElementById('weak-limbs-list').innerHTML = weakHtml || '<p>苦手肢なし</p>';
+  };
+
+  // グループ表示（問題ごと／論点ごと）用の1グループぶんのカードHTML。
+  const renderWeakGroupCard = (rank, metaHtml, textExcerptHtml, statsLabel, limbs) => {
+    const sortedLimbs = [...limbs].sort((a, b) => weakScore(getRecord(b.id)) - weakScore(getRecord(a.id)));
+    const limbRowsHtml = sortedLimbs.map(limb => renderWeakLimbRow(limb)).join('');
+    return `<div class="weak-question-group">
+      <div class="weak-question-group-header">
+        <span class="weak-rank">${rank}</span>
+        <div class="weak-question-group-info">
+          <div class="weak-question-group-meta">${metaHtml}　<strong>${statsLabel}</strong></div>
+          ${textExcerptHtml ? `<div class="weak-question-group-text">${textExcerptHtml}</div>` : ''}
+        </div>
+      </div>
+      <div class="weak-question-group-limbs">${limbRowsHtml}</div>
+    </div>`;
+  };
+
+  if (weakGroupMode === 'question' || weakGroupMode === 'topic') {
+    const isTopic = weakGroupMode === 'topic';
+    // question: 同じ問題に属する未克服肢をまとめる（未克服肢数が多い問題＝濃度が高い問題を優先表示）。
+    // topic: キーワード辞書（WEAK_TOPIC_RULES）で問題文・肢文から論点を推定し、論点ごとにまとめる。
+    const groups = new Map();
+    for (const limb of weakMatched) {
+      const key = isTopic ? classifyWeakTopic(limb) : (limb.questionId || limb.id);
+      if (!groups.has(key)) {
+        groups.set(key, { key, subject: limb.subject, category: limb.category, source: limb.source, questionText: limb.questionText, limbs: [] });
+      }
+      groups.get(key).limbs.push(limb);
+    }
+    const questionLimbCountMap = isTopic ? null : new Map(questions.map(q => [q.id, Array.isArray(q.limbs) ? q.limbs.length : 0]));
+    let groupRows = [...groups.values()].map(g => {
+      const totalWrong = g.limbs.reduce((s, l) => s + getRecord(l.id).wrong, 0);
+      return { ...g, weakCount: g.limbs.length, totalWrong };
+    });
+    groupRows.sort((a, b) => {
+      // 論点表示では「その他（未分類）」は常に末尾に回す（キーワードに掛からなかった雑多な集まりのため）。
+      if (isTopic) {
+        if (a.key === WEAK_TOPIC_OTHER && b.key !== WEAK_TOPIC_OTHER) return 1;
+        if (b.key === WEAK_TOPIC_OTHER && a.key !== WEAK_TOPIC_OTHER) return -1;
+      }
+      return (b.weakCount - a.weakCount) || (b.totalWrong - a.totalWrong);
+    });
+    // weakLimit が 0 のときは「すべて表示」（グループ表示では件数＝グループ数に適用する）
+    const groupSorted = weakLimit > 0 ? groupRows.slice(0, weakLimit) : groupRows;
+    const unitLabel = isTopic ? '論点' : '問';
+
+    if (weakTotalEl) {
+      const filterNote = hideHighRate ? `（正答率 ${threshold}% 未満に絞り込み）` : '';
+      weakTotalEl.textContent = groupRows.length === 0
+        ? `該当 0 ${unitLabel}${filterNote}`
+        : groupRows.length > groupSorted.length
+          ? `該当 ${groupRows.length} ${unitLabel}（肢 ${weakMatched.length} 件）中 上位 ${groupSorted.length} ${unitLabel}を表示${filterNote}`
+          : `該当 ${groupRows.length} ${unitLabel}（肢 ${weakMatched.length} 件）をすべて表示${filterNote}`;
+    }
+
+    const groupHtml = groupSorted.map((g, gi) => {
+      if (isTopic) {
+        const metaHtml = `<span class="weak-topic-name">${esc(g.key)}</span>`;
+        const statsLabel = `未克服 ${g.weakCount}肢（wrong合計 ${g.totalWrong}）`;
+        return renderWeakGroupCard(gi + 1, metaHtml, '', statsLabel, g.limbs);
+      }
+      const totalLimbsInQuestion = questionLimbCountMap.get(g.key) || g.limbs.length;
+      const metaHtml = `${esc(g.subject || '')}${g.category ? ' / ' + esc(normalizeCategoryLabel(g.category)) : ''}${g.source ? ' / ' + esc(g.source) : ''}`;
+      const qTextRaw = g.questionText ? String(g.questionText) : '';
+      const qTextExcerpt = qTextRaw ? `${esc(qTextRaw.slice(0, 80))}${qTextRaw.length > 80 ? '…' : ''}` : '';
+      const statsLabel = `未克服 ${g.weakCount}/${totalLimbsInQuestion}肢（wrong合計 ${g.totalWrong}）`;
+      return renderWeakGroupCard(gi + 1, metaHtml, qTextExcerpt, statsLabel, g.limbs);
+    }).join('');
+    weakListEl.innerHTML = groupHtml || '<p>苦手肢なし</p>';
+    renderStudyGoalPanel();
+    return;
+  }
+
+  const weakSorted0 = [...weakMatched].sort((a, b) => {
+    if (weakSort === 'fewAnswers') {
+      const ra = getRecord(a.id);
+      const rb = getRecord(b.id);
+      const countDiff = (ra.correct + ra.wrong) - (rb.correct + rb.wrong);
+      if (countDiff !== 0) return countDiff;
+      return weakScore(rb) - weakScore(ra);
+    }
+    return weakScore(getRecord(b.id)) - weakScore(getRecord(a.id));
+  });
+  // weakLimit が 0 のときは「すべて表示」
+  const weakSorted = weakLimit > 0 ? weakSorted0.slice(0, weakLimit) : weakSorted0;
+
+  if (weakTotalEl) {
+    const filterNote = hideHighRate ? `（正答率 ${threshold}% 未満に絞り込み）` : '';
+    weakTotalEl.textContent = weakMatched.length === 0
+      ? `該当 0 件${filterNote}`
+      : weakMatched.length > weakSorted.length
+        ? `該当 ${weakMatched.length} 件中 上位 ${weakSorted.length} 件を表示${filterNote}`
+        : `該当 ${weakMatched.length} 件をすべて表示${filterNote}`;
+  }
+
+  const weakHtml = weakSorted.map((limb, i) => renderWeakLimbRow(limb, i + 1)).join('');
+  weakListEl.innerHTML = weakHtml || '<p>苦手肢なし</p>';
   renderStudyGoalPanel();
 }
 
@@ -4791,20 +4923,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const weakThresholdEl = document.getElementById('weak-hide-threshold');
   const weakLimitEl = document.getElementById('weak-list-limit');
   const weakSortEl = document.getElementById('weak-list-sort');
+  const weakGroupModeEl = document.getElementById('weak-group-mode');
   const weakListPref = getWeakListPref();
   if (weakHideHighRateEl) weakHideHighRateEl.checked = weakListPref.hideHighRate;
   if (weakThresholdEl) weakThresholdEl.value = String(weakListPref.threshold);
   if (weakLimitEl) weakLimitEl.value = String(weakListPref.limit);
   if (weakSortEl) weakSortEl.value = weakListPref.sort;
+  if (weakGroupModeEl) weakGroupModeEl.value = weakListPref.groupMode;
+  // グループ表示中は「並び順」（肢単位のソート）は使わないため、無効化して分かりやすくする。
+  if (weakSortEl) weakSortEl.disabled = weakListPref.groupMode !== 'none';
 
-  // 4つのコントロールは同じ設定オブジェクトを更新するため、保存処理を共通化する。
+  // 5つのコントロールは同じ設定オブジェクトを更新するため、保存処理を共通化する。
   const persistWeakListPref = () => {
     saveWeakListPref({
       hideHighRate: !!weakHideHighRateEl?.checked,
       threshold: Number(weakThresholdEl?.value || 80),
       limit: weakLimitEl?.value,
-      sort: weakSortEl?.value
+      sort: weakSortEl?.value,
+      groupMode: weakGroupModeEl?.value
     });
+    if (weakSortEl) weakSortEl.disabled = weakGroupModeEl?.value !== 'none';
     renderStats();
   };
 
@@ -4812,6 +4950,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (weakThresholdEl) weakThresholdEl.addEventListener('change', persistWeakListPref);
   if (weakLimitEl) weakLimitEl.addEventListener('change', persistWeakListPref);
   if (weakSortEl) weakSortEl.addEventListener('change', persistWeakListPref);
+  if (weakGroupModeEl) weakGroupModeEl.addEventListener('change', persistWeakListPref);
 
   // 学習ページ
   document.getElementById('btn-start').addEventListener('click', startSession);

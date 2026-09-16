@@ -896,6 +896,30 @@ body {
 .weak-limb-row:last-child { border-bottom: none; }
 .weak-rank { font-size: 1.1rem; font-weight: 800; color: var(--warn); min-width: 24px; }
 
+.weak-question-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 2px solid var(--border);
+}
+.weak-question-group:last-child { border-bottom: none; }
+.weak-question-group-header {
+  display: flex;
+  gap: 10px;
+}
+.weak-question-group-info { flex: 1; }
+.weak-question-group-meta { font-size: .85rem; }
+.weak-question-group-meta strong { color: var(--warn); }
+.weak-topic-name { font-weight: 700; font-size: .95rem; }
+.weak-question-group-text { font-size: .82rem; color: var(--text-muted); margin-top: 2px; }
+.weak-question-group-limbs {
+  margin-left: 34px;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+}
+.weak-question-group-limbs .weak-limb-row { padding: 6px 0; }
+
 .weak-filter-bar {
   display: flex;
   flex-wrap: wrap;
