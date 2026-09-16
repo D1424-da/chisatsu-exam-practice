@@ -403,6 +403,64 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     })).toBe(100);
   });
 
+  test('FEATURE: 苦手肢リストを回答数が少ない順に並び替えられ、設定が保存される', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof normalizeWeakListSort !== 'function') return null;
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'test-uid';
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: ['2026-01-01'],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      // 回答回数はバラバラ・苦手スコア順だと回答回数順にならないよう意図的にずらす
+      const specs = [
+        { id: 'L_many_wrong',  correct: 1,  wrong: 9 },  // 計10回・苦手スコアは高いが回答数も多い
+        { id: 'L_few_1',       correct: 0,  wrong: 1 },  // 計1回
+        { id: 'L_mid',         correct: 3,  wrong: 3 },  // 計6回
+        { id: 'L_few_2',       correct: 1,  wrong: 1 },  // 計2回
+      ];
+      records = {};
+      const limbs = specs.map(s => {
+        records[s.id] = mk(s.correct, s.wrong);
+        return { id: s.id, text: s.id, correct: true, explanation: '' };
+      });
+      questions = [{ id: 'q1', subject: 'S', limbs }];
+      document.getElementById('weak-hide-high-rate').checked = false;
+      document.getElementById('weak-list-limit').value = '0';
+
+      const sortEl = document.getElementById('weak-list-sort');
+      const idsInOrder = () => [...document.querySelectorAll('.weak-limb-row')].map(el => el.dataset.limbId);
+
+      sortEl.value = 'weak';
+      renderStats();
+      const weakOrder = idsInOrder();
+
+      sortEl.value = 'fewAnswers';
+      renderStats();
+      const fewAnswersOrder = idsInOrder();
+
+      window.getAuthUid = origGetAuthUid;
+      return { weakOrder, fewAnswersOrder, invalid: normalizeWeakListSort('bogus') };
+    });
+    if (result === null) test.skip();
+
+    // 苦手スコア順では、間違いの多い L_many_wrong が先頭に来る
+    expect(result.weakOrder[0]).toBe('L_many_wrong');
+    // 回答数が少ない順では、回答回数の昇順（1回→2回→6回→10回）になる
+    expect(result.fewAnswersOrder).toEqual(['L_few_1', 'L_few_2', 'L_mid', 'L_many_wrong']);
+    // 不正値はデフォルト（苦手順）に丸められる
+    expect(result.invalid).toBe('weak');
+
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.getElementById('weak-list-sort');
+      el.value = 'fewAnswers';
+      el.dispatchEvent(new Event('change'));
+      const saved = JSON.parse(localStorage.getItem('chisatsu_limb_weak_list_pref') || '{}');
+      return saved.sort ?? null;
+    })).toBe('fewAnswers');
+  });
+
   test('BUG-FIX: 回答時に全件スナップショットではなく変更した肢だけを送る', async ({ page }) => {
     const result = await page.evaluate(async () => {
       if (typeof queueRecordFieldsSync !== 'function' || typeof buildRecordFieldsPatch !== 'function') return null;
