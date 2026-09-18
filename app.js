@@ -172,10 +172,11 @@ function getWeakListPref() {
       hideHighRate: !!raw.hideHighRate,
       threshold: [60, 70, 80, 90, 95].includes(Number(raw.threshold)) ? Number(raw.threshold) : 80,
       limit: normalizeWeakListLimit(raw.limit),
-      sort: normalizeWeakListSort(raw.sort)
+      sort: normalizeWeakListSort(raw.sort),
+      neverCorrect: !!raw.neverCorrect
     };
   } catch {
-    return { hideHighRate: false, threshold: 80, limit: WEAK_LIST_DEFAULT_LIMIT, sort: WEAK_LIST_DEFAULT_SORT };
+    return { hideHighRate: false, threshold: 80, limit: WEAK_LIST_DEFAULT_LIMIT, sort: WEAK_LIST_DEFAULT_SORT, neverCorrect: false };
   }
 }
 
@@ -184,7 +185,8 @@ function saveWeakListPref(pref) {
     hideHighRate: !!pref?.hideHighRate,
     threshold: [60, 70, 80, 90, 95].includes(Number(pref?.threshold)) ? Number(pref.threshold) : 80,
     limit: normalizeWeakListLimit(pref?.limit),
-    sort: normalizeWeakListSort(pref?.sort)
+    sort: normalizeWeakListSort(pref?.sort),
+    neverCorrect: !!pref?.neverCorrect
   };
   storageSetItem(KEY_WEAK_LIST_PREF, JSON.stringify(safe));
 }
@@ -774,6 +776,12 @@ function isUnassessedLimb(limb) {
   const r = getEffectiveRecord(limb);
   if ((r.correct + r.wrong) <= 0) return false;   // 未回答は対象外
   return !isOutstandingWrong(r);                   // 未克服の誤答は「まちがえたもの」に任せる
+}
+
+/** 一度も正解していない肢か（回答はあるが正解が一度もない。文中〇×は各空欄を合算して判定する） */
+function isNeverCorrectLimb(limb) {
+  const r = getEffectiveRecord(limb);
+  return r.correct === 0 && r.wrong > 0;
 }
 
 /** 回答回数が相対的に少ない肢か（文中〇×は各空欄を合算した回数で判定する） */
@@ -3319,6 +3327,8 @@ function startSession() {
   } else if (mode === 'wrong') {
     limbs = limbs.filter(l => isOutstandingWrong(getEffectiveRecord(l)));
     limbs = shuffle(limbs);
+  } else if (mode === 'neverCorrect') {
+    limbs = shuffle(limbs.filter(l => isNeverCorrectLimb(l)));
   } else if (mode === 'bookmarked') {
     limbs = limbs.filter(l => !!getRecord(l.id).bookmarked);
     limbs = shuffle(limbs);
@@ -4454,12 +4464,14 @@ function renderStats() {
   const weakThresholdEl = document.getElementById('weak-hide-threshold');
   const weakLimitEl = document.getElementById('weak-list-limit');
   const weakSortEl = document.getElementById('weak-list-sort');
+  const weakNeverCorrectEl = document.getElementById('weak-never-correct');
   const hideHighRate = !!weakHideHighRateEl?.checked;
   const threshold = [60, 70, 80, 90, 95].includes(Number(weakThresholdEl?.value))
     ? Number(weakThresholdEl.value)
     : 80;
   const weakLimit = normalizeWeakListLimit(weakLimitEl?.value);
   const weakSort = normalizeWeakListSort(weakSortEl?.value);
+  const weakNeverCorrect = !!weakNeverCorrectEl?.checked;
 
   const allLimbs = getAllLimbs('', '', true);
   let total = 0;
@@ -4554,6 +4566,7 @@ function renderStats() {
       const rt = Math.round(r.correct / t * 100);
       return rt < threshold;
     })
+    .filter((l) => !weakNeverCorrect || getRecord(l.id).correct === 0)
     .sort((a, b) => {
       if (weakSort === 'fewAnswers') {
         const ra = getRecord(a.id);
@@ -4569,7 +4582,7 @@ function renderStats() {
 
   const weakTotalEl = document.getElementById('weak-limbs-total');
   if (weakTotalEl) {
-    const filterNote = hideHighRate ? `（正答率 ${threshold}% 未満に絞り込み）` : '';
+    const filterNote = (hideHighRate ? `（正答率 ${threshold}% 未満に絞り込み）` : '') + (weakNeverCorrect ? '（一度も正解していないもののみ）' : '');
     weakTotalEl.textContent = weakMatched.length === 0
       ? `該当 0 件${filterNote}`
       : weakMatched.length > weakSorted.length
@@ -4791,19 +4804,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const weakThresholdEl = document.getElementById('weak-hide-threshold');
   const weakLimitEl = document.getElementById('weak-list-limit');
   const weakSortEl = document.getElementById('weak-list-sort');
+  const weakNeverCorrectEl = document.getElementById('weak-never-correct');
   const weakListPref = getWeakListPref();
   if (weakHideHighRateEl) weakHideHighRateEl.checked = weakListPref.hideHighRate;
   if (weakThresholdEl) weakThresholdEl.value = String(weakListPref.threshold);
   if (weakLimitEl) weakLimitEl.value = String(weakListPref.limit);
   if (weakSortEl) weakSortEl.value = weakListPref.sort;
+  if (weakNeverCorrectEl) weakNeverCorrectEl.checked = weakListPref.neverCorrect;
 
-  // 4つのコントロールは同じ設定オブジェクトを更新するため、保存処理を共通化する。
+  // 5つのコントロールは同じ設定オブジェクトを更新するため、保存処理を共通化する。
   const persistWeakListPref = () => {
     saveWeakListPref({
       hideHighRate: !!weakHideHighRateEl?.checked,
       threshold: Number(weakThresholdEl?.value || 80),
       limit: weakLimitEl?.value,
-      sort: weakSortEl?.value
+      sort: weakSortEl?.value,
+      neverCorrect: !!weakNeverCorrectEl?.checked
     });
     renderStats();
   };
@@ -4812,6 +4828,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (weakThresholdEl) weakThresholdEl.addEventListener('change', persistWeakListPref);
   if (weakLimitEl) weakLimitEl.addEventListener('change', persistWeakListPref);
   if (weakSortEl) weakSortEl.addEventListener('change', persistWeakListPref);
+  if (weakNeverCorrectEl) weakNeverCorrectEl.addEventListener('change', persistWeakListPref);
 
   // 学習ページ
   document.getElementById('btn-start').addEventListener('click', startSession);
