@@ -461,6 +461,83 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     })).toBe('fewAnswers');
   });
 
+  test('FEATURE: 苦手肢リストで一度も正解していない肢だけに絞り込め、設定が保存される', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof renderStats !== 'function') return null;
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'test-uid';
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: ['2026-01-01'],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      records = {};
+      questions = [{ id: 'q1', subject: 'S', limbs: [
+        { id: 'L_never', text: '一度も正解なし', correct: true, explanation: '' },
+        { id: 'L_some', text: '正解したこともある', correct: true, explanation: '' },
+      ] }];
+      records['L_never'] = mk(0, 3); // 一度も正解していない
+      records['L_some'] = mk(2, 1);  // 正解したことがある
+
+      document.getElementById('weak-hide-high-rate').checked = false;
+      document.getElementById('weak-list-limit').value = '0';
+      document.getElementById('weak-never-correct').checked = false;
+      renderStats();
+      const off = document.querySelectorAll('.weak-limb-row').length;
+
+      document.getElementById('weak-never-correct').checked = true;
+      renderStats();
+      const onIds = [...document.querySelectorAll('.weak-limb-row')].map(el => el.dataset.limbId);
+      const totalText = document.getElementById('weak-limbs-total').textContent;
+
+      window.getAuthUid = origGetAuthUid;
+      return { off, onIds, totalText };
+    });
+    if (result === null) test.skip();
+
+    // オフでは両方（2件）表示される
+    expect(result.off).toBe(2);
+    // オンでは一度も正解していない L_never だけに絞り込まれる
+    expect(result.onIds).toEqual(['L_never']);
+    expect(result.totalText).toContain('一度も正解していない');
+
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.getElementById('weak-never-correct');
+      el.checked = true;
+      el.dispatchEvent(new Event('change'));
+      const saved = JSON.parse(localStorage.getItem('chisatsu_limb_weak_list_pref') || '{}');
+      return saved.neverCorrect ?? null;
+    })).toBe(true);
+  });
+
+  test('FEATURE: filter-mode=neverCorrect で一度も正解していない肢だけを出題する', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof startSession !== 'function' || typeof isNeverCorrectLimb !== 'function') return null;
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: [],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      records = {};
+      questions = [{ id: 'q1', subject: 'S', limbs: [
+        { id: 'L_never', text: '一度も正解なし', correct: true, explanation: '' },
+        { id: 'L_some', text: '正解したこともある', correct: true, explanation: '' },
+        { id: 'L_unanswered', text: '未回答', correct: true, explanation: '' },
+      ] }];
+      records['L_never'] = mk(0, 2);
+      records['L_some'] = mk(1, 1);
+      // L_unanswered は無回答（レコードなし）
+
+      document.getElementById('filter-mode').value = 'neverCorrect';
+      startSession();
+      const ids = session ? session.queue.map(l => l.id) : null;
+      return { ids };
+    });
+    if (result === null) test.skip();
+    // 一度も正解していない L_never だけがキューに入る（未回答・正解経験ありは除外）
+    expect(result.ids).toEqual(['L_never']);
+  });
+
   test('BUG-FIX: 回答時に全件スナップショットではなく変更した肢だけを送る', async ({ page }) => {
     const result = await page.evaluate(async () => {
       if (typeof queueRecordFieldsSync !== 'function' || typeof buildRecordFieldsPatch !== 'function') return null;
