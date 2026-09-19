@@ -538,6 +538,83 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.ids).toEqual(['L_never']);
   });
 
+  test('FEATURE: 苦手肢リストで正答率50%以下の肢だけに絞り込め、設定が保存される', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof renderStats !== 'function') return null;
+      const origGetAuthUid = window.getAuthUid;
+      window.getAuthUid = () => 'test-uid';
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: ['2026-01-01'],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      records = {};
+      questions = [{ id: 'q1', subject: 'S', limbs: [
+        { id: 'L_50', text: '正答率ちょうど50%', correct: true, explanation: '' },
+        { id: 'L_60', text: '正答率60%', correct: true, explanation: '' },
+      ] }];
+      records['L_50'] = mk(1, 1); // 50%
+      records['L_60'] = mk(3, 2); // 60%
+
+      document.getElementById('weak-hide-high-rate').checked = false;
+      document.getElementById('weak-never-correct').checked = false;
+      document.getElementById('weak-list-limit').value = '0';
+      document.getElementById('weak-low-accuracy').checked = false;
+      renderStats();
+      const off = document.querySelectorAll('.weak-limb-row').length;
+
+      document.getElementById('weak-low-accuracy').checked = true;
+      renderStats();
+      const onIds = [...document.querySelectorAll('.weak-limb-row')].map(el => el.dataset.limbId);
+      const totalText = document.getElementById('weak-limbs-total').textContent;
+
+      window.getAuthUid = origGetAuthUid;
+      return { off, onIds, totalText };
+    });
+    if (result === null) test.skip();
+
+    expect(result.off).toBe(2);
+    // 50%ちょうどは「以下」に含まれ、60%は除外される
+    expect(result.onIds).toEqual(['L_50']);
+    expect(result.totalText).toContain('正答率50%以下');
+
+    await expect.poll(() => page.evaluate(() => {
+      const el = document.getElementById('weak-low-accuracy');
+      el.checked = true;
+      el.dispatchEvent(new Event('change'));
+      const saved = JSON.parse(localStorage.getItem('chisatsu_limb_weak_list_pref') || '{}');
+      return saved.lowAccuracy ?? null;
+    })).toBe(true);
+  });
+
+  test('FEATURE: filter-mode=lowAccuracy で正答率50%以下の肢だけを出題する', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof startSession !== 'function' || typeof isLowAccuracyLimb !== 'function') return null;
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: [],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      records = {};
+      questions = [{ id: 'q1', subject: 'S', limbs: [
+        { id: 'L_50', text: '正答率50%', correct: true, explanation: '' },
+        { id: 'L_60', text: '正答率60%', correct: true, explanation: '' },
+        { id: 'L_unanswered', text: '未回答', correct: true, explanation: '' },
+      ] }];
+      records['L_50'] = mk(1, 1);
+      records['L_60'] = mk(3, 2);
+      // L_unanswered は無回答（レコードなし）
+
+      document.getElementById('filter-mode').value = 'lowAccuracy';
+      startSession();
+      const ids = session ? session.queue.map(l => l.id) : null;
+      return { ids };
+    });
+    if (result === null) test.skip();
+    // 正答率50%以下の L_50 だけがキューに入る（60%・未回答は除外）
+    expect(result.ids).toEqual(['L_50']);
+  });
+
   test('BUG-FIX: 回答時に全件スナップショットではなく変更した肢だけを送る', async ({ page }) => {
     const result = await page.evaluate(async () => {
       if (typeof queueRecordFieldsSync !== 'function' || typeof buildRecordFieldsPatch !== 'function') return null;
