@@ -306,6 +306,47 @@ test.describe('回帰テスト: 全自動改善対応の確認', () => {
     expect(result.label).toContain('回以下');
   });
 
+  test('BUG-FIX: 絞り込み後の母数が小さいと「回答数が少ない」が答えても減らなくなる', async ({ page }) => {
+    const result = await page.evaluate(() => {
+      if (typeof computeFewAnswersInfo !== 'function') return null;
+      const mk = (c, w) => ({
+        correct: c, wrong: w, wrongDateKeys: [],
+        review: { intervalDays: 1, streak: 0, ease: 2, lastAnsweredAtMs: 1, dueAtMs: 0 },
+        mastery: '', masteryUpdatedAtMs: 1, note: '', bookmarked: false
+      });
+      // 実際の不具合報告を再現: 年度・科目で絞った結果55肢しかない状況
+      records = {};
+      const limbs = [];
+      let idx = 0;
+      const tierPlan = [[1, 10], [2, 10], [3, 10], [4, 10], [5, 10], [7, 5]];
+      for (const [count, n] of tierPlan) {
+        for (let i = 0; i < n; i++) {
+          const id = `L${idx++}`;
+          limbs.push({ id, text: id, correct: true, explanation: '' });
+          if (count > 0) records[id] = mk(count, 0);
+        }
+      }
+      const before = computeFewAnswersInfo(limbs);
+      const countOf = (info, l) => info.effMap.get(l).correct + info.effMap.get(l).wrong;
+      const fewBefore = limbs.filter(l => before.cutoff >= 0 && countOf(before, l) <= before.cutoff).length;
+
+      // ちょうどしきい値の回数だった1肢に正解を1つ加え、しきい値を超えさせる（＝実際に学習した状態）
+      const target = limbs.find(l => countOf(before, l) === before.cutoff);
+      records[target.id] = mk(before.cutoff + 1, 0);
+
+      const after = computeFewAnswersInfo(limbs);
+      const fewAfter = limbs.filter(l => after.cutoff >= 0 && countOf(after, l) <= after.cutoff).length;
+
+      return { total: limbs.length, fewBefore, fewAfter };
+    });
+    if (result === null) test.skip();
+
+    // 修正前は55肢中50肢（9割以上）が対象になり、1肢学習しても表示件数が全く減らなかった。
+    // 絞り込み後の母数の半分を上限にすることで、少なくとも2割以上は対象外の余地が残る。
+    expect(result.fewBefore).toBeLessThan(result.total - 10);
+    expect(result.fewAfter).toBeLessThan(result.fewBefore);
+  });
+
   test('FEATURE: 苦手肢リストが正答率フィルター適用後の総数を表示する', async ({ page }) => {
     const result = await page.evaluate(() => {
       if (typeof renderStats !== 'function') return null;

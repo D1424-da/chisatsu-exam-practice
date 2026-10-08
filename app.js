@@ -739,6 +739,12 @@ const MASTERED_STREAK_MIN = 1;
  * - 全肢の回答回数が同じなら該当0件（偏りが無い＝やることが無い）
  *   ただし全肢が未回答なら、絶対的に少ないので全件を対象とする
  * - 最多グループは「遅れている」とは言えないので含めない
+ *
+ * 目安件数（FEW_ANSWERS_TARGET）は絞り込み後の肢数に対して相対的に小さいとは限らない。
+ * 例えば年度・科目で絞った結果が55肢しかない場合、目安50は母数の9割を超えるため、
+ * 1肢答えてしきい値を超えても「まだ50に足りない」としきい値を自動的に広げ直してしまい、
+ * 表示件数がいつまでも減らないように見えるバグになる。絞り込み後の肢数の半分を上限に
+ * 目安件数をスケールダウンし、常に半分以上は「対象外」の余地を残すことでこれを防ぐ。
  */
 function computeFewAnswersInfo(limbs) {
   const effMap = new Map();
@@ -758,9 +764,10 @@ function computeFewAnswersInfo(limbs) {
     return { effMap, cutoff: maxCount === 0 ? 0 : -1 };
   }
 
+  const target = Math.min(FEW_ANSWERS_TARGET, Math.ceil(limbs.length / 2));
   let cutoff = tiers[0];
   let acc = tierSize.get(tiers[0]);
-  for (let i = 1; i < tiers.length && acc < FEW_ANSWERS_TARGET; i++) {
+  for (let i = 1; i < tiers.length && acc < target; i++) {
     if (tiers[i] === maxCount) break;
     cutoff = tiers[i];
     acc += tierSize.get(tiers[i]);
